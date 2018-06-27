@@ -17,7 +17,6 @@ package images
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -68,7 +67,7 @@ func findLayers(imageID, path string, layerSet map[string]bool) (*LayerJSON, []*
 		return nil, nil, err
 	}
 
-	layers := make([]*LayerJSON, len(layerSet))
+	layers := make([]*LayerJSON, len(images[0].Layers))
 	for i, f := range images[0].Layers {
 		basename := path + "/" + f
 		sum, err := utils.Sha256sum(basename)
@@ -100,8 +99,7 @@ func findLayers(imageID, path string, layerSet map[string]bool) (*LayerJSON, []*
 				return nil, nil, err
 			}
 		}
-		layers = append(layers, layerJSON)
-		fmt.Println(layers)
+		layers[i] = layerJSON
 	}
 
 	return configJSON, layers, nil
