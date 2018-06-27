@@ -16,13 +16,12 @@ package images
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"strings"
 
+	"github.com/Senetas/crypto-cli/registry"
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
 	tarinator "github.com/verybluebot/tarinator-go"
@@ -81,12 +80,10 @@ func PushImage(imageID string) error {
 
 	manifest := assembleManifest(configData, layerData)
 
-	json, err := json.MarshalIndent(manifest, "", "    ")
+	_, err = registry.PutManifest("narthanaepa1", "narthanaepa1/my-alpine", "crypto", manifest)
 	if err != nil {
 		return err
 	}
-
-	fmt.Println(string(json))
 
 	os.RemoveAll(path + imgName)
 

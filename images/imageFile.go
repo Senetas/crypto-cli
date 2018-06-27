@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/Senetas/crypto-cli/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
@@ -30,8 +31,8 @@ type localImageManifest struct {
 
 const saltBase = "com.senetas.crypto/"
 
-func assembleManifest(config *LayerJSON, layers []*LayerJSON) *ImageManifestJSON {
-	return &ImageManifestJSON{
+func assembleManifest(config *types.LayerJSON, layers []*types.LayerJSON) *types.ImageManifestJSON {
+	return &types.ImageManifestJSON{
 		SchemaVersion: 2,
 		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
 		Config:        config,
@@ -40,7 +41,7 @@ func assembleManifest(config *LayerJSON, layers []*LayerJSON) *ImageManifestJSON
 
 // find the layer files that correpond to the digests we want to encrypt
 // TODO: find a way to do this by interfacing with the daemon directly
-func findLayers(imageID, path string, layerSet map[string]bool) (*LayerJSON, []*LayerJSON, error) {
+func findLayers(imageID, path string, layerSet map[string]bool) (*types.LayerJSON, []*types.LayerJSON, error) {
 	dat, err := ioutil.ReadFile(path + "/manifest.json")
 	if err != nil {
 		return nil, nil, err
@@ -62,12 +63,12 @@ func findLayers(imageID, path string, layerSet map[string]bool) (*LayerJSON, []*
 	}
 
 	salt := saltBase + imageID + "/config"
-	config, err := NewLayerJSON(filename, digest, size, key, "hunter2", salt)
+	config, err := types.NewLayerJSON(filename, digest, size, key, "hunter2", salt)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	layers := make([]*LayerJSON, len(images[0].Layers))
+	layers := make([]*types.LayerJSON, len(images[0].Layers))
 	for i, f := range images[0].Layers {
 		basename := path + "/" + f
 		sum, err := utils.Sha256sum(basename)
@@ -76,7 +77,7 @@ func findLayers(imageID, path string, layerSet map[string]bool) (*LayerJSON, []*
 		}
 
 		l := "sha256:" + sum
-		var layerJSON *LayerJSON
+		var layerJSON *types.LayerJSON
 		if layerSet[l] {
 			filename, digest, size, key, err := encryptLayer(basename)
 			if err != nil {
@@ -84,7 +85,7 @@ func findLayers(imageID, path string, layerSet map[string]bool) (*LayerJSON, []*
 			}
 
 			salt := saltBase + imageID + "/layer" + string(i)
-			layerJSON, err = NewLayerJSON(filename, digest, size, key, "hunter2", salt)
+			layerJSON, err = types.NewLayerJSON(filename, digest, size, key, "hunter2", salt)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -94,7 +95,7 @@ func findLayers(imageID, path string, layerSet map[string]bool) (*LayerJSON, []*
 				return nil, nil, err
 			}
 
-			layerJSON, err = NewPlainLayerJSON(basename, l, stats.Size())
+			layerJSON, err = types.NewPlainLayerJSON(basename, l, stats.Size())
 			if err != nil {
 				return nil, nil, err
 			}

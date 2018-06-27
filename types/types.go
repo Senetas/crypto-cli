@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package images
+package types
 
 import (
 	"crypto/aes"
@@ -105,7 +105,7 @@ func enckey(plaintext []byte, pass, salt string) ([]byte, error) {
 
 	ciphertext := aesgcm.Seal(nil, nonce, plaintext, bsalt)
 
-	return Concat([][]byte{nonce, ciphertext}), nil
+	return utils.Concat([][]byte{nonce, ciphertext}), nil
 }
 
 // NewCryptoJSON creates a new CryptoJSON struct by encrypting a plaintext key with a passphrase and salt
