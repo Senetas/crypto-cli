@@ -90,3 +90,6 @@ $RECYCLE.BIN/
 
 ### KDE Plasma ###
 .directory
+
+### go run ###
+crypto-cli
