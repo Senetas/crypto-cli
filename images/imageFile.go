@@ -62,7 +62,7 @@ func findLayers(imageID, path string, layerSet map[string]bool) (*LayerJSON, []*
 	}
 
 	salt := saltBase + imageID + "/config"
-	configJSON, err := NewLayerJSON(filename, digest, size, key, "hunter2", salt)
+	config, err := NewLayerJSON(filename, digest, size, key, "hunter2", salt)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -102,7 +102,7 @@ func findLayers(imageID, path string, layerSet map[string]bool) (*LayerJSON, []*
 		layers[i] = layerJSON
 	}
 
-	return configJSON, layers, nil
+	return config, layers, nil
 }
 
 func encryptLayer(filename string) (string, string, int64, []byte, error) {
