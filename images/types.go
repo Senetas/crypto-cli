@@ -105,21 +105,7 @@ func enckey(plaintext []byte, pass, salt string) ([]byte, error) {
 
 	ciphertext := aesgcm.Seal(nil, nonce, plaintext, bsalt)
 
-	return concat([][]byte{nonce, ciphertext}), nil
-}
-
-func concat(slices [][]byte) []byte {
-	var l int
-	for _, s := range slices {
-		l += len(s)
-	}
-
-	out := make([]byte, l)
-	var i int
-	for _, s := range slices {
-		i += copy(out[i:], s)
-	}
-	return out
+	return Concat([][]byte{nonce, ciphertext}), nil
 }
 
 // NewCryptoJSON creates a new CryptoJSON struct by encrypting a plaintext key with a passphrase and salt
