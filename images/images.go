@@ -17,14 +17,18 @@ package images
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"log"
 	"os"
 	"strings"
 
-	"github.com/Senetas/crypto-cli/registry"
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
 	tarinator "github.com/verybluebot/tarinator-go"
+
+	"github.com/Senetas/crypto-cli/registry"
+	"github.com/Senetas/crypto-cli/utils"
 )
 
 const labelString = "LABEL com.senetas.crypto.enabled=true"
@@ -49,15 +53,20 @@ func PushImage(imageID string) error {
 	if err != nil {
 		return err
 	}
-	defer outFile.Close()
+	defer utils.CheckedClose(outFile)
 
 	if _, err = io.Copy(outFile, img); err != nil {
 		return err
 	}
-	outFile.Sync()
+
+	if err = outFile.Sync(); err != nil {
+		return err
+	}
 
 	go func() {
-		img.Close()
+		if err := img.Close(); err != nil {
+			log.Println(err)
+		}
 	}()
 
 	if err = tarinator.UnTarinate(path+imgName, imgFile); err != nil {
@@ -65,7 +74,9 @@ func PushImage(imageID string) error {
 	}
 
 	go func() {
-		os.Remove(imgFile)
+		if err := os.Remove(imgFile); err != nil {
+			log.Println(err)
+		}
 	}()
 
 	layerSet := make(map[string]bool)
@@ -78,14 +89,45 @@ func PushImage(imageID string) error {
 		return err
 	}
 
-	manifest := assembleManifest(configData, layerData)
+	user := "narthanaepa1"
+	repo := "narthanaepa1/my-alpine"
+	tag := "crypto"
 
-	_, err = registry.PutManifest("narthanaepa1", "narthanaepa1/my-alpine", "crypto", manifest)
+	service := "registry.docker.io"
+	authServer := "auth.docker.io"
+
+	authToken, err := registry.AuthToken()
 	if err != nil {
 		return err
 	}
 
-	os.RemoveAll(path + imgName)
+	token, err := registry.Authenticate(user, service, repo, authServer, authToken)
+
+	manifest := assembleManifest(configData, layerData)
+
+	mdigest, err := registry.PushManifest(user, repo, tag, token, manifest)
+	if err != nil {
+		return err
+	}
+
+	fmt.Print("Successfully uploaded manifest with digest: ")
+	fmt.Println(mdigest)
+
+	if err = registry.PushLayer(user, repo, tag, token, configData); err != nil {
+		return err
+	}
+
+	for _, l := range layerData {
+		if err = registry.PushLayer(user, repo, tag, token, l); err != nil {
+			return err
+		}
+	}
+
+	fmt.Println("Layers and config uploaded successfully")
+
+	if err = os.RemoveAll(path + imgName); err != nil {
+		return err
+	}
 
 	return nil
 }

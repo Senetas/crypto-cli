@@ -18,26 +18,20 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	//"net/http/httputil"
 	"net/url"
+	"os"
+	"strconv"
 
 	"github.com/Senetas/crypto-cli/types"
+	"github.com/Senetas/crypto-cli/utils"
 )
 
-// PutManifest puts a manifest on the registry
-func PutManifest(user, repo, tag string, manifest *types.ImageManifestJSON) (string, error) {
-	authToken, err := AuthToken()
-	if err != nil {
-		return "", err
-	}
-
-	token, err := Authenticate(user, "registry.docker.io", repo, "auth.docker.io", authToken)
-	if err != nil {
-		return "", err
-	}
-
-	digest, err := putManifest("registry-1.docker.io", "v2", repo, tag, token, manifest)
+// PushManifest puts a manifest on the registry
+func PushManifest(user, repo, tag, token string, manifest *types.ImageManifestJSON) (string, error) {
+	digest, err := pushManifest("registry-1.docker.io", "v2", repo, tag, token, manifest)
 	if err != nil {
 		return "", err
 	}
@@ -45,7 +39,7 @@ func PutManifest(user, repo, tag string, manifest *types.ImageManifestJSON) (str
 	return digest, nil
 }
 
-func putManifest(regAddr, regPath, repo, tag, token string, manifest *types.ImageManifestJSON) (string, error) {
+func pushManifest(regAddr, regPath, repo, tag, token string, manifest *types.ImageManifestJSON) (string, error) {
 	manifestJSON, err := json.MarshalIndent(manifest, "", "\t")
 	if err != nil {
 		return "", err
@@ -85,4 +79,102 @@ func putManifest(regAddr, regPath, repo, tag, token string, manifest *types.Imag
 	resp.Body.Close()
 
 	return resp.Header.Get("Docker-Content-Digest"), nil
+}
+
+// PushLayer pushes a layer to the registry, checking if it exists
+func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err error) {
+	layerExists, err := checkLayer(user, repo, token, layerData.Digest)
+	if err != nil {
+		return err
+	}
+
+	if layerExists {
+		fmt.Println("Layer " + layerData.Digest + " exists")
+		return nil
+	}
+
+	u := url.URL{
+		Scheme: "https",
+		Host:   "registry-1.docker.io",
+		Path:   "v2/" + repo + "/blobs/uploads/"}
+	q := url.Values{}
+	q.Add("digest", layerData.Digest)
+
+	rawQ, err := url.QueryUnescape(q.Encode())
+	if err != nil {
+		return err
+	}
+	u.RawQuery = rawQ
+
+	layerFile, err := os.Open(layerData.Filename)
+	if err != nil {
+		return err
+	}
+
+	stat, err := layerFile.Stat()
+	if err != nil {
+		return err
+	}
+
+	client := &http.Client{}
+	req, err := http.NewRequest("POST", u.String(), layerFile)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Add("Authorization", "Bearer "+token)
+	req.Header.Add("Content-Length", strconv.FormatInt(stat.Size(), 10))
+	req.Header.Add("Content-Type", "application/octect-stream")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = utils.CheckedClose(resp.Body)
+	}()
+
+	//dump, err := httputil.DumpResponse(resp, true)
+	//if err != nil {
+	//return err
+	//}
+	//fmt.Println(string(dump))
+
+	if resp.StatusCode == http.StatusAccepted {
+		return nil
+	}
+
+	return errors.New("upload of layer " + layerData.Digest + " failed")
+}
+
+func checkLayer(user, repo, token, digest string) (b bool, err error) {
+	u := url.URL{
+		Scheme: "https",
+		Host:   "registry-1.docker.io",
+		Path:   "v2/" + repo + "/" + "blobs" + "/" + digest}
+
+	client := &http.Client{}
+	req, err := http.NewRequest("HEAD", u.String(), nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Add("Authorization", "Bearer "+token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		b = false
+		err = utils.CheckedClose(resp.Body)
+	}()
+
+	//dump, err := httputil.DumpRequestOut(req, true)
+	//if err != nil {
+	//return false, err
+	//}
+	//fmt.Println(string(dump))
+
+	return resp.StatusCode == http.StatusOK, nil
 }

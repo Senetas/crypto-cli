@@ -48,7 +48,7 @@ type LayerJSON struct {
 	ContentType string      `json:"mediaType"`
 	Size        int64       `json:"size"`
 	Digest      string      `json:"digest"`
-	filename    string
+	Filename    string      `json:"-"`
 }
 
 // CryptoJSON is the go type backing a crypto object in a manifest
@@ -125,7 +125,7 @@ func newPlainLayerJSON(filename, digest string, size int64) (*LayerJSON, error) 
 	layer := &LayerJSON{
 		Size:     size,
 		Digest:   digest,
-		filename: filename}
+		Filename: filename}
 
 	return layer, nil
 }
