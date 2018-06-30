@@ -15,9 +15,9 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
+
+	"github.com/Senetas/crypto-cli/images"
 )
 
 // pullCmd represents the pull command
@@ -31,7 +31,9 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("pull called")
+		if err := images.PullImage(args[0]); err != nil {
+			panic(err)
+		}
 	},
 }
 

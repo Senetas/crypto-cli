@@ -12,16 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package utils
+package images_test
 
 import (
-	"io"
+	"os"
+	"testing"
+
+	"github.com/Senetas/crypto-cli/images"
 )
 
-// CheckedClose may be called on defer to properly close a resouce and log any errors
-func CheckedClose(c io.Closer) error {
-	if err := c.Close(); err != nil {
-		return err
+func TestEncDecImage(t *testing.T) {
+	imgName, manifest, err := images.EncryptImage("narthanaepa1/my-alpine:test")
+	if err != nil {
+		t.Error(err)
 	}
-	return nil
+
+	dir := os.TempDir()
+	path := dir + "/com.senetas.crypto/" + imgName
+
+	t.Log(path)
+	t.Log(manifest.Config.Crypto)
+
+	if err = images.DecryptImage(manifest); err != nil {
+		t.Errorf("%v\ne = %s", err, manifest.Config.Crypto)
+	}
 }

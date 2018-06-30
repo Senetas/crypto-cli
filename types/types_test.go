@@ -12,16 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package utils
+package types_test
 
 import (
-	"io"
+	"reflect"
+	"testing"
+
+	"github.com/Senetas/crypto-cli/crypto"
+	"github.com/Senetas/crypto-cli/types"
 )
 
-// CheckedClose may be called on defer to properly close a resouce and log any errors
-func CheckedClose(c io.Closer) error {
-	if err := c.Close(); err != nil {
-		return err
+func TestCrypto(t *testing.T) {
+	plaintext := []byte("Hello my name a Borat!")
+	c := &types.CryptoJSON{
+		CryptoType: crypto.PassPBKDF2AESGCM,
+		DecKey:     plaintext}
+
+	if err := c.Encrypt("hunter2", "saltysaltysaltysalty"); err != nil {
+		t.Error(err)
 	}
-	return nil
+
+	// make a copy
+	d := c
+
+	if err := d.Decrypt("hunter2", "saltysaltysaltysalty"); err != nil {
+		t.Error(err)
+	}
+
+	if !reflect.DeepEqual(c, d) {
+		t.Errorf("inversion failed, c = %s, d = %s", c, d)
+	}
 }

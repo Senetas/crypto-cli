@@ -24,27 +24,13 @@ import (
 	"github.com/docker/docker/cli/config"
 )
 
-// AuthToken queries the server for a auth token using the default login data
-func AuthToken() (string, error) {
-	dat, err := ioutil.ReadFile(config.Dir() + "/config.json")
+// Authenticate against the given server, returning the bearer token
+func Authenticate(user, service, repo, authServer string) (string, error) {
+	authToken, err := localAuthToken()
 	if err != nil {
 		return "", err
 	}
 
-	var config map[string]interface{}
-	if err = json.Unmarshal(dat, &config); err != nil {
-		return "", nil
-	}
-
-	for _, v := range config["auths"].(map[string]interface{}) {
-		return (v.(map[string]interface{})["auth"]).(string), nil
-	}
-
-	return "", errors.New("No Authentication Token was found. Try to run \"docker login\"")
-}
-
-// Authenticate against the give server, returning the bearer token
-func Authenticate(user, service, repo, authServer, authToken string) (string, error) {
 	u := url.URL{
 		Scheme: "https",
 		Host:   authServer,
@@ -88,4 +74,22 @@ func Authenticate(user, service, repo, authServer, authToken string) (string, er
 	json.Unmarshal(body, &bodyJSON)
 
 	return bodyJSON["token"].(string), nil
+}
+
+func localAuthToken() (string, error) {
+	dat, err := ioutil.ReadFile(config.Dir() + "/config.json")
+	if err != nil {
+		return "", err
+	}
+
+	var config map[string]interface{}
+	if err = json.Unmarshal(dat, &config); err != nil {
+		return "", nil
+	}
+
+	for _, v := range config["auths"].(map[string]interface{}) {
+		return (v.(map[string]interface{})["auth"]).(string), nil
+	}
+
+	return "", errors.New("No Authentication Token was found. Try to run \"docker login\"")
 }

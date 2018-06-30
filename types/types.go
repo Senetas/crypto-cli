@@ -15,23 +15,10 @@
 package types
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 
-	"github.com/Senetas/crypto-cli/utils"
-)
-
-// EncAlgo represents the collection of algorithms used for encryption and authentication
-type EncAlgo string
-
-const (
-	// None represents an identity encryption function
-	None EncAlgo = "NONE"
-	// PassPBKDF2AESGCM represents encryption with AES-GCM with a key derived
-	// from a passphrase using PBKDF2
-	PassPBKDF2AESGCM EncAlgo = "PASS_PBKDF2_AES_GCM"
+	"github.com/Senetas/crypto-cli/crypto"
 )
 
 // ImageManifestJSON represents a docker image manifest schema v2.2
@@ -53,131 +40,81 @@ type LayerJSON struct {
 
 // CryptoJSON is the go type backing a crypto object in a manifest
 type CryptoJSON struct {
-	CryptoType EncAlgo `json:"cryptoType"`
-	Key        string  `json:"key"`
+	CryptoType crypto.EncAlgo `json:"cryptoType"`
+	EncKey     string         `json:"key"`
+	DecKey     []byte         `json:"-"`
 }
 
-func deckey(ciphertext []byte, pass, salt string) ([]byte, error) {
-	nonce := ciphertext[:12]
-	ckey := ciphertext[13:]
-
-	bsalt := []byte(salt)
-
-	key := utils.PassSalt2Key(pass, bsalt)
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-
-	aesgcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-
-	plaintext, err := aesgcm.Open(nil, nonce, ckey, bsalt)
-	if err != nil {
-		return nil, err
-	}
-
-	return plaintext, nil
+// DeCryptoData stores the decrypted data keys after decrypting a crypto object
+type DeCryptoData struct {
+	CryptoType crypto.EncAlgo
+	Key        []byte
 }
 
-func enckey(plaintext []byte, pass, salt string) ([]byte, error) {
-	bsalt := []byte(salt)
-
-	key := utils.PassSalt2Key(pass, bsalt)
-
-	block, err := aes.NewCipher(key)
+// Encrypt creates a new CryptoJSON struct by encrypting a plaintext key with a passphrase and salt
+func (c *CryptoJSON) Encrypt(pass, salt string) error {
+	ciphertextKey, err := crypto.Enckey(c.DecKey, pass, salt)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	nonce := make([]byte, 12)
-	if _, err := rand.Read(nonce); err != nil {
-		return nil, err
-	}
+	fmt.Println("start")
+	fmt.Println(ciphertextKey)
+	fmt.Println("end")
+	c.EncKey = base64.URLEncoding.EncodeToString(ciphertextKey)
 
-	aesgcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-
-	ciphertext := aesgcm.Seal(nil, nonce, plaintext, bsalt)
-
-	return utils.Concat([][]byte{nonce, ciphertext}), nil
+	return nil
 }
 
-// NewCryptoJSON creates a new CryptoJSON struct by encrypting a plaintext key with a passphrase and salt
-func newCryptoJSON(plaintextKey []byte, pass, salt string, cryptoType EncAlgo) (*CryptoJSON, error) {
-	ciphertextKey, err := enckey(plaintextKey, pass, salt)
+// Decrypt is the inverse function of Encrypt (up to error, types etc)
+func (c *CryptoJSON) Decrypt(pass, salt string) error {
+	decoded, err := base64.URLEncoding.DecodeString(c.EncKey)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	crypto := &CryptoJSON{
-		CryptoType: cryptoType,
-		Key:        base64.URLEncoding.EncodeToString(ciphertextKey)}
+	fmt.Println(decoded)
 
-	return crypto, nil
+	c.DecKey, err = crypto.Deckey(decoded, pass, salt)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func newPlainLayerJSON(filename, digest string, size int64) (*LayerJSON, error) {
+func newPlainLayerJSON(filename, digest string, size int64) *LayerJSON {
 	layer := &LayerJSON{
 		Size:     size,
 		Digest:   digest,
 		Filename: filename}
-
-	return layer, nil
+	return layer
 }
 
-func newLayerJSON(filename, digest string, size int64, plaintextKey []byte, pass, salt string) (*LayerJSON, error) {
-	layer, err := newPlainLayerJSON(filename, digest, size)
-	if err != nil {
-		return nil, err
-	}
-
-	crypto, err := newCryptoJSON(plaintextKey, pass, salt, PassPBKDF2AESGCM)
-	if err != nil {
-		return nil, err
-	}
-
-	layer.Crypto = crypto
-
-	return layer, nil
+func newLayerJSON(filename, digest string, size int64, plaintextKey []byte) *LayerJSON {
+	layer := newPlainLayerJSON(filename, digest, size)
+	layer.Crypto = &CryptoJSON{
+		CryptoType: crypto.PassPBKDF2AESGCM,
+		DecKey:     plaintextKey}
+	return layer
 }
 
 // NewConfigJSON creates a new LayerJSON for a config layer
-func NewConfigJSON(filename, digest string, size int64, plaintextKey []byte, pass, salt string) (*LayerJSON, error) {
-	layer, err := newLayerJSON(filename, digest, size, plaintextKey, pass, salt)
-	if err != nil {
-		return nil, err
-	}
-
+func NewConfigJSON(filename, digest string, size int64, plaintextKey []byte) *LayerJSON {
+	layer := newLayerJSON(filename, digest, size, plaintextKey)
 	layer.ContentType = "application/vnd.docker.container.image.v1+json"
-
-	return layer, nil
+	return layer
 }
 
 // NewLayerJSON creates a new LayerJSON for a data layer
-func NewLayerJSON(filename, digest string, size int64, plaintextKey []byte, pass, salt string) (*LayerJSON, error) {
-	layer, err := newLayerJSON(filename, digest, size, plaintextKey, pass, salt)
-	if err != nil {
-		return nil, err
-	}
-
+func NewLayerJSON(filename, digest string, size int64, plaintextKey []byte) *LayerJSON {
+	layer := newLayerJSON(filename, digest, size, plaintextKey)
 	layer.ContentType = "application/vnd.docker.image.rootfs.diff.tar.gzip"
-
-	return layer, nil
+	return layer
 }
 
 // NewPlainLayerJSON creates a new LayerJSON for an unencrypted data layer
-func NewPlainLayerJSON(filename, digest string, size int64) (*LayerJSON, error) {
-	layer, err := newPlainLayerJSON(filename, digest, size)
-	if err != nil {
-		return nil, err
-	}
-
+func NewPlainLayerJSON(filename, digest string, size int64) *LayerJSON {
+	layer := newPlainLayerJSON(filename, digest, size)
 	layer.ContentType = "application/vnd.docker.image.rootfs.diff.tar.gzip"
-
-	return layer, nil
+	return layer
 }

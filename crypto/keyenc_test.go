@@ -12,16 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package utils
+package crypto_test
 
 import (
-	"io"
+	"bytes"
+	"testing"
+
+	"github.com/Senetas/crypto-cli/crypto"
 )
 
-// CheckedClose may be called on defer to properly close a resouce and log any errors
-func CheckedClose(c io.Closer) error {
-	if err := c.Close(); err != nil {
-		return err
+func TestKey(t *testing.T) {
+	plaintext := []byte("Hello")
+	salt := "com.senetas.crypto/narthanaepa1:test/config"
+	ciphertext, err := crypto.Enckey([]byte(plaintext), "hunter2", salt)
+	if err != nil {
+		panic(err)
 	}
-	return nil
+
+	plaintext1, err := crypto.Deckey(ciphertext, "hunter2", salt)
+	if err != nil {
+		panic(err)
+	}
+
+	if !bytes.Equal(plaintext, plaintext1) {
+		t.Errorf("plaintext %s was encrypted to %v which decrypted to %s", plaintext, ciphertext, plaintext1)
+	}
 }

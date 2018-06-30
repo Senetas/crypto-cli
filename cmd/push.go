@@ -15,8 +15,9 @@
 package cmd
 
 import (
-	"github.com/Senetas/crypto-cli/images"
 	"github.com/spf13/cobra"
+
+	"github.com/Senetas/crypto-cli/images"
 )
 
 // pushCmd represents the push command

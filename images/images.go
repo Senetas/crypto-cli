@@ -15,52 +15,74 @@
 package images
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os"
-	"strings"
 
-	"github.com/docker/docker/client"
 	"github.com/google/uuid"
+	digest "github.com/opencontainers/go-digest"
 	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/registry"
+	"github.com/Senetas/crypto-cli/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
 const labelString = "LABEL com.senetas.crypto.enabled=true"
 
-// PushImage encrypts then pushes an image
-func PushImage(imageID string) error {
-	layers, img, err := obtainImageData(imageID)
+const (
+	user       = "narthanaepa1"
+	repo       = "narthanaepa1/my-alpine"
+	tag        = "crypto"
+	service    = "registry.docker.io"
+	authServer = "auth.docker.io"
+	saltBase   = "com.senetas.crypto/" + repo + "/" + tag
+	configSalt = saltBase + "/config"
+	layerSalt  = saltBase + "/layer%d"
+)
+
+var path = os.TempDir() + "/com.senetas.crypto/"
+
+func assembleManifest(config *types.LayerJSON, layers []*types.LayerJSON) *types.ImageManifestJSON {
+	return &types.ImageManifestJSON{
+		SchemaVersion: 2,
+		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+		Config:        config,
+		Layers:        layers}
+}
+
+func EncryptImage(repotag string) (string, *types.ImageManifestJSON, error) {
+	layers, img, err := getImgTarLayers(repotag)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
+	defer func() {
+		err = utils.CheckedClose(img)
+	}()
 
 	// output image
 	imgName := uuid.New().String()
-	path := os.TempDir() + "/com.senetas.crypto/"
 	imgFile := path + imgName + ".tar"
 
 	if err = os.MkdirAll(path+imgName, 0755); err != nil {
-		return err
+		return "", nil, err
 	}
 
 	outFile, err := os.Create(imgFile)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
-	defer utils.CheckedClose(outFile)
+	defer func() {
+		err = utils.CheckedClose(outFile)
+	}()
 
 	if _, err = io.Copy(outFile, img); err != nil {
-		return err
+		return "", nil, err
 	}
 
 	if err = outFile.Sync(); err != nil {
-		return err
+		return "", nil, err
 	}
 
 	go func() {
@@ -70,7 +92,7 @@ func PushImage(imageID string) error {
 	}()
 
 	if err = tarinator.UnTarinate(path+imgName, imgFile); err != nil {
-		return err
+		return "", nil, err
 	}
 
 	go func() {
@@ -84,47 +106,54 @@ func PushImage(imageID string) error {
 		layerSet[x] = true
 	}
 
-	configData, layerData, err := findLayers(imageID, path+imgName, layerSet)
+	configData, layerData, err := findLayers(repotag, path+imgName, layerSet)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
-
-	user := "narthanaepa1"
-	repo := "narthanaepa1/my-alpine"
-	tag := "crypto"
-
-	service := "registry.docker.io"
-	authServer := "auth.docker.io"
-
-	authToken, err := registry.AuthToken()
-	if err != nil {
-		return err
-	}
-
-	token, err := registry.Authenticate(user, service, repo, authServer, authToken)
 
 	manifest := assembleManifest(configData, layerData)
 
-	mdigest, err := registry.PushManifest(user, repo, tag, token, manifest)
+	pass := "hunter2"
+	if err = manifest.Config.Crypto.Encrypt(pass, configSalt); err != nil {
+		return "", nil, err
+	}
+
+	for i, l := range manifest.Layers {
+		salt := fmt.Sprintf(layerSalt, i)
+		if l.Crypto != nil {
+			if err = l.Crypto.Encrypt(pass, salt); err != nil {
+				return "", nil, err
+			}
+		}
+	}
+
+	return imgName, manifest, nil
+}
+
+func DecryptImage(manifest *types.ImageManifestJSON) error {
+	pass := "hunter2"
+	salt := saltBase + repo + "/" + tag + "/config"
+	fmt.Println(salt)
+	// decrypt config
+	if err := manifest.Config.Crypto.Decrypt(pass, salt); err != nil {
+		return err
+	}
+	return nil
+}
+
+// PushImage encrypts then pushes an image
+func PushImage(repotag string) (err error) {
+	imgName, mainfest, err := EncryptImage(repotag)
 	if err != nil {
 		return err
 	}
 
-	fmt.Print("Successfully uploaded manifest with digest: ")
-	fmt.Println(mdigest)
-
-	if err = registry.PushLayer(user, repo, tag, token, configData); err != nil {
+	// Upload to registry
+	if err = registry.PushImage(user, repo, tag, service, authServer, mainfest); err != nil {
 		return err
 	}
 
-	for _, l := range layerData {
-		if err = registry.PushLayer(user, repo, tag, token, l); err != nil {
-			return err
-		}
-	}
-
-	fmt.Println("Layers and config uploaded successfully")
-
+	// cleanup temporary files
 	if err = os.RemoveAll(path + imgName); err != nil {
 		return err
 	}
@@ -132,63 +161,33 @@ func PushImage(imageID string) error {
 	return nil
 }
 
-func obtainImageData(imageID string) ([]string, io.ReadCloser, error) {
-	ctx := context.Background()
-
-	// TODO: fix hardcoded version/ check if necessary
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
+// PullImage pulls an image from the registry
+func PullImage(repotag string) (err error) {
+	token, err := registry.Authenticate(user, service, repo, authServer)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	// get the history
-	hist, err := cli.ImageHistory(ctx, imageID)
+	manifest, err := registry.PullManifest(user, repo, tag, token)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	// obtain the most recent two complete images
-	ids := []string{hist[0].ID}
-
-	// advance pointer to history entry for LABEL "com.senetas.crypto.enabled=true"
-	i := 0
-	for ; i < len(hist) && !strings.Contains(hist[i].CreatedBy, labelString); i++ {
+	fmt.Printf("Obtaining config: %s\n", manifest.Config.Digest)
+	d := digest.Digest(manifest.Config.Digest)
+	manifest.Config.Filename, err = registry.PullFromDigest(user, repo, token, &d)
+	if err != nil {
+		return err
 	}
-	if i >= len(hist)-1 {
-		return nil, nil, errors.New("no " + labelString + " in Dockerfile")
-	}
-	ids = append(ids, hist[i+1].ID)
 
-	// map the layers of the two tags, since one tag was based on the other,
-	// the layers of the lower tag should be duplicates of the upper one
-	layerMap := make(map[string]int)
-	for _, x := range ids {
-		inspt, _, err := cli.ImageInspectWithRaw(ctx, x)
+	fmt.Println("Obtaining layers")
+	for _, l := range manifest.Layers {
+		d := digest.Digest(l.Digest)
+		l.Filename, err = registry.PullFromDigest(user, repo, token, &d)
 		if err != nil {
-			return nil, nil, err
-		}
-
-		for _, x := range inspt.RootFS.Layers {
-			layerMap[x]++
+			return err
 		}
 	}
 
-	layers := []string{}
-	for k, v := range layerMap {
-		if v == 1 {
-			layers = append(layers, k)
-		}
-	}
-
-	inspt, _, err := cli.ImageInspectWithRaw(ctx, imageID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	img, err := cli.ImageSave(ctx, []string{inspt.ID})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return layers, img, nil
+	return nil
 }
