@@ -15,15 +15,19 @@
 package images
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/google/uuid"
 	digest "github.com/opencontainers/go-digest"
 	tarinator "github.com/verybluebot/tarinator-go"
 
+	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/registry"
 	"github.com/Senetas/crypto-cli/types"
 	"github.com/Senetas/crypto-cli/utils"
@@ -52,17 +56,17 @@ func assembleManifest(config *types.LayerJSON, layers []*types.LayerJSON) *types
 		Layers:        layers}
 }
 
-func EncryptImage(repotag string) (string, *types.ImageManifestJSON, error) {
+func EncryptImage(repotag string) (imgName string, manifest *types.ImageManifestJSON, err error) {
 	layers, img, err := getImgTarLayers(repotag)
 	if err != nil {
 		return "", nil, err
 	}
 	defer func() {
-		err = utils.CheckedClose(img)
+		err = utils.CheckedClose(img, err)
 	}()
 
 	// output image
-	imgName := uuid.New().String()
+	imgName = uuid.New().String()
 	imgFile := path + imgName + ".tar"
 
 	if err = os.MkdirAll(path+imgName, 0755); err != nil {
@@ -74,7 +78,7 @@ func EncryptImage(repotag string) (string, *types.ImageManifestJSON, error) {
 		return "", nil, err
 	}
 	defer func() {
-		err = utils.CheckedClose(outFile)
+		err = utils.CheckedClose(outFile, err)
 	}()
 
 	if _, err = io.Copy(outFile, img); err != nil {
@@ -111,7 +115,7 @@ func EncryptImage(repotag string) (string, *types.ImageManifestJSON, error) {
 		return "", nil, err
 	}
 
-	manifest := assembleManifest(configData, layerData)
+	manifest = assembleManifest(configData, layerData)
 
 	pass := "hunter2"
 	if err = manifest.Config.Crypto.Encrypt(pass, configSalt); err != nil {
@@ -130,26 +134,126 @@ func EncryptImage(repotag string) (string, *types.ImageManifestJSON, error) {
 	return imgName, manifest, nil
 }
 
-func DecryptImage(manifest *types.ImageManifestJSON) error {
+func DecryptImage(manifest *types.ImageManifestJSON) (tarball string, err error) {
 	pass := "hunter2"
-	salt := saltBase + repo + "/" + tag + "/config"
-	fmt.Println(salt)
-	// decrypt config
+	salt := configSalt
+
+	// decrypt config key
 	if err := manifest.Config.Crypto.Decrypt(pass, salt); err != nil {
-		return err
+		return "", err
 	}
-	return nil
+
+	// decrypt config file
+	if err := crypto.DecFile(manifest.Config.Filename, manifest.Config.Filename+".dec", manifest.Config.Crypto.DecKey); err != nil {
+		return "", err
+	}
+
+	// decompress config file
+	d, err := utils.Decompress(manifest.Config.Filename + ".dec")
+	if err != nil {
+		return "", err
+	}
+
+	dir := filepath.Dir(manifest.Config.Filename)
+	newDir := filepath.Join(dir, "new")
+	os.MkdirAll(newDir, 0755)
+
+	if err = os.Rename(manifest.Config.Filename+".dec.dec", filepath.Join(newDir, d.Hex()+".json")); err != nil {
+		return "", err
+	}
+
+	am := &types.ArchiveManifest{
+		Config:   d.Hex() + ".json",
+		RepoTags: []string{repo + ":" + tag},
+		Layers:   make([]string, len(manifest.Layers))}
+
+	for i, l := range manifest.Layers {
+		if l.Crypto != nil {
+			salt := fmt.Sprintf(layerSalt, i)
+			if err := l.Crypto.Decrypt(pass, salt); err != nil {
+				return "", err
+			}
+		}
+
+		layerfilename := l.Filename
+
+		// decrypt layer file
+		if l.Crypto != nil {
+			layerfilename = l.Filename + ".dec"
+			if err := crypto.DecFile(l.Filename, layerfilename, l.Crypto.DecKey); err != nil {
+				return "", err
+			}
+		}
+
+		// decompress layer file
+		d, err := utils.Decompress(layerfilename)
+		if err != nil {
+			return "", err
+		}
+
+		layerfilename = layerfilename + ".dec"
+		layernewname := filepath.Join(newDir, d.Hex()+".tar")
+
+		if err = os.Rename(layerfilename, layernewname); err != nil {
+			return "", err
+		}
+
+		am.Layers[i] = d.Hex() + ".tar"
+	}
+
+	amJSON, err := json.Marshal(am)
+	if err != nil {
+		return "", err
+	}
+
+	amr := bytes.NewReader(amJSON)
+	amFH, err := os.Create(filepath.Join(newDir, "manifest.json"))
+	if err != nil {
+		return "", err
+	}
+
+	if _, err = io.Copy(amFH, amr); err != nil {
+		return "", err
+	}
+
+	files, err := filepath.Glob(filepath.Join(newDir, "*"))
+	if err != nil {
+		return "", err
+	}
+
+	tarball = filepath.Join(dir, "new.tar")
+	if err = tarinator.Tarinate(files, tarball); err != nil {
+		return "", err
+	}
+
+	return tarball, nil
 }
+
+//func scanlChainID(diffIDs []layer.DiffID) []layer.ChainID {
+//return scanlChainIDRec(make([]layer.ChainID, 0), diffIDs)
+//}
+
+//func scanlChainIDRec(ancestors []layer.ChainID, diffIDs []layer.DiffID) []layer.ChainID {
+//if len(diffIDs) == 0 {
+//return ancestors
+//}
+//if len(ancestors) == 0 {
+//return scanlChainIDRec([]layer.ChainID{layer.ChainID(diffIDs[0])}, diffIDs[1:])
+//}
+//newParent := layer.ChainID(digest.FromBytes([]byte(string(ancestors[len(ancestors)-1]) + " " + string(diffIDs[0]))))
+//newAncestors := append(ancestors, newParent)
+//return scanlChainIDRec(newAncestors, diffIDs[1:])
+//}
 
 // PushImage encrypts then pushes an image
 func PushImage(repotag string) (err error) {
-	imgName, mainfest, err := EncryptImage(repotag)
+	imgName, manifest, err := EncryptImage(repotag)
 	if err != nil {
 		return err
 	}
 
 	// Upload to registry
-	if err = registry.PushImage(user, repo, tag, service, authServer, mainfest); err != nil {
+	if err = registry.PushImage(user, repo, tag, service, authServer, manifest); err != nil {
 		return err
 	}
 
@@ -187,6 +291,10 @@ func PullImage(repotag string) (err error) {
 		if err != nil {
 			return err
 		}
+	}
+
+	if err := DecryptImage(manifest); err != nil {
+		return nil
 	}
 
 	return nil

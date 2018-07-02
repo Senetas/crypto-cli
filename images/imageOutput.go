@@ -18,9 +18,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"strings"
 
 	"github.com/docker/docker/client"
@@ -140,15 +140,33 @@ func findLayers(repo, path string, layerSet map[string]bool) (*types.LayerJSON, 
 			}
 			layers[i] = types.NewLayerJSON(filename, digest, size, key)
 		} else {
-			stats, err := os.Stat(basename)
+			filename, digest, size, _, err := compressLayer(basename)
+			fmt.Println(size)
+			fmt.Println(filename)
 			if err != nil {
 				return nil, nil, err
 			}
-			layers[i] = types.NewPlainLayerJSON(basename, l, stats.Size())
+			layers[i] = types.NewPlainLayerJSON(filename, digest, size)
 		}
 	}
 
 	return config, layers, nil
+}
+
+func compressLayer(filename string) (compFile string, dg string, size int64, key []byte, err error) {
+	compFile = filename + ".gz"
+
+	if err := utils.Compress(filename); err != nil {
+		return "", "", 0, nil, err
+	}
+
+	sum, err := crypto.Sha256sum(compFile)
+	if err != nil {
+		return "", "", 0, nil, err
+	}
+	dg = "sha256:" + sum
+
+	return compFile, dg, size, key, nil
 }
 
 func encryptLayer(filename string) (encFile string, dg string, size int64, key []byte, err error) {
@@ -165,13 +183,9 @@ func encryptLayer(filename string) (encFile string, dg string, size int64, key [
 	}
 
 	sum, err := crypto.Sha256sum(encFile)
-	encFH, err := os.Open(encFile)
 	if err != nil {
 		return "", "", 0, nil, err
 	}
-	defer func() {
-		err = utils.CheckedClose(encFH)
-	}()
 	dg = "sha256:" + sum
 
 	return encFile, dg, size, key, nil

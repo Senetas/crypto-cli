@@ -15,13 +15,34 @@
 package utils
 
 import (
+	"errors"
 	"io"
 )
 
 // CheckedClose may be called on defer to properly close a resouce and log any errors
-func CheckedClose(c io.Closer) error {
-	if err := c.Close(); err != nil {
-		return err
+func CheckedClose(c io.Closer, err error) error {
+	if err2 := c.Close(); err2 != nil {
+		return CombineErr([]error{err, err2})
 	}
 	return nil
+}
+
+// CombineErr concatenates errors
+func CombineErr(es []error) error {
+	if len(es) == 0 {
+		return nil
+	}
+	var i int
+	var outStr string
+	for i = 0; i < len(es) && es[i] == nil; i++ {
+	}
+	if i < len(es) {
+		outStr = es[i].Error()
+	}
+	for ; i < len(es); i++ {
+		if es[i] != nil {
+			outStr = outStr + "\n" + es[i].Error()
+		}
+	}
+	return errors.New(outStr)
 }

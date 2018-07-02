@@ -132,7 +132,7 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 		return err
 	}
 	defer func() {
-		err = utils.CheckedClose(resp.Body)
+		err = utils.CheckedClose(resp.Body, err)
 	}()
 
 	//dump, err := httputil.DumpResponse(resp, true)
@@ -168,7 +168,7 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 		return err
 	}
 	defer func() {
-		err = utils.CheckedClose(layerFH)
+		err = utils.CheckedClose(layerFH, err)
 	}()
 
 	stat, err := layerFH.Stat()
@@ -190,7 +190,7 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 		return err
 	}
 	defer func() {
-		err = utils.CheckedClose(resp.Body)
+		err = utils.CheckedClose(resp.Body, err)
 	}()
 
 	//dump, err = httputil.DumpResponse(resp, true)
@@ -226,7 +226,7 @@ func checkLayer(user, repo, token, digest string) (b bool, err error) {
 	}
 	defer func() {
 		b = false
-		err = utils.CheckedClose(resp.Body)
+		err = utils.CheckedClose(resp.Body, err)
 	}()
 
 	//dump, err := httputil.DumpRequestOut(req, true)

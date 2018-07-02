@@ -14,7 +14,12 @@
 
 package main
 
-import "github.com/Senetas/crypto-cli/cmd"
+import (
+	_ "crypto/sha256"
+	_ "crypto/sha512"
+
+	"github.com/Senetas/crypto-cli/cmd"
+)
 
 func main() {
 	cmd.Execute()

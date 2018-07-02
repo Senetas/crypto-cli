@@ -136,7 +136,7 @@ func PullFromDigest(user, repo, token string, d *digest.Digest) (fn string, err 
 		return "", err
 	}
 	defer func() {
-		err = utils.CheckedClose(fh)
+		err = utils.CheckedClose(fh, err)
 	}()
 
 	pr, pw := io.Pipe()
@@ -185,20 +185,7 @@ func quitUnVerified(fn string, fh *os.File, err error) (string, error) {
 	_ = fh.Close()
 	err2 := errors.New("could not verify digest")
 	if err3 := os.Remove(fn); err3 != nil {
-		return "", combineErr([]error{err, err2, err3})
+		return "", utils.CombineErr([]error{err, err2, err3})
 	}
 	return "", err
-}
-
-func combineErr(es []error) error {
-	if len(es) == 0 {
-		return nil
-	}
-	outStr := es[0].Error()
-	for _, s := range es[1:] {
-		if s != nil {
-			outStr = outStr + "\n" + s.Error()
-		}
-	}
-	return errors.New(outStr)
 }

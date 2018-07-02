@@ -24,7 +24,6 @@ import (
 	"github.com/udhos/equalfile"
 
 	"github.com/Senetas/crypto-cli/crypto"
-	"github.com/Senetas/crypto-cli/utils"
 )
 
 func TestFile(t *testing.T) {
@@ -37,7 +36,7 @@ func TestFile(t *testing.T) {
 		t.Errorf("Could not read random data into file")
 	}
 
-	if err = utils.CheckedClose(fh); err != nil {
+	if err = fh.Close(); err != nil {
 		t.Logf(err.Error())
 	}
 

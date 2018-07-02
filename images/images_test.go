@@ -36,4 +36,8 @@ func TestEncDecImage(t *testing.T) {
 	if err = images.DecryptImage(manifest); err != nil {
 		t.Errorf("%v\ne = %s", err, manifest.Config.Crypto)
 	}
+
+	//if err = os.RemoveAll(path); err != nil {
+	//t.Log(err)
+	//}
 }

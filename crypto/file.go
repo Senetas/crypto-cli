@@ -29,12 +29,14 @@ import (
 )
 
 // Sha256sum calculates the sha256 incrementally, returns a string
-func Sha256sum(file string) (string, error) {
+func Sha256sum(file string) (s string, err error) {
 	f, err := os.Open(file)
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() {
+		err = utils.CheckedClose(f, err)
+	}()
 
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
@@ -61,7 +63,7 @@ func EncFile(infile, outfile string) (key []byte, d digest.Digest, size int64, e
 		return nil, "", 0, err
 	}
 	defer func() {
-		err = utils.CheckedClose(inFH)
+		err = utils.CheckedClose(inFH, err)
 	}()
 
 	outFH, err := os.Create(outfile)
@@ -69,7 +71,7 @@ func EncFile(infile, outfile string) (key []byte, d digest.Digest, size int64, e
 		return nil, "", 0, err
 	}
 	defer func() {
-		err = utils.CheckedClose(outFH)
+		err = utils.CheckedClose(outFH, err)
 	}()
 
 	cfg := sio.Config{
@@ -89,13 +91,13 @@ func EncFile(infile, outfile string) (key []byte, d digest.Digest, size int64, e
 
 // DecFile decrypts (and authenticates) infile and writes it to outfile
 // only persists if the decrypttion and authentication suceedes
-func DecFile(infile, outfile string, datakey []byte) error {
+func DecFile(infile, outfile string, datakey []byte) (err error) {
 	inFH, err := os.Open(infile)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		err = utils.CheckedClose(inFH)
+		err = utils.CheckedClose(inFH, err)
 	}()
 
 	outFH, err := os.Create(outfile)
@@ -103,7 +105,7 @@ func DecFile(infile, outfile string, datakey []byte) error {
 		return err
 	}
 	defer func() {
-		err = utils.CheckedClose(outFH)
+		err = utils.CheckedClose(outFH, err)
 	}()
 
 	cfg := sio.Config{

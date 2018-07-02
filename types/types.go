@@ -21,6 +21,14 @@ import (
 	"github.com/Senetas/crypto-cli/crypto"
 )
 
+// ArchiveManifest represents the json manifest in an image archive
+// such as that produced by docker save
+type ArchiveManifest struct {
+	Config   string
+	RepoTags []string
+	Layers   []string
+}
+
 // ImageManifestJSON represents a docker image manifest schema v2.2
 type ImageManifestJSON struct {
 	SchemaVersion int          `json:"schemaVersion"`
