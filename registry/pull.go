@@ -130,6 +130,10 @@ func PullFromDigest(user, repo, token string, d *digest.Digest) (fn string, err 
 
 	dir := os.TempDir() + "/com.senetas.crypto"
 
+	if err = os.MkdirAll(dir, 0755); err != nil {
+		return "", err
+	}
+
 	fn = dir + "/" + d.Encoded()
 	fh, err := os.Create(fn)
 	if err != nil {

@@ -143,6 +143,11 @@ func DecryptImage(manifest *types.ImageManifestJSON) (tarball string, err error)
 		return "", err
 	}
 
+	dir := filepath.Dir(manifest.Config.Filename)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", err
+	}
+
 	// decrypt config file
 	if err := crypto.DecFile(manifest.Config.Filename, manifest.Config.Filename+".dec", manifest.Config.Crypto.DecKey); err != nil {
 		return "", err
@@ -154,9 +159,10 @@ func DecryptImage(manifest *types.ImageManifestJSON) (tarball string, err error)
 		return "", err
 	}
 
-	dir := filepath.Dir(manifest.Config.Filename)
 	newDir := filepath.Join(dir, "new")
-	os.MkdirAll(newDir, 0755)
+	if err := os.MkdirAll(newDir, 0755); err != nil {
+		return "", err
+	}
 
 	if err = os.Rename(manifest.Config.Filename+".dec.dec", filepath.Join(newDir, d.Hex()+".json")); err != nil {
 		return "", err
