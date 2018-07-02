@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -141,8 +140,6 @@ func findLayers(repo, path string, layerSet map[string]bool) (*types.LayerJSON, 
 			layers[i] = types.NewLayerJSON(filename, digest, size, key)
 		} else {
 			filename, digest, size, _, err := compressLayer(basename)
-			fmt.Println(size)
-			fmt.Println(filename)
 			if err != nil {
 				return nil, nil, err
 			}

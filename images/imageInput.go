@@ -15,6 +15,31 @@
 package images
 
 import (
-//"github.com/docker/docker/layer"
-//"github.com/opencontainers/go-digest"
+	"context"
+	"os"
+
+	"github.com/docker/docker/client"
 )
+
+func importImage(tarball string) error {
+	ctx := context.Background()
+
+	// TODO: fix hardcoded version/ check if necessary
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
+	if err != nil {
+		return err
+	}
+
+	fh, err := os.Open(tarball)
+	if err != nil {
+		return err
+	}
+
+	resp, err := cli.ImageLoad(ctx, fh, false)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+
+	return nil
+}

@@ -16,7 +16,6 @@ package types
 
 import (
 	"encoding/base64"
-	"fmt"
 
 	"github.com/Senetas/crypto-cli/crypto"
 )
@@ -66,9 +65,6 @@ func (c *CryptoJSON) Encrypt(pass, salt string) error {
 		return err
 	}
 
-	fmt.Println("start")
-	fmt.Println(ciphertextKey)
-	fmt.Println("end")
 	c.EncKey = base64.URLEncoding.EncodeToString(ciphertextKey)
 
 	return nil
@@ -80,7 +76,6 @@ func (c *CryptoJSON) Decrypt(pass, salt string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(decoded)
 
 	c.DecKey, err = crypto.Deckey(decoded, pass, salt)
 	if err != nil {

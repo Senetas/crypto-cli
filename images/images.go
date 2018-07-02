@@ -201,7 +201,7 @@ func DecryptImage(manifest *types.ImageManifestJSON) (tarball string, err error)
 		am.Layers[i] = d.Hex() + ".tar"
 	}
 
-	amJSON, err := json.Marshal(am)
+	amJSON, err := json.Marshal([]*types.ArchiveManifest{am})
 	if err != nil {
 		return "", err
 	}
@@ -293,8 +293,18 @@ func PullImage(repotag string) (err error) {
 		}
 	}
 
-	if err := DecryptImage(manifest); err != nil {
-		return nil
+	tarball, err := DecryptImage(manifest)
+	if err != nil {
+		return err
+	}
+
+	if err = importImage(tarball); err != nil {
+		return err
+	}
+
+	// cleanup temporary files
+	if err = os.RemoveAll(path); err != nil {
+		return err
 	}
 
 	return nil
