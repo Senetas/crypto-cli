@@ -39,11 +39,9 @@ const labelString = "LABEL com.senetas.crypto.enabled=true"
 
 const (
 	user       = "narthanaepa1"
-	repo       = "narthanaepa1/my-alpine"
-	tag        = "crypto"
 	service    = "registry.docker.io"
 	authServer = "auth.docker.io"
-	saltBase   = "com.senetas.crypto/" + repo + "/" + tag
+	saltBase   = "com.senetas.crypto/%s/%s"
 	configSalt = saltBase + "/config"
 	layerSalt  = saltBase + "/layer%d"
 )
@@ -120,12 +118,13 @@ func EncryptImage(repo, tag string) (imgName string, manifest *types.ImageManife
 	manifest = assembleManifest(configData, layerData)
 
 	pass := "hunter2"
-	if err = manifest.Config.Crypto.Encrypt(pass, configSalt); err != nil {
+	salt := fmt.Sprintf(configSalt, repo, tag)
+	if err = manifest.Config.Crypto.Encrypt(pass, salt); err != nil {
 		return "", nil, err
 	}
 
 	for i, l := range manifest.Layers {
-		salt := fmt.Sprintf(layerSalt, i)
+		salt = fmt.Sprintf(layerSalt, repo, tag, i)
 		if l.Crypto != nil {
 			if err = l.Crypto.Encrypt(pass, salt); err != nil {
 				return "", nil, err
@@ -136,9 +135,14 @@ func EncryptImage(repo, tag string) (imgName string, manifest *types.ImageManife
 	return imgName, manifest, nil
 }
 
-func DecryptImage(manifest *types.ImageManifestJSON) (tarball string, err error) {
+func DecryptImage(manifest *types.ImageManifestJSON, target reference.Named) (tarball string, err error) {
+	repo, tag, err := resloveNamed(target)
+	if err != nil {
+		return "", err
+	}
+
 	pass := "hunter2"
-	salt := configSalt
+	salt := fmt.Sprintf(configSalt, repo, tag)
 
 	// decrypt config key
 	if err := manifest.Config.Crypto.Decrypt(pass, salt); err != nil {
@@ -175,9 +179,10 @@ func DecryptImage(manifest *types.ImageManifestJSON) (tarball string, err error)
 		RepoTags: []string{repo + ":" + tag},
 		Layers:   make([]string, len(manifest.Layers))}
 
+	// decrypt keys and files for layers
 	for i, l := range manifest.Layers {
 		if l.Crypto != nil {
-			salt := fmt.Sprintf(layerSalt, i)
+			salt := fmt.Sprintf(layerSalt, repo, tag, i)
 			if err := l.Crypto.Decrypt(pass, salt); err != nil {
 				return "", err
 			}
@@ -239,38 +244,47 @@ func DecryptImage(manifest *types.ImageManifestJSON) (tarball string, err error)
 
 // PushImage encrypts then pushes an image
 func PushImage(ref reference.Named) (err error) {
-	var name, tag string
-	switch r := ref.(type) {
-	case reference.NamedTagged:
-		name = r.Name()
-		tag = r.Tag()
-	case reference.Named:
-		name = r.Name()
-		tag = "latest"
-	default:
-		return errors.New("invalid image name")
+	repo, tag, err := resloveNamed(ref)
+	if err != nil {
+		return nil
 	}
 
-	imgName, manifest, err := EncryptImage(name, tag)
+	imgDir, manifest, err := EncryptImage(repo, tag)
 	if err != nil {
 		return err
 	}
 
 	// Upload to registry
-	if err = registry.PushImage(user, name, tag, service, authServer, manifest); err != nil {
+	if err = registry.PushImage(user, repo, tag, service, authServer, manifest); err != nil {
 		return err
 	}
 
 	// cleanup temporary files
-	if err = os.RemoveAll(path + imgName); err != nil {
+	if err = os.RemoveAll(path + imgDir); err != nil {
 		return err
 	}
 
 	return nil
 }
 
+func resloveNamed(ref reference.Named) (string, string, error) {
+	switch r := ref.(type) {
+	case reference.NamedTagged:
+		return r.Name(), r.Tag(), nil
+	case reference.Named:
+		return r.Name(), "latest", nil
+	default:
+		return "", "", errors.New("invalid image name")
+	}
+}
+
 // PullImage pulls an image from the registry
-func PullImage(repotag string) (err error) {
+func PullImage(ref reference.Named) (err error) {
+	repo, tag, err := resloveNamed(ref)
+	if err != nil {
+		return err
+	}
+
 	token, err := registry.Authenticate(user, service, repo, authServer)
 	if err != nil {
 		return err
@@ -297,7 +311,7 @@ func PullImage(repotag string) (err error) {
 		}
 	}
 
-	tarball, err := DecryptImage(manifest)
+	tarball, err := DecryptImage(manifest, ref)
 	if err != nil {
 		return err
 	}
