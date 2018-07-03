@@ -270,9 +270,9 @@ func PushImage(ref reference.Named) (err error) {
 func resloveNamed(ref reference.Named) (string, string, error) {
 	switch r := ref.(type) {
 	case reference.NamedTagged:
-		return r.Name(), r.Tag(), nil
+		return reference.Path(r), r.Tag(), nil
 	case reference.Named:
-		return r.Name(), "latest", nil
+		return reference.Path(r), "latest", nil
 	default:
 		return "", "", errors.New("invalid image name")
 	}

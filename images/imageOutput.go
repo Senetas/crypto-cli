@@ -20,6 +20,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/docker/docker/client"
@@ -156,6 +157,13 @@ func compressLayer(filename string) (compFile string, dg string, size int64, key
 	if err := utils.Compress(filename); err != nil {
 		return "", "", 0, nil, err
 	}
+
+	stat, err := os.Stat(compFile)
+	if err != nil {
+		return "", "", 0, nil, err
+	}
+
+	size = stat.Size()
 
 	sum, err := crypto.Sha256sum(compFile)
 	if err != nil {

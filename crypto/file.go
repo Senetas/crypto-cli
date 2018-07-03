@@ -80,7 +80,8 @@ func EncFile(infile, outfile string) (key []byte, d digest.Digest, size int64, e
 		CipherSuites: []byte{sio.AES_256_GCM},
 		Key:          key}
 
-	if _, err = sio.Encrypt(outFH, inFH, cfg); err != nil {
+	size, err = sio.Encrypt(outFH, inFH, cfg)
+	if err != nil {
 		outFH.Close()
 		os.Remove(outfile)
 		return nil, "", 0, err

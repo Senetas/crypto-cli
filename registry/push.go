@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	//"net/http/httputil"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"strconv"
@@ -31,7 +31,6 @@ import (
 
 // PushImage pushes the config, layers and mainifest to the nominated registry, in that order
 func PushImage(user, repo, tag, service, authServer string, manifest *types.ImageManifestJSON) error {
-
 	// Authenticate with the Auth server
 	token, err := Authenticate(user, service, repo, authServer)
 
@@ -80,20 +79,27 @@ func PushManifest(user, repo, tag, token string, manifest *types.ImageManifestJS
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
 
-	//dump, err := httputil.DumpRequestOut(req, true)
-	//if err != nil {
-	//return "", err
-	//}
-	//fmt.Println(string(dump))
+	dump, err := httputil.DumpRequestOut(req, true)
+	if err != nil {
+		return "", err
+	}
+	fmt.Println(string(dump))
 
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
 
+	dump, err = httputil.DumpResponse(resp, true)
+	if err != nil {
+		return "", err
+	}
+	fmt.Println(string(dump))
+
 	if resp.StatusCode != http.StatusCreated {
 		return "", errors.New("manifest upload failed with status: " + resp.Status)
 	}
+
 	if err = resp.Body.Close(); err != nil {
 		return "", err
 	}
@@ -135,11 +141,11 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 		err = utils.CheckedClose(resp.Body, err)
 	}()
 
-	//dump, err := httputil.DumpResponse(resp, true)
-	//if err != nil {
-	//return err
-	//}
-	//fmt.Println(string(dump))
+	dump, err := httputil.DumpResponse(resp, true)
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(dump))
 
 	if resp.StatusCode != http.StatusAccepted {
 		return errors.New("upload of layer " + layerData.Digest + " was not accepted")
