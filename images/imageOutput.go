@@ -38,8 +38,6 @@ import (
 // CreateManifest creates a manifest and encrypts all necessary parts of it
 // These are they ready to be uploaded to a regitry
 func CreateManifest(ref *reference.Named) (manifest *types.ImageManifestJSON, err error) {
-	manifest = &types.ImageManifestJSON{}
-
 	repo, tag, err := resloveNamed(ref)
 	if err != nil {
 		return nil, err
@@ -54,7 +52,10 @@ func CreateManifest(ref *reference.Named) (manifest *types.ImageManifestJSON, er
 	}()
 
 	// output image
-	manifest.DirName = uuid.New().String()
+	manifest = &types.ImageManifestJSON{
+		SchemaVersion: 2,
+		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+		DirName:       path + uuid.New().String()}
 	imgFile := manifest.DirName + ".tar"
 
 	if err = os.MkdirAll(manifest.DirName, 0755); err != nil {
@@ -103,11 +104,8 @@ func CreateManifest(ref *reference.Named) (manifest *types.ImageManifestJSON, er
 		return nil, err
 	}
 
-	manifest = &types.ImageManifestJSON{
-		SchemaVersion: 2,
-		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
-		Config:        configData,
-		Layers:        layerData}
+	manifest.Config = configData
+	manifest.Layers = layerData
 
 	pass := "hunter2"
 	salt := fmt.Sprintf(configSalt, repo, tag)

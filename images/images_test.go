@@ -33,7 +33,6 @@ func TestEncDecImage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	t.Log(manifest)
 
 	if _, err = images.TarFromManifest(manifest, &ref); err != nil {
