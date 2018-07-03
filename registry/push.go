@@ -124,7 +124,7 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 	u := &url.URL{
 		Scheme: "https",
 		Host:   "registry-1.docker.io",
-		Path:   path.Join("v2", repo, "blobs", "uploads")}
+		Path:   utils.PathTrailingJoin("v2", repo, "blobs", "uploads")}
 
 	client := &http.Client{}
 	req, err := http.NewRequest("POST", u.String(), nil)
@@ -134,6 +134,12 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 
 	req.Header.Add("Authorization", "Bearer "+token)
 
+	dump, err := httputil.DumpRequestOut(req, true)
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(dump))
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -142,7 +148,7 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 		err = utils.CheckedClose(resp.Body, err)
 	}()
 
-	dump, err := httputil.DumpResponse(resp, true)
+	dump, err = httputil.DumpResponse(resp, true)
 	if err != nil {
 		return err
 	}
@@ -192,6 +198,12 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 	req.Header.Add("Content-Length", strconv.FormatInt(stat.Size(), 10))
 	req.Header.Add("Content-Type", "application/octect-stream")
 
+	dump, err = httputil.DumpRequestOut(req, false)
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(dump))
+
 	resp, err = client.Do(req)
 	if err != nil {
 		return err
@@ -200,11 +212,11 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 		err = utils.CheckedClose(resp.Body, err)
 	}()
 
-	//dump, err = httputil.DumpResponse(resp, true)
-	//if err != nil {
-	//return err
-	//}
-	//fmt.Println(string(dump))
+	dump, err = httputil.DumpResponse(resp, true)
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(dump))
 
 	if resp.StatusCode != http.StatusCreated {
 		return errors.New("upload of layer " + layerData.Digest + " failed")
