@@ -17,6 +17,7 @@ package images
 import (
 	"errors"
 	"os"
+	"path/filepath"
 
 	"github.com/docker/distribution/reference"
 )
@@ -33,7 +34,7 @@ const (
 	layerSalt  = saltBase + "/layer%d"
 )
 
-var path = os.TempDir() + "/com.senetas.crypto/"
+var path = filepath.Join(os.TempDir(), "com.senetas.crypto")
 
 func resloveNamed(ref *reference.Named) (string, string, error) {
 	switch r := (*ref).(type) {

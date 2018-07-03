@@ -22,6 +22,8 @@ import (
 	"os"
 	//"net/http/httputil"
 	"net/url"
+	"path"
+	"path/filepath"
 
 	digest "github.com/opencontainers/go-digest"
 
@@ -37,7 +39,7 @@ func PullManifest(user, repo, tag, token string) (manifest *types.ImageManifestJ
 	u := url.URL{
 		Scheme: "https",
 		Host:   regAddr,
-		Path:   regPath + "/" + repo + "/manifests/" + tag}
+		Path:   path.Join(regPath, repo, "manifests", tag)}
 
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", u.String(), nil)
@@ -92,7 +94,7 @@ func PullFromDigest(user, repo, token string, d *digest.Digest) (fn string, err 
 	u := url.URL{
 		Scheme: "https",
 		Host:   regAddr,
-		Path:   regPath + "/" + repo + "/blobs/" + d.String()}
+		Path:   path.Join(regPath, repo, "blobs", d.String())}
 
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", u.String(), nil)
@@ -128,13 +130,13 @@ func PullFromDigest(user, repo, token string, d *digest.Digest) (fn string, err 
 		return "", errors.New("Failed to download blob" + d.String())
 	}
 
-	dir := os.TempDir() + "/com.senetas.crypto"
+	dir := filepath.Join(os.TempDir(), "com.senetas.crypto")
 
 	if err = os.MkdirAll(dir, 0755); err != nil {
 		return "", err
 	}
 
-	fn = dir + "/" + d.Encoded()
+	fn = filepath.Join(dir, d.Encoded())
 	fh, err := os.Create(fn)
 	if err != nil {
 		return "", err

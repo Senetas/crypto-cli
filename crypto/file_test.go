@@ -19,6 +19,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/udhos/equalfile"
@@ -28,7 +29,7 @@ import (
 
 func TestFile(t *testing.T) {
 	dir, err := ioutil.TempDir("", "com.senetas.crypto")
-	fn := dir + "/plain"
+	fn := filepath.Join(dir, "plain")
 	fh, err := os.Create(fn)
 	r := rand.Reader
 	_, err = io.CopyN(fh, r, 1024)
@@ -40,24 +41,27 @@ func TestFile(t *testing.T) {
 		t.Logf(err.Error())
 	}
 
-	key, _, _, err := crypto.EncFile(fn, dir+"/enc")
+	encpath := filepath.Join(dir, "enc")
+	decpath := filepath.Join(dir, "dec")
+
+	key, _, _, err := crypto.EncFile(fn, filepath.Join(dir, "enc"))
 	if err != nil {
 		t.Errorf(err.Error())
 	}
 
 	t.Logf("%v\n", key)
 
-	if err = crypto.DecFile(dir+"/enc", dir+"/dec", key); err != nil {
+	if err = crypto.DecFile(encpath, decpath, key); err != nil {
 		t.Errorf(err.Error())
 	}
 
 	cmp := equalfile.New(nil, equalfile.Options{})
-	equal, err := cmp.CompareFile(dir+"/plain", dir+"/dec")
+	equal, err := cmp.CompareFile(fn, decpath)
 	if err != nil {
 		t.Errorf("%v\n", err)
 	}
 	if !equal {
-		fha, err := os.Open(dir + "/plain")
+		fha, err := os.Open(fn)
 		if err != nil {
 			t.Errorf(err.Error())
 		}
@@ -65,7 +69,7 @@ func TestFile(t *testing.T) {
 		if err != nil {
 			t.Errorf(err.Error())
 		}
-		fhb, err := os.Open(dir + "/dec")
+		fhb, err := os.Open(decpath)
 		if err != nil {
 			t.Errorf(err.Error())
 		}

@@ -23,7 +23,7 @@ import (
 
 func TestKey(t *testing.T) {
 	plaintext := []byte("Hello")
-	salt := "com.senetas.crypto/narthanaepa1:test/config"
+	salt := "com.senetas.crypto/narthanaepa1/my-alpine/test/config"
 	ciphertext, err := crypto.Enckey([]byte(plaintext), "hunter2", salt)
 	if err != nil {
 		panic(err)

@@ -52,6 +52,7 @@ func PassSalt2Key(pass string, salt []byte) []byte {
 }
 
 // EncFile encrypts the file inName to outName with a random 32 byte key. returns the key
+// assumes infile and outfile use they system seperator
 func EncFile(infile, outfile string) (key []byte, d digest.Digest, size int64, err error) {
 	key = make([]byte, 32)
 	if _, err = rand.Read(key); err != nil {
@@ -92,6 +93,7 @@ func EncFile(infile, outfile string) (key []byte, d digest.Digest, size int64, e
 
 // DecFile decrypts (and authenticates) infile and writes it to outfile
 // only persists if the decrypttion and authentication suceedes
+// assumes infile and outfile use they system seperator
 func DecFile(infile, outfile string, datakey []byte) (err error) {
 	inFH, err := os.Open(infile)
 	if err != nil {

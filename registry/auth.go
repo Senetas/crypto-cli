@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path/filepath"
 
 	"github.com/docker/docker/cli/config"
 )
@@ -77,7 +78,7 @@ func Authenticate(user, service, repo, authServer string) (string, error) {
 }
 
 func localAuthToken() (string, error) {
-	dat, err := ioutil.ReadFile(config.Dir() + "/config.json")
+	dat, err := ioutil.ReadFile(filepath.Join(config.Dir(), "config.json"))
 	if err != nil {
 		return "", err
 	}

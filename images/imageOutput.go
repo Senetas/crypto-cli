@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/docker/distribution/reference"
@@ -192,7 +193,7 @@ func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
 // find the layer files that correponds to the digests we want to encrypt
 // TODO: find a way to do this by interfacing with the daemon directly
 func findLayers(repo, tag, path string, layerSet map[string]bool) (*types.LayerJSON, []*types.LayerJSON, error) {
-	dat, err := ioutil.ReadFile(path + "/manifest.json")
+	dat, err := ioutil.ReadFile(filepath.Join(path, "manifest.json"))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -211,7 +212,7 @@ func findLayers(repo, tag, path string, layerSet map[string]bool) (*types.LayerJ
 		return nil, nil, errors.New("no image data was found")
 	}
 
-	configfilename := path + "/" + images[0].Config
+	configfilename := filepath.Join(path, images[0].Config)
 	filename, digest, size, key, err := encryptLayer(configfilename)
 	if err != nil {
 		return nil, nil, err
@@ -221,7 +222,7 @@ func findLayers(repo, tag, path string, layerSet map[string]bool) (*types.LayerJ
 
 	layers := make([]*types.LayerJSON, len(images[0].Layers))
 	for i, f := range images[0].Layers {
-		basename := path + "/" + f
+		basename := filepath.Join(path, f)
 		sum, err := crypto.Sha256sum(basename)
 		if err != nil {
 			return nil, nil, err

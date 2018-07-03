@@ -33,6 +33,7 @@ const (
 	PassPBKDF2AESGCM EncAlgo = "PASS_PBKDF2_AES_GCM"
 )
 
+// Deckey decrypts the ciphertext = key with the given passphrase and salt
 func Deckey(ciphertext []byte, pass, salt string) ([]byte, error) {
 	nonce := ciphertext[:12]
 	ckey := ciphertext[12:]
@@ -59,6 +60,7 @@ func Deckey(ciphertext []byte, pass, salt string) ([]byte, error) {
 	return plaintext, nil
 }
 
+// Enckey encrypts the ciphertext = key with the given passphrase and salt
 func Enckey(plaintext []byte, pass, salt string) ([]byte, error) {
 	bsalt := []byte(salt)
 

@@ -23,6 +23,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"path"
 	"strconv"
 
 	"github.com/Senetas/crypto-cli/types"
@@ -66,7 +67,7 @@ func PushManifest(user, repo, tag, token string, manifest *types.ImageManifestJS
 	u := &url.URL{
 		Scheme: "https",
 		Host:   regAddr,
-		Path:   regPath + "/" + repo + "/manifests/" + tag}
+		Path:   path.Join(regPath, repo, "manifests", tag)}
 
 	client := &http.Client{}
 	req, err := http.NewRequest("PUT", u.String(), bytes.NewReader(manifestJSON))
@@ -123,7 +124,7 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 	u := &url.URL{
 		Scheme: "https",
 		Host:   "registry-1.docker.io",
-		Path:   "v2/" + repo + "/blobs/uploads/"}
+		Path:   path.Join("v2", repo, "blobs", "uploads")}
 
 	client := &http.Client{}
 	req, err := http.NewRequest("POST", u.String(), nil)
@@ -216,7 +217,7 @@ func checkLayer(user, repo, token, digest string) (b bool, err error) {
 	u := url.URL{
 		Scheme: "https",
 		Host:   "registry-1.docker.io",
-		Path:   "v2/" + repo + "/blobs/" + digest}
+		Path:   path.Join("v2", repo, "blobs", digest)}
 
 	client := &http.Client{}
 	req, err := http.NewRequest("HEAD", u.String(), nil)
