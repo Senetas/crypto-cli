@@ -51,7 +51,7 @@ func runPush(remote string) error {
 		return err
 	}
 
-	if err = images.PushImage(ref); err != nil {
+	if err = images.PushImage(&ref); err != nil {
 		return err
 	}
 

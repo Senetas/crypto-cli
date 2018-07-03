@@ -34,6 +34,7 @@ type ImageManifestJSON struct {
 	MediaType     string       `json:"mediaType"`
 	Config        *LayerJSON   `json:"config"`
 	Layers        []*LayerJSON `json:"layers"`
+	DirName       string       `json:"-"`
 }
 
 // LayerJSON is the go type for an element in the layer array

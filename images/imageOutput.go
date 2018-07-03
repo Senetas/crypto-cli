@@ -18,21 +18,113 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"strings"
 
+	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/client"
+	"github.com/google/uuid"
+	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
-type localImageManifest struct {
-	Config string
-	Layers []string
+// CreateManifest creates a manifest and encrypts all necessary parts of it
+// These are they ready to be uploaded to a regitry
+func CreateManifest(ref *reference.Named) (manifest *types.ImageManifestJSON, err error) {
+	manifest = &types.ImageManifestJSON{}
+
+	repo, tag, err := resloveNamed(ref)
+	if err != nil {
+		return nil, err
+	}
+
+	layers, img, err := getImgTarLayers(repo, tag)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = utils.CheckedClose(img, err)
+	}()
+
+	// output image
+	manifest.DirName = uuid.New().String()
+	imgFile := manifest.DirName + ".tar"
+
+	if err = os.MkdirAll(manifest.DirName, 0755); err != nil {
+		return nil, err
+	}
+
+	outFile, err := os.Create(imgFile)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = utils.CheckedClose(outFile, err)
+	}()
+
+	if _, err = io.Copy(outFile, img); err != nil {
+		return nil, err
+	}
+
+	if err = outFile.Sync(); err != nil {
+		return nil, err
+	}
+
+	go func() {
+		if err := img.Close(); err != nil {
+			log.Println(err)
+		}
+	}()
+
+	if err = tarinator.UnTarinate(manifest.DirName, imgFile); err != nil {
+		return nil, err
+	}
+
+	go func() {
+		if err := os.Remove(imgFile); err != nil {
+			log.Println(err)
+		}
+	}()
+
+	layerSet := make(map[string]bool)
+	for _, x := range layers {
+		layerSet[x] = true
+	}
+
+	configData, layerData, err := findLayers(repo, tag, manifest.DirName, layerSet)
+	if err != nil {
+		return nil, err
+	}
+
+	manifest = &types.ImageManifestJSON{
+		SchemaVersion: 2,
+		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+		Config:        configData,
+		Layers:        layerData}
+
+	pass := "hunter2"
+	salt := fmt.Sprintf(configSalt, repo, tag)
+	if err = manifest.Config.Crypto.Encrypt(pass, salt); err != nil {
+		return nil, err
+	}
+
+	for i, l := range manifest.Layers {
+		salt = fmt.Sprintf(layerSalt, repo, tag, i)
+		if l.Crypto != nil {
+			if err = l.Crypto.Encrypt(pass, salt); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return manifest, nil
 }
 
 func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
@@ -107,7 +199,12 @@ func findLayers(repo, tag, path string, layerSet map[string]bool) (*types.LayerJ
 		return nil, nil, err
 	}
 
-	var images []*localImageManifest
+	type configLayers struct {
+		Config string
+		Layers []string
+	}
+
+	var images []*configLayers
 	if err := json.Unmarshal(dat, &images); err != nil {
 		return nil, nil, err
 	}

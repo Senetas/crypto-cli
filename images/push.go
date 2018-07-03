@@ -12,35 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package images_test
+package images
 
 import (
 	"os"
-	"testing"
 
 	"github.com/docker/distribution/reference"
 
-	"github.com/Senetas/crypto-cli/images"
+	"github.com/Senetas/crypto-cli/registry"
 )
 
-func TestEncDecImage(t *testing.T) {
-	ref, err := reference.ParseNormalizedNamed("narthanaepa1/my-alpine:test")
+// PushImage encrypts then pushes an image
+func PushImage(ref *reference.Named) (err error) {
+	repo, tag, err := resloveNamed(ref)
 	if err != nil {
-		t.Fatal(err)
+		return nil
 	}
 
-	manifest, err := images.CreateManifest(&ref)
+	manifest, err := CreateManifest(ref)
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 
-	t.Log(manifest)
-
-	if _, err = images.TarFromManifest(manifest, &ref); err != nil {
-		t.Fatalf("%v\ne = %s", err, manifest.Config.Crypto)
+	// Upload to registry
+	if err = registry.PushImage(user, repo, tag, service, authServer, manifest); err != nil {
+		return err
 	}
 
+	// cleanup temporary files
 	if err = os.RemoveAll(manifest.DirName); err != nil {
-		t.Log(err)
+		return err
 	}
+
+	return nil
 }

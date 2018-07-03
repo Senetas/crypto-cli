@@ -12,35 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package images_test
+package images
 
 import (
+	"errors"
 	"os"
-	"testing"
 
 	"github.com/docker/distribution/reference"
-
-	"github.com/Senetas/crypto-cli/images"
 )
 
-func TestEncDecImage(t *testing.T) {
-	ref, err := reference.ParseNormalizedNamed("narthanaepa1/my-alpine:test")
-	if err != nil {
-		t.Fatal(err)
-	}
+const labelString = "LABEL com.senetas.crypto.enabled=true"
 
-	manifest, err := images.CreateManifest(&ref)
-	if err != nil {
-		t.Fatal(err)
-	}
+const (
+	user       = "narthanaepa1"
+	pass       = "hunter2"
+	service    = "registry.docker.io"
+	authServer = "auth.docker.io"
+	saltBase   = "com.senetas.crypto/%s/%s"
+	configSalt = saltBase + "/config"
+	layerSalt  = saltBase + "/layer%d"
+)
 
-	t.Log(manifest)
+var path = os.TempDir() + "/com.senetas.crypto/"
 
-	if _, err = images.TarFromManifest(manifest, &ref); err != nil {
-		t.Fatalf("%v\ne = %s", err, manifest.Config.Crypto)
-	}
-
-	if err = os.RemoveAll(manifest.DirName); err != nil {
-		t.Log(err)
+func resloveNamed(ref *reference.Named) (string, string, error) {
+	switch r := (*ref).(type) {
+	case reference.NamedTagged:
+		return reference.Path(r), r.Tag(), nil
+	case reference.Named:
+		return reference.Path(r), "latest", nil
+	default:
+		return "", "", errors.New("invalid image name")
 	}
 }

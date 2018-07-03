@@ -45,7 +45,7 @@ func runPull(remote string) error {
 		return err
 	}
 
-	if err = images.PullImage(ref); err != nil {
+	if err = images.PullImage(&ref); err != nil {
 		return err
 	}
 
