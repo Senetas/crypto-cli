@@ -17,12 +17,14 @@ package images
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
 
+	"github.com/docker/distribution/reference"
 	"github.com/google/uuid"
 	digest "github.com/opencontainers/go-digest"
 	tarinator "github.com/verybluebot/tarinator-go"
@@ -56,8 +58,8 @@ func assembleManifest(config *types.LayerJSON, layers []*types.LayerJSON) *types
 		Layers:        layers}
 }
 
-func EncryptImage(repotag string) (imgName string, manifest *types.ImageManifestJSON, err error) {
-	layers, img, err := getImgTarLayers(repotag)
+func EncryptImage(repo, tag string) (imgName string, manifest *types.ImageManifestJSON, err error) {
+	layers, img, err := getImgTarLayers(repo, tag)
 	if err != nil {
 		return "", nil, err
 	}
@@ -110,7 +112,7 @@ func EncryptImage(repotag string) (imgName string, manifest *types.ImageManifest
 		layerSet[x] = true
 	}
 
-	configData, layerData, err := findLayers(repotag, path+imgName, layerSet)
+	configData, layerData, err := findLayers(repo, tag, path+imgName, layerSet)
 	if err != nil {
 		return "", nil, err
 	}
@@ -235,31 +237,27 @@ func DecryptImage(manifest *types.ImageManifestJSON) (tarball string, err error)
 	return tarball, nil
 }
 
-//func scanlChainID(diffIDs []layer.DiffID) []layer.ChainID {
-//return scanlChainIDRec(make([]layer.ChainID, 0), diffIDs)
-//}
-
-//func scanlChainIDRec(ancestors []layer.ChainID, diffIDs []layer.DiffID) []layer.ChainID {
-//if len(diffIDs) == 0 {
-//return ancestors
-//}
-//if len(ancestors) == 0 {
-//return scanlChainIDRec([]layer.ChainID{layer.ChainID(diffIDs[0])}, diffIDs[1:])
-//}
-//newParent := layer.ChainID(digest.FromBytes([]byte(string(ancestors[len(ancestors)-1]) + " " + string(diffIDs[0]))))
-//newAncestors := append(ancestors, newParent)
-//return scanlChainIDRec(newAncestors, diffIDs[1:])
-//}
-
 // PushImage encrypts then pushes an image
-func PushImage(repotag string) (err error) {
-	imgName, manifest, err := EncryptImage(repotag)
+func PushImage(ref reference.Named) (err error) {
+	var name, tag string
+	switch r := ref.(type) {
+	case reference.NamedTagged:
+		name = r.Name()
+		tag = r.Tag()
+	case reference.Named:
+		name = r.Name()
+		tag = "latest"
+	default:
+		return errors.New("invalid image name")
+	}
+
+	imgName, manifest, err := EncryptImage(name, tag)
 	if err != nil {
 		return err
 	}
 
 	// Upload to registry
-	if err = registry.PushImage(user, repo, tag, service, authServer, manifest); err != nil {
+	if err = registry.PushImage(user, name, tag, service, authServer, manifest); err != nil {
 		return err
 	}
 

@@ -15,38 +15,57 @@
 package cmd
 
 import (
+	"github.com/docker/distribution/reference"
+	//"github.com/docker/docker/registry"
 	"github.com/spf13/cobra"
 
 	"github.com/Senetas/crypto-cli/images"
 )
 
 // pushCmd represents the push command
-var pushCmd = &cobra.Command{
-	Use:   "push",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
+var (
+	pushCmd = &cobra.Command{
+		Use:   "push",
+		Short: "Encrypt an image and then push it to a remote repository.",
+		Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		if err := images.PushImage(args[0]); err != nil {
-			panic(err)
-		}
-	},
+		Run: func(cmd *cobra.Command, args []string) {
+			err := runPush(args[0])
+			if err != nil {
+				panic(err)
+			}
+		},
+	}
+
+	passphrase string
+	cryptotype string
+)
+
+func runPush(remote string) error {
+	ref, err := reference.ParseNormalizedNamed(remote)
+	if err != nil {
+		return err
+	}
+
+	if err = images.PushImage(ref); err != nil {
+		return err
+	}
+
+	//repoInfo, err := registry.ParseRepositoryInfo(ref)
+	//if err != nil {
+	//return err
+	//}
+
+	return nil
 }
 
 func init() {
 	rootCmd.AddCommand(pushCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// pushCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// pushCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	pushCmd.Flags().StringVarP(&passphrase, "pass", "p", "", "Specifies the passphrase to use if passphrase encryption is selected")
+	pushCmd.Flags().StringVarP(&cryptotype, "type", "t", "", "Specifies the type of encryption to use.")
 }

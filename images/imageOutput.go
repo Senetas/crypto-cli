@@ -34,7 +34,7 @@ type localImageManifest struct {
 	Layers []string
 }
 
-func getImgTarLayers(repotag string) ([]string, io.ReadCloser, error) {
+func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
 	ctx := context.Background()
 
 	// TODO: fix hardcoded version/ check if necessary
@@ -44,7 +44,7 @@ func getImgTarLayers(repotag string) ([]string, io.ReadCloser, error) {
 	}
 
 	// get the history
-	hist, err := cli.ImageHistory(ctx, repotag)
+	hist, err := cli.ImageHistory(ctx, repo+":"+tag)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -85,7 +85,7 @@ func getImgTarLayers(repotag string) ([]string, io.ReadCloser, error) {
 		}
 	}
 
-	inspt, _, err := cli.ImageInspectWithRaw(ctx, repotag)
+	inspt, _, err := cli.ImageInspectWithRaw(ctx, repo+":"+tag)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -100,7 +100,7 @@ func getImgTarLayers(repotag string) ([]string, io.ReadCloser, error) {
 
 // find the layer files that correponds to the digests we want to encrypt
 // TODO: find a way to do this by interfacing with the daemon directly
-func findLayers(repo, path string, layerSet map[string]bool) (*types.LayerJSON, []*types.LayerJSON, error) {
+func findLayers(repo, tag, path string, layerSet map[string]bool) (*types.LayerJSON, []*types.LayerJSON, error) {
 	dat, err := ioutil.ReadFile(path + "/manifest.json")
 	if err != nil {
 		return nil, nil, err

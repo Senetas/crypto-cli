@@ -24,20 +24,23 @@ import (
 func TestEncDecImage(t *testing.T) {
 	imgName, manifest, err := images.EncryptImage("narthanaepa1/my-alpine:test")
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	dir := os.TempDir()
 	path := dir + "/com.senetas.crypto/" + imgName
-
-	t.Log(path)
-	t.Log(manifest.Config.Crypto)
-
-	if err = images.DecryptImage(manifest); err != nil {
-		t.Errorf("%v\ne = %s", err, manifest.Config.Crypto)
+	if err = os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
 	}
+	defer func() {
+		if err = os.RemoveAll(path); err != nil {
+			t.Log(err)
+		}
+	}()
 
-	//if err = os.RemoveAll(path); err != nil {
-	//t.Log(err)
-	//}
+	t.Log(manifest)
+
+	if _, err = images.DecryptImage(manifest); err != nil {
+		t.Fatalf("%v\ne = %s", err, manifest.Config.Crypto)
+	}
 }
