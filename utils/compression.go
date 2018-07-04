@@ -23,7 +23,7 @@ import (
 )
 
 // Compress a file as gz, should already be tarred
-// assumes file is use the system seperator
+// assumes file uses the system seperator
 func Compress(file string) (err error) {
 	out, err := os.Create(file + ".gz")
 	defer func() {
@@ -48,8 +48,8 @@ func Compress(file string) (err error) {
 	return nil
 }
 
-// Decompress a file as gz, should already be tarred
-// assumes file is use the system seperator
+// Decompress a file as gz, should already be tarred, assumes file uses the
+// system seperator. Also calcuates the digest in parallel
 func Decompress(file string) (d *digest.Digest, err error) {
 	out, err := os.Create(file + ".dec")
 	if err != nil {

@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,6 +28,7 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/crypto"
@@ -81,7 +81,7 @@ func CreateManifest(ref *reference.Named) (manifest *types.ImageManifestJSON, er
 
 	go func() {
 		if err := img.Close(); err != nil {
-			log.Println(err)
+			log.Error().Err(err)
 		}
 	}()
 
@@ -89,9 +89,10 @@ func CreateManifest(ref *reference.Named) (manifest *types.ImageManifestJSON, er
 		return nil, err
 	}
 
+	// delete source tarball
 	go func() {
 		if err := os.Remove(imgFile); err != nil {
-			log.Println(err)
+			log.Error().Err(err)
 		}
 	}()
 
