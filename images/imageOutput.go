@@ -28,6 +28,7 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
+	digest "github.com/opencontainers/go-digest"
 	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/crypto"
@@ -192,6 +193,7 @@ func findLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*t
 		layerSet[x] = true
 	}
 
+	// read the archive manifest
 	dat, err := ioutil.ReadFile(filepath.Join(path, "manifest.json"))
 	if err != nil {
 		return nil, nil, err
@@ -211,8 +213,8 @@ func findLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*t
 		return nil, nil, errors.New("no image data was found")
 	}
 
-	configfilename := filepath.Join(path, images[0].Config)
-	filename, digest, size, key, err := encryptLayer(configfilename)
+	configfile := filepath.Join(path, images[0].Config)
+	filename, digest, size, key, err := encryptLayer(configfile)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -246,47 +248,39 @@ func findLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*t
 	return config, layerJSON, nil
 }
 
-func compressLayer(filename string) (compFile string, dg string, size int64, key []byte, err error) {
+func compressLayer(filename string) (compFile string, d *digest.Digest, size int64, key []byte, err error) {
 	compFile = filename + ".gz"
 
-	if err := utils.Compress(filename); err != nil {
-		return "", "", 0, nil, err
+	d, err = utils.CompressWithDigest(filename)
+	if err != nil {
+		return "", nil, 0, nil, err
 	}
 
 	stat, err := os.Stat(compFile)
 	if err != nil {
-		return "", "", 0, nil, err
+		return "", nil, 0, nil, err
 	}
 
-	size = stat.Size()
-
-	sum, err := crypto.Sha256sum(compFile)
-	if err != nil {
-		return "", "", 0, nil, err
-	}
-	dg = "sha256:" + sum
-
-	return compFile, dg, size, key, nil
+	return compFile, d, stat.Size(), key, nil
 }
 
-func encryptLayer(filename string) (encFile string, dg string, size int64, key []byte, err error) {
-	compFile := filename + ".gz"
-	encFile = compFile + ".aes"
+func encryptLayer(filename string) (encname string, d *digest.Digest, size int64, key []byte, err error) {
+	compname := filename + ".gz"
+	encname = compname + ".aes"
 
 	if err := utils.Compress(filename); err != nil {
-		return "", "", 0, nil, err
+		return "", nil, 0, nil, err
 	}
 
-	key, _, size, err = crypto.EncFile(compFile, encFile)
+	key, err = crypto.GenDataKey()
 	if err != nil {
-		return "", "", 0, nil, err
+		return "", nil, 0, nil, err
 	}
 
-	sum, err := crypto.Sha256sum(encFile)
+	d, size, err = crypto.EncFile(compname, encname, key)
 	if err != nil {
-		return "", "", 0, nil, err
+		return "", nil, 0, nil, err
 	}
-	dg = "sha256:" + sum
 
-	return encFile, dg, size, key, nil
+	return encname, d, size, key, nil
 }

@@ -51,17 +51,21 @@ func PassSalt2Key(pass string, salt []byte) []byte {
 	return pbkdf2.Key([]byte(pass), salt, 8192, 32, sha256.New)
 }
 
+//GenDataKey generates a random key for data encryption
+func GenDataKey() ([]byte, error) {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return nil, err
+	}
+	return key, nil
+}
+
 // EncFile encrypts the file inName to outName with a random 32 byte key. returns the key
 // assumes infile and outfile use they system seperator
-func EncFile(infile, outfile string) (key []byte, d digest.Digest, size int64, err error) {
-	key = make([]byte, 32)
-	if _, err = rand.Read(key); err != nil {
-		return nil, "", 0, err
-	}
-
+func EncFile(infile, outfile string, key []byte) (d *digest.Digest, size int64, err error) {
 	inFH, err := os.Open(infile)
 	if err != nil {
-		return nil, "", 0, err
+		return nil, 0, err
 	}
 	defer func() {
 		err = utils.CheckedClose(inFH, err)
@@ -69,7 +73,7 @@ func EncFile(infile, outfile string) (key []byte, d digest.Digest, size int64, e
 
 	outFH, err := os.Create(outfile)
 	if err != nil {
-		return nil, "", 0, err
+		return nil, 0, err
 	}
 	defer func() {
 		err = utils.CheckedClose(outFH, err)
@@ -79,16 +83,16 @@ func EncFile(infile, outfile string) (key []byte, d digest.Digest, size int64, e
 		MinVersion:   sio.Version20,
 		MaxVersion:   sio.Version20,
 		CipherSuites: []byte{sio.AES_256_GCM},
-		Key:          key}
-
-	size, err = sio.Encrypt(outFH, inFH, cfg)
-	if err != nil {
-		outFH.Close()
-		os.Remove(outfile)
-		return nil, "", 0, err
+		Key:          key,
 	}
 
-	return key, "", size, nil
+	digester := digest.Canonical.Digester()
+	mw := io.MultiWriter(digester.Hash(), outFH)
+	size, err = sio.Encrypt(mw, inFH, cfg)
+
+	ds := digester.Digest()
+
+	return &ds, size, nil
 }
 
 // DecFile decrypts (and authenticates) infile and writes it to outfile

@@ -16,7 +16,6 @@ package main
 
 import (
 	_ "crypto/sha256"
-	_ "crypto/sha512"
 
 	"github.com/Senetas/crypto-cli/cmd"
 )

@@ -17,6 +17,8 @@ package types
 import (
 	"encoding/base64"
 
+	digest "github.com/opencontainers/go-digest"
+
 	"github.com/Senetas/crypto-cli/crypto"
 )
 
@@ -39,11 +41,11 @@ type ImageManifestJSON struct {
 
 // LayerJSON is the go type for an element in the layer array
 type LayerJSON struct {
-	Crypto      *CryptoJSON `json:"crypto,omitempty"`
-	ContentType string      `json:"mediaType"`
-	Size        int64       `json:"size"`
-	Digest      string      `json:"digest"`
-	Filename    string      `json:"-"`
+	Crypto      *CryptoJSON    `json:"crypto,omitempty"`
+	ContentType string         `json:"mediaType"`
+	Size        int64          `json:"size"`
+	Digest      *digest.Digest `json:"digest"`
+	Filename    string         `json:"-"`
 }
 
 // CryptoJSON is the go type backing a crypto object in a manifest
@@ -86,16 +88,16 @@ func (c *CryptoJSON) Decrypt(pass, salt string) error {
 	return nil
 }
 
-func newPlainLayerJSON(filename, digest string, size int64) *LayerJSON {
+func newPlainLayerJSON(filename string, d *digest.Digest, size int64) *LayerJSON {
 	layer := &LayerJSON{
 		Size:     size,
-		Digest:   digest,
+		Digest:   d,
 		Filename: filename}
 	return layer
 }
 
-func newLayerJSON(filename, digest string, size int64, plaintextKey []byte) *LayerJSON {
-	layer := newPlainLayerJSON(filename, digest, size)
+func newLayerJSON(filename string, d *digest.Digest, size int64, plaintextKey []byte) *LayerJSON {
+	layer := newPlainLayerJSON(filename, d, size)
 	layer.Crypto = &CryptoJSON{
 		CryptoType: crypto.PassPBKDF2AESGCM,
 		DecKey:     plaintextKey}
@@ -103,22 +105,22 @@ func newLayerJSON(filename, digest string, size int64, plaintextKey []byte) *Lay
 }
 
 // NewConfigJSON creates a new LayerJSON for a config layer
-func NewConfigJSON(filename, digest string, size int64, plaintextKey []byte) *LayerJSON {
-	layer := newLayerJSON(filename, digest, size, plaintextKey)
+func NewConfigJSON(filename string, d *digest.Digest, size int64, plaintextKey []byte) *LayerJSON {
+	layer := newLayerJSON(filename, d, size, plaintextKey)
 	layer.ContentType = "application/vnd.docker.container.image.v1+json"
 	return layer
 }
 
 // NewLayerJSON creates a new LayerJSON for a data layer
-func NewLayerJSON(filename, digest string, size int64, plaintextKey []byte) *LayerJSON {
-	layer := newLayerJSON(filename, digest, size, plaintextKey)
+func NewLayerJSON(filename string, d *digest.Digest, size int64, plaintextKey []byte) *LayerJSON {
+	layer := newLayerJSON(filename, d, size, plaintextKey)
 	layer.ContentType = "application/vnd.docker.image.rootfs.diff.tar.gzip"
 	return layer
 }
 
 // NewPlainLayerJSON creates a new LayerJSON for an unencrypted data layer
-func NewPlainLayerJSON(filename, digest string, size int64) *LayerJSON {
-	layer := newPlainLayerJSON(filename, digest, size)
+func NewPlainLayerJSON(filename string, d *digest.Digest, size int64) *LayerJSON {
+	layer := newPlainLayerJSON(filename, d, size)
 	layer.ContentType = "application/vnd.docker.image.rootfs.diff.tar.gzip"
 	return layer
 }

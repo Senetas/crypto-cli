@@ -24,6 +24,7 @@ import (
 	"path"
 	"strconv"
 
+	digest "github.com/opencontainers/go-digest"
 	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/types"
@@ -131,7 +132,7 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 	}()
 
 	if resp.StatusCode != http.StatusAccepted {
-		return errors.New("upload of layer " + layerData.Digest + " was not accepted")
+		return errors.New("upload of layer " + layerData.Digest.String() + " was not accepted")
 	}
 
 	// now actually upload the blob
@@ -144,7 +145,7 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 	if err != nil {
 		return err
 	}
-	q.Add("digest", layerData.Digest)
+	q.Add("digest", layerData.Digest.String())
 	rawq, err := url.QueryUnescape(q.Encode())
 	if err != nil {
 		return err
@@ -183,17 +184,17 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 	}()
 
 	if resp.StatusCode != http.StatusCreated {
-		return errors.New("upload of layer " + layerData.Digest + " failed")
+		return errors.New("upload of layer " + layerData.Digest.String() + " failed")
 	}
 
 	return nil
 }
 
-func checkLayer(user, repo, token, digest string) (b bool, err error) {
+func checkLayer(user, repo, token string, d *digest.Digest) (b bool, err error) {
 	u := url.URL{
 		Scheme: "https",
 		Host:   "registry-1.docker.io",
-		Path:   path.Join("v2", repo, "blobs", digest)}
+		Path:   path.Join("v2", repo, "blobs", d.String())}
 
 	client := &http.Client{}
 	req, err := http.NewRequest("HEAD", u.String(), nil)

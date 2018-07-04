@@ -120,39 +120,11 @@ func PullFromDigest(user, repo, token string, d *digest.Digest) (fn string, err 
 		err = utils.CheckedClose(fh, err)
 	}()
 
-	pr, pw := io.Pipe()
-	tr := io.TeeReader(resp.Body, pw)
 	vw := d.Verifier()
+	mw := io.MultiWriter(vw, fh)
 
-	done := make(chan int64)
-	errChan := make(chan error)
-	defer close(done)
-	defer close(errChan)
-
-	go func() {
-		var err2 error
-		defer func() {
-			err2 = pw.Close()
-		}()
-
-		n, err2 := io.Copy(fh, tr)
-
-		errChan <- err2
-		done <- n
-	}()
-
-	go func() {
-		n, err2 := io.Copy(vw, pr)
-
-		errChan <- err2
-		done <- n
-	}()
-
-	for i := 0; i < 2; i++ {
-		if err := <-errChan; err != nil {
-			return "", err
-		}
-		<-done
+	if _, err = io.Copy(mw, resp.Body); err != nil {
+		return "", err
 	}
 
 	if !vw.Verified() {

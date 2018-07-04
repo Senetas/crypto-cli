@@ -44,8 +44,12 @@ func TestFile(t *testing.T) {
 	encpath := filepath.Join(dir, "enc")
 	decpath := filepath.Join(dir, "dec")
 
-	key, _, _, err := crypto.EncFile(fn, filepath.Join(dir, "enc"))
+	key, err := crypto.GenDataKey()
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err = crypto.EncFile(fn, filepath.Join(dir, "enc"), key); err != nil {
 		t.Errorf(err.Error())
 	}
 

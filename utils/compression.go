@@ -26,6 +26,9 @@ import (
 // assumes file uses the system seperator
 func Compress(file string) (err error) {
 	out, err := os.Create(file + ".gz")
+	if err != nil {
+		return err
+	}
 	defer func() {
 		err = CheckedClose(out, err)
 	}()
@@ -43,9 +46,71 @@ func Compress(file string) (err error) {
 		err = CheckedClose(in, err)
 	}()
 
-	io.Copy(w, in)
+	if _, err = io.Copy(w, in); err != nil {
+		return err
+	}
 
 	return nil
+}
+
+// CompressWithDigest a file as gz, should already be tarred
+// assumes file uses the system seperator
+func CompressWithDigest(file string) (d *digest.Digest, err error) {
+	in, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+
+	out, err := os.Create(file + ".gz")
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = CheckedClose(out, err)
+	}()
+
+	digester := digest.Canonical.Digester()
+	mw := io.MultiWriter(digester.Hash(), out)
+
+	// for some reason, not using pipes with writing from gzip to hashes does not work
+	// so while the go routines should be able to be replaced by a single io.Copy, it cannot
+	pr, pw := io.Pipe()
+	c := make(chan error)
+	defer close(c)
+
+	go func() {
+		var err error
+		defer func() {
+			err = CheckedClose(pw, err)
+		}()
+		zw := gzip.NewWriter(pw)
+		if _, err = io.Copy(zw, in); err != nil {
+			c <- err
+		}
+		if err = zw.Close(); err != nil {
+			c <- err
+		}
+		if err = in.Close(); err != nil {
+			c <- err
+		}
+		c <- nil
+	}()
+
+	go func() {
+		if _, err = io.Copy(mw, pr); err != nil {
+			c <- err
+		}
+		c <- nil
+	}()
+
+	for i := 0; i < 2; i++ {
+		if err = <-c; err != nil {
+			return nil, err
+		}
+	}
+
+	ds := digester.Digest()
+	return &ds, nil
 }
 
 // Decompress a file as gz, should already be tarred, assumes file uses the
@@ -75,39 +140,13 @@ func Decompress(file string) (d *digest.Digest, err error) {
 		err = CheckedClose(r, err)
 	}()
 
-	pr, pw := io.Pipe()
-	tr := io.TeeReader(r, pw)
 	digester := digest.Canonical.Digester()
+	mw := io.MultiWriter(digester.Hash(), out)
 
-	done := make(chan int64)
-	defer close(done)
-	errChan := make(chan error)
-	defer close(errChan)
-
-	go func() {
-		var err2 error
-		defer func() {
-			err2 = pw.Close()
-		}()
-
-		n, err2 := io.Copy(out, tr)
-
-		errChan <- err2
-		done <- n
-	}()
-
-	go func() {
-		n, err2 := io.Copy(digester.Hash(), pr)
-		errChan <- err2
-		done <- n
-	}()
-
-	for i := 0; i < 2; i++ {
-		if err := <-errChan; err != nil {
-			return nil, err
-		}
-		<-done
+	if _, err = io.Copy(mw, r); err != nil {
+		return nil, err
 	}
+	r.Close()
 
 	ds := digester.Digest()
 	return &ds, nil

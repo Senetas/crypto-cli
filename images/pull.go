@@ -18,7 +18,6 @@ import (
 	"os"
 
 	"github.com/docker/distribution/reference"
-	digest "github.com/opencontainers/go-digest"
 	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/registry"
@@ -42,16 +41,14 @@ func PullImage(ref *reference.Named) (err error) {
 	}
 
 	log.Info().Msgf("Obtaining config: %s\n", manifest.Config.Digest)
-	d := digest.Digest(manifest.Config.Digest)
-	manifest.Config.Filename, err = registry.PullFromDigest(user, repo, token, &d)
+	manifest.Config.Filename, err = registry.PullFromDigest(user, repo, token, manifest.Config.Digest)
 	if err != nil {
 		return err
 	}
 
 	log.Info().Msg("Obtaining layers")
 	for _, l := range manifest.Layers {
-		d := digest.Digest(l.Digest)
-		l.Filename, err = registry.PullFromDigest(user, repo, token, &d)
+		l.Filename, err = registry.PullFromDigest(user, repo, token, l.Digest)
 		if err != nil {
 			return err
 		}
