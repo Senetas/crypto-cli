@@ -18,13 +18,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
 	"path"
 	"strconv"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/types"
 	"github.com/Senetas/crypto-cli/utils"
@@ -43,13 +43,13 @@ func PushImage(user, repo, tag, service, authServer string, manifest *types.Imag
 			return err
 		}
 	}
-	fmt.Println("Layers and config uploaded successfully")
+	log.Info().Msg("Layers and config uploaded successfully")
 
 	mdigest, err := PushManifest(user, repo, tag, token, manifest)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Successfully uploaded manifest with digest: %s\n", mdigest)
+	log.Info().Msgf("Successfully uploaded manifest with digest: %s\n", mdigest)
 
 	return nil
 }
@@ -80,22 +80,10 @@ func PushManifest(user, repo, tag, token string, manifest *types.ImageManifestJS
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
 
-	dump, err := httputil.DumpRequestOut(req, true)
+	resp, err := doRequest(client, req, true, true)
 	if err != nil {
 		return "", err
 	}
-	fmt.Println(string(dump))
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-
-	dump, err = httputil.DumpResponse(resp, true)
-	if err != nil {
-		return "", err
-	}
-	fmt.Println(string(dump))
 
 	if resp.StatusCode != http.StatusCreated {
 		return "", errors.New("manifest upload failed with status: " + resp.Status)
@@ -116,7 +104,7 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 	}
 
 	if layerExists {
-		fmt.Println("Layer " + layerData.Digest + " exists")
+		log.Info().Msgf("Layer %s exists.", layerData.Digest)
 		return nil
 	}
 
@@ -134,25 +122,13 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 
 	req.Header.Add("Authorization", "Bearer "+token)
 
-	dump, err := httputil.DumpRequestOut(req, true)
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(dump))
-
-	resp, err := client.Do(req)
+	resp, err := doRequest(client, req, true, true)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		err = utils.CheckedClose(resp.Body, err)
 	}()
-
-	dump, err = httputil.DumpResponse(resp, true)
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(dump))
 
 	if resp.StatusCode != http.StatusAccepted {
 		return errors.New("upload of layer " + layerData.Digest + " was not accepted")
@@ -198,25 +174,13 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 	req.Header.Add("Content-Length", strconv.FormatInt(stat.Size(), 10))
 	req.Header.Add("Content-Type", "application/octect-stream")
 
-	dump, err = httputil.DumpRequestOut(req, false)
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(dump))
-
-	resp, err = client.Do(req)
+	resp, err = doRequest(client, req, false, true)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		err = utils.CheckedClose(resp.Body, err)
 	}()
-
-	dump, err = httputil.DumpResponse(resp, true)
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(dump))
 
 	if resp.StatusCode != http.StatusCreated {
 		return errors.New("upload of layer " + layerData.Digest + " failed")
@@ -239,7 +203,7 @@ func checkLayer(user, repo, token, digest string) (b bool, err error) {
 
 	req.Header.Add("Authorization", "Bearer "+token)
 
-	resp, err := client.Do(req)
+	resp, err := doRequest(client, req, true, true)
 	if err != nil {
 		return false, err
 	}
@@ -247,12 +211,6 @@ func checkLayer(user, repo, token, digest string) (b bool, err error) {
 		b = false
 		err = utils.CheckedClose(resp.Body, err)
 	}()
-
-	//dump, err := httputil.DumpRequestOut(req, true)
-	//if err != nil {
-	//return false, err
-	//}
-	//fmt.Println(string(dump))
 
 	return resp.StatusCode == http.StatusOK, nil
 }

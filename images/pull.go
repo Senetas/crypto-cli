@@ -15,11 +15,11 @@
 package images
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/docker/distribution/reference"
 	digest "github.com/opencontainers/go-digest"
+	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/registry"
 )
@@ -41,14 +41,14 @@ func PullImage(ref *reference.Named) (err error) {
 		return err
 	}
 
-	fmt.Printf("Obtaining config: %s\n", manifest.Config.Digest)
+	log.Info().Msgf("Obtaining config: %s\n", manifest.Config.Digest)
 	d := digest.Digest(manifest.Config.Digest)
 	manifest.Config.Filename, err = registry.PullFromDigest(user, repo, token, &d)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("Obtaining layers")
+	log.Info().Msg("Obtaining layers")
 	for _, l := range manifest.Layers {
 		d := digest.Digest(l.Digest)
 		l.Filename, err = registry.PullFromDigest(user, repo, token, &d)

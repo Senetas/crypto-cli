@@ -19,9 +19,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"os"
-	//"net/http/httputil"
 	"net/url"
+	"os"
 	"path"
 	"path/filepath"
 
@@ -52,25 +51,13 @@ func PullManifest(user, repo, tag, token string) (manifest *types.ImageManifestJ
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	//dump, err := httputil.DumpRequest(req, true)
-	//if err != nil {
-	//return nil, err
-	//}
-	//fmt.Println(string(dump))
-
-	resp, err := client.Do(req)
+	resp, err := doRequest(client, req, true, true)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		err = resp.Body.Close()
+		err = utils.CheckedClose(resp.Body, err)
 	}()
-
-	//dump, err = httputil.DumpResponse(resp, true)
-	//if err != nil {
-	//return nil, err
-	//}
-	//fmt.Println(string(dump))
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.New("manifest upload failed with status: " + resp.Status)
@@ -106,25 +93,13 @@ func PullFromDigest(user, repo, token string, d *digest.Digest) (fn string, err 
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	//dump, err := httputil.DumpRequest(req, true)
-	//if err != nil {
-	//return "", err
-	//}
-	//fmt.Println(string(dump))
-
-	resp, err := client.Do(req)
+	resp, err := doRequest(client, req, true, false)
 	if err != nil {
 		return "", err
 	}
 	defer func() {
-		err = resp.Body.Close()
+		err = utils.CheckedClose(resp.Body, err)
 	}()
-
-	//dump, err := httputil.DumpResponse(resp, false)
-	//if err != nil {
-	//return "", err
-	//}
-	//fmt.Println(string(dump))
 
 	if resp.StatusCode != http.StatusOK {
 		return "", errors.New("Failed to download blob" + d.String())
