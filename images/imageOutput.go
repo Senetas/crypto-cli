@@ -28,7 +28,6 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
-	"github.com/rs/zerolog/log"
 	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/crypto"
@@ -44,64 +43,27 @@ func CreateManifest(ref *reference.Named) (manifest *types.ImageManifestJSON, er
 		return nil, err
 	}
 
-	layers, img, err := getImgTarLayers(repo, tag)
+	layers, tarFH, err := getImgTarLayers(repo, tag)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		err = utils.CheckedClose(img, err)
+		err = utils.CheckedClose(tarFH, err)
 	}()
 
 	// output image
 	manifest = &types.ImageManifestJSON{
 		SchemaVersion: 2,
 		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
-		DirName:       path + uuid.New().String()}
-	imgFile := manifest.DirName + ".tar"
+		DirName:       path + uuid.New().String(),
+	}
 
-	if err = os.MkdirAll(manifest.DirName, 0755); err != nil {
+	// extract image
+	if err = extractTarBall(tarFH, manifest); err != nil {
 		return nil, err
 	}
 
-	outFile, err := os.Create(imgFile)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		err = utils.CheckedClose(outFile, err)
-	}()
-
-	if _, err = io.Copy(outFile, img); err != nil {
-		return nil, err
-	}
-
-	if err = outFile.Sync(); err != nil {
-		return nil, err
-	}
-
-	go func() {
-		if err := img.Close(); err != nil {
-			log.Error().Err(err)
-		}
-	}()
-
-	if err = tarinator.UnTarinate(manifest.DirName, imgFile); err != nil {
-		return nil, err
-	}
-
-	// delete source tarball
-	go func() {
-		if err := os.Remove(imgFile); err != nil {
-			log.Error().Err(err)
-		}
-	}()
-
-	layerSet := make(map[string]bool)
-	for _, x := range layers {
-		layerSet[x] = true
-	}
-
-	configData, layerData, err := findLayers(repo, tag, manifest.DirName, layerSet)
+	configData, layerData, err := findLayers(repo, tag, manifest.DirName, layers)
 	if err != nil {
 		return nil, err
 	}
@@ -109,8 +71,8 @@ func CreateManifest(ref *reference.Named) (manifest *types.ImageManifestJSON, er
 	manifest.Config = configData
 	manifest.Layers = layerData
 
-	pass := "hunter2"
 	salt := fmt.Sprintf(configSalt, repo, tag)
+
 	if err = manifest.Config.Crypto.Encrypt(pass, salt); err != nil {
 		return nil, err
 	}
@@ -191,9 +153,45 @@ func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
 	return layers, img, nil
 }
 
+func extractTarBall(tarFH io.Reader, manifest *types.ImageManifestJSON) (err error) {
+	tarfile := manifest.DirName + ".tar"
+
+	if err = os.MkdirAll(manifest.DirName, 0755); err != nil {
+		return err
+	}
+
+	outFH, err := os.Create(tarfile)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = utils.CheckedClose(outFH, err)
+	}()
+
+	if _, err = io.Copy(outFH, tarFH); err != nil {
+		return err
+	}
+
+	if err = outFH.Sync(); err != nil {
+		return err
+	}
+
+	if err = tarinator.UnTarinate(manifest.DirName, tarfile); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // find the layer files that correponds to the digests we want to encrypt
 // TODO: find a way to do this by interfacing with the daemon directly
-func findLayers(repo, tag, path string, layerSet map[string]bool) (*types.LayerJSON, []*types.LayerJSON, error) {
+func findLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*types.LayerJSON, error) {
+	// assemble layers
+	layerSet := make(map[string]bool)
+	for _, x := range layers {
+		layerSet[x] = true
+	}
+
 	dat, err := ioutil.ReadFile(filepath.Join(path, "manifest.json"))
 	if err != nil {
 		return nil, nil, err
@@ -221,7 +219,7 @@ func findLayers(repo, tag, path string, layerSet map[string]bool) (*types.LayerJ
 
 	config := types.NewConfigJSON(filename, digest, size, key)
 
-	layers := make([]*types.LayerJSON, len(images[0].Layers))
+	layerJSON := make([]*types.LayerJSON, len(images[0].Layers))
 	for i, f := range images[0].Layers {
 		basename := filepath.Join(path, f)
 		sum, err := crypto.Sha256sum(basename)
@@ -235,17 +233,17 @@ func findLayers(repo, tag, path string, layerSet map[string]bool) (*types.LayerJ
 			if err != nil {
 				return nil, nil, err
 			}
-			layers[i] = types.NewLayerJSON(filename, digest, size, key)
+			layerJSON[i] = types.NewLayerJSON(filename, digest, size, key)
 		} else {
 			filename, digest, size, _, err := compressLayer(basename)
 			if err != nil {
 				return nil, nil, err
 			}
-			layers[i] = types.NewPlainLayerJSON(filename, digest, size)
+			layerJSON[i] = types.NewPlainLayerJSON(filename, digest, size)
 		}
 	}
 
-	return config, layers, nil
+	return config, layerJSON, nil
 }
 
 func compressLayer(filename string) (compFile string, dg string, size int64, key []byte, err error) {
