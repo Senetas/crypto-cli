@@ -28,9 +28,9 @@ type EncAlgo string
 const (
 	// None represents an identity encryption function
 	None EncAlgo = "NONE"
-	// PassPBKDF2AESGCM represents encryption with AES-GCM with a key derived
+	// Pbkdf2Aes256Gcm represents aead with AES256-GCM with a key derived
 	// from a passphrase using PBKDF2
-	PassPBKDF2AESGCM EncAlgo = "PASS_PBKDF2_AES_GCM"
+	Pbkdf2Aes256Gcm EncAlgo = "PBKDF2-AES256-GCM"
 )
 
 // Deckey decrypts the ciphertext = key with the given passphrase and salt

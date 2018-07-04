@@ -99,8 +99,9 @@ func newPlainLayerJSON(filename string, d *digest.Digest, size int64) *LayerJSON
 func newLayerJSON(filename string, d *digest.Digest, size int64, plaintextKey []byte) *LayerJSON {
 	layer := newPlainLayerJSON(filename, d, size)
 	layer.Crypto = &CryptoJSON{
-		CryptoType: crypto.PassPBKDF2AESGCM,
-		DecKey:     plaintextKey}
+		CryptoType: crypto.Pbkdf2Aes256Gcm,
+		DecKey:     plaintextKey,
+	}
 	return layer
 }
 

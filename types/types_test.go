@@ -23,17 +23,17 @@ import (
 )
 
 func TestCrypto(t *testing.T) {
-	plaintext := []byte("Hello my name a Borat!")
+	plaintext := []byte("196884 = 196883 + 1")
 	c := &types.CryptoJSON{
-		CryptoType: crypto.PassPBKDF2AESGCM,
-		DecKey:     plaintext}
+		CryptoType: crypto.Pbkdf2Aes256Gcm,
+		DecKey:     plaintext,
+	}
 
 	if err := c.Encrypt("hunter2", "saltysaltysaltysalty"); err != nil {
 		t.Error(err)
 	}
 
-	// make a copy
-	d := c
+	d := c // make a copy
 
 	if err := d.Decrypt("hunter2", "saltysaltysaltysalty"); err != nil {
 		t.Error(err)
