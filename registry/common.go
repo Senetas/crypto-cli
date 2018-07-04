@@ -7,6 +7,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const (
+	regAddr = "registry-1.docker.io"
+	regPath = "v2"
+)
+
 func doRequest(client *http.Client, req *http.Request, reqBody, respBody bool) (*http.Response, error) {
 	dump, err := httputil.DumpRequestOut(req, reqBody)
 	if err != nil {

@@ -60,6 +60,9 @@ func CompressWithDigest(file string) (d *digest.Digest, err error) {
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		err = CheckedClose(in, err)
+	}()
 
 	out, err := os.Create(file + ".gz")
 	if err != nil {
@@ -71,42 +74,14 @@ func CompressWithDigest(file string) (d *digest.Digest, err error) {
 
 	digester := digest.Canonical.Digester()
 	mw := io.MultiWriter(digester.Hash(), out)
+	zw := gzip.NewWriter(mw)
 
-	// for some reason, not using pipes with writing from gzip to hashes does not work
-	// so while the go routines should be able to be replaced by a single io.Copy, it cannot
-	pr, pw := io.Pipe()
-	c := make(chan error)
-	defer close(c)
+	if _, err = io.Copy(zw, in); err != nil {
+		return nil, err
+	}
 
-	go func() {
-		var err error
-		defer func() {
-			err = CheckedClose(pw, err)
-		}()
-		zw := gzip.NewWriter(pw)
-		if _, err = io.Copy(zw, in); err != nil {
-			c <- err
-		}
-		if err = zw.Close(); err != nil {
-			c <- err
-		}
-		if err = in.Close(); err != nil {
-			c <- err
-		}
-		c <- nil
-	}()
-
-	go func() {
-		if _, err = io.Copy(mw, pr); err != nil {
-			c <- err
-		}
-		c <- nil
-	}()
-
-	for i := 0; i < 2; i++ {
-		if err = <-c; err != nil {
-			return nil, err
-		}
+	if err = zw.Close(); err != nil {
+		return nil, err
 	}
 
 	ds := digester.Digest()
@@ -114,16 +89,8 @@ func CompressWithDigest(file string) (d *digest.Digest, err error) {
 }
 
 // Decompress a file as gz, should already be tarred, assumes file uses the
-// system seperator. Also calcuates the digest in parallel
+// system seperator (i.e. built with filepath). Also calcuates the digest in parallel
 func Decompress(file string) (d *digest.Digest, err error) {
-	out, err := os.Create(file + ".dec")
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		err = CheckedClose(out, err)
-	}()
-
 	in, err := os.Open(file)
 	if err != nil {
 		return nil, err
@@ -132,21 +99,29 @@ func Decompress(file string) (d *digest.Digest, err error) {
 		err = CheckedClose(in, err)
 	}()
 
-	r, err := gzip.NewReader(in)
+	out, err := os.Create(file + ".dec")
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		err = CheckedClose(r, err)
+		err = CheckedClose(out, err)
 	}()
+
+	zr, err := gzip.NewReader(in)
+	if err != nil {
+		return nil, err
+	}
 
 	digester := digest.Canonical.Digester()
 	mw := io.MultiWriter(digester.Hash(), out)
 
-	if _, err = io.Copy(mw, r); err != nil {
+	if _, err = io.Copy(mw, zr); err != nil {
 		return nil, err
 	}
-	r.Close()
+
+	if err = zr.Close(); err != nil {
+		return nil, err
+	}
 
 	ds := digester.Digest()
 	return &ds, nil

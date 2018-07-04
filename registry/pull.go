@@ -75,9 +75,6 @@ func PullManifest(user, repo, tag, token string) (manifest *types.ImageManifestJ
 // PullFromDigest downloads a blob (refereced by its digest) from the registry to a temporay file.
 // It verifies that the downloaded matches its digest, deleting if if it does not
 func PullFromDigest(user, repo, token string, d *digest.Digest) (fn string, err error) {
-	regAddr := "registry-1.docker.io"
-	regPath := "v2"
-
 	u := url.URL{
 		Scheme: "https",
 		Host:   regAddr,
@@ -97,16 +94,12 @@ func PullFromDigest(user, repo, token string, d *digest.Digest) (fn string, err 
 	if err != nil {
 		return "", err
 	}
-	defer func() {
-		err = utils.CheckedClose(resp.Body, err)
-	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", errors.New("Failed to download blob" + d.String())
 	}
 
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto")
-
 	if err = os.MkdirAll(dir, 0755); err != nil {
 		return "", err
 	}
@@ -124,6 +117,10 @@ func PullFromDigest(user, repo, token string, d *digest.Digest) (fn string, err 
 	mw := io.MultiWriter(vw, fh)
 
 	if _, err = io.Copy(mw, resp.Body); err != nil {
+		return "", err
+	}
+
+	if err = resp.Body.Close(); err != nil {
 		return "", err
 	}
 

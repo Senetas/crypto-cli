@@ -57,9 +57,6 @@ func PushImage(user, repo, tag, service, authServer string, manifest *types.Imag
 
 // PushManifest puts a manifest on the registry
 func PushManifest(user, repo, tag, token string, manifest *types.ImageManifestJSON) (string, error) {
-	regAddr := "registry-1.docker.io"
-	regPath := "v2"
-
 	manifestJSON, err := json.MarshalIndent(manifest, "", "\t")
 	if err != nil {
 		return "", err

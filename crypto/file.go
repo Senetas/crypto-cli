@@ -91,7 +91,6 @@ func EncFile(infile, outfile string, key []byte) (d *digest.Digest, size int64, 
 	size, err = sio.Encrypt(mw, inFH, cfg)
 
 	ds := digester.Digest()
-
 	return &ds, size, nil
 }
 
