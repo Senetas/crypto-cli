@@ -15,6 +15,7 @@
 package images
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/docker/distribution/reference"
@@ -26,8 +27,15 @@ import (
 func PushImage(ref *reference.Named) (err error) {
 	repo, tag, err := resloveNamed(ref)
 	if err != nil {
-		return nil
+		return err
 	}
+
+	endpoint, err := getEndPoint(ref)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(endpoint)
 
 	manifest, err := CreateManifest(ref)
 	if err != nil {
@@ -35,7 +43,7 @@ func PushImage(ref *reference.Named) (err error) {
 	}
 
 	// Upload to registry
-	if err = registry.PushImage(user, repo, tag, service, authServer, manifest); err != nil {
+	if err = registry.PushImage(user, repo, tag, service, authServer, manifest, endpoint); err != nil {
 		return err
 	}
 

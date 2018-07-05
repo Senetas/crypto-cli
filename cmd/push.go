@@ -16,8 +16,8 @@ package cmd
 
 import (
 	"github.com/docker/distribution/reference"
-	//"github.com/docker/docker/registry"
 	"github.com/spf13/cobra"
+	//"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/Senetas/crypto-cli/images"
 )
@@ -51,11 +51,6 @@ func runPush(remote string) error {
 	if err = images.PushImage(&ref); err != nil {
 		return err
 	}
-
-	//repoInfo, err := registry.ParseRepositoryInfo(ref)
-	//if err != nil {
-	//return err
-	//}
 
 	return nil
 }

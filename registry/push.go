@@ -21,9 +21,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"strconv"
 
+	"github.com/docker/distribution/reference"
+	"github.com/docker/distribution/registry/api/v2"
+	"github.com/docker/docker/registry"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/rs/zerolog/log"
 
@@ -32,7 +34,7 @@ import (
 )
 
 // PushImage pushes the config, layers and mainifest to the nominated registry, in that order
-func PushImage(user, repo, tag, service, authServer string, manifest *types.ImageManifestJSON) error {
+func PushImage(user, repo, tag, service, authServer string, ref *reference.Named, manifest *types.ImageManifestJSON, endpoint *registry.APIEndpoint) error {
 	// Authenticate with the Auth server
 	token, err := Authenticate(user, service, repo, authServer)
 
@@ -46,7 +48,7 @@ func PushImage(user, repo, tag, service, authServer string, manifest *types.Imag
 	}
 	log.Info().Msg("Layers and config uploaded successfully")
 
-	mdigest, err := PushManifest(user, repo, tag, token, manifest)
+	mdigest, err := PushManifest(token, ref, manifest, endpoint)
 	if err != nil {
 		return err
 	}
@@ -56,19 +58,20 @@ func PushImage(user, repo, tag, service, authServer string, manifest *types.Imag
 }
 
 // PushManifest puts a manifest on the registry
-func PushManifest(user, repo, tag, token string, manifest *types.ImageManifestJSON) (string, error) {
+func PushManifest(token string, ref *reference.Named, manifest *types.ImageManifestJSON, endpoint *registry.APIEndpoint) (string, error) {
 	manifestJSON, err := json.MarshalIndent(manifest, "", "\t")
 	if err != nil {
 		return "", err
 	}
 
-	u := &url.URL{
-		Scheme: "https",
-		Host:   regAddr,
-		Path:   path.Join(regPath, repo, "manifests", tag)}
+	builder := v2.NewURLBuilder(endpoint.URL, false)
+	urlStr, err := builder.BuildManifestURL(*ref)
+	if err != nil {
+		return "", err
+	}
 
 	client := &http.Client{}
-	req, err := http.NewRequest("PUT", u.String(), bytes.NewReader(manifestJSON))
+	req, err := http.NewRequest("PUT", urlStr, bytes.NewReader(manifestJSON))
 	if err != nil {
 		return "", err
 	}
@@ -96,7 +99,7 @@ func PushManifest(user, repo, tag, token string, manifest *types.ImageManifestJS
 
 // PushLayer pushes a layer to the registry, checking if it exists
 func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err error) {
-	layerExists, err := checkLayer(user, repo, token, layerData.Digest)
+	layerExists, err := checkLayer(token, ref, layerData.Digest)
 	if err != nil {
 		return err
 	}
@@ -187,14 +190,20 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 	return nil
 }
 
-func checkLayer(user, repo, token string, d *digest.Digest) (b bool, err error) {
-	u := url.URL{
-		Scheme: "https",
-		Host:   "registry-1.docker.io",
-		Path:   path.Join("v2", repo, "blobs", d.String())}
+func checkLayer(token string, ref *reference.Named, d *digest.Digest, endpoint *registry.APIEndpoint) (b bool, err error) {
+	canonical, err := reference.WithDigest(ref, d)
+	if err != nil {
+		return false, err
+	}
+
+	builder := v2.NewURLBuilder(endpoint.URL, false)
+	urlStr, err := builder.BuildManifestURL(*ref)
+	if err != nil {
+		return false, err
+	}
 
 	client := &http.Client{}
-	req, err := http.NewRequest("HEAD", u.String(), nil)
+	req, err := http.NewRequest("HEAD", urlStr, nil)
 	if err != nil {
 		return false, err
 	}
