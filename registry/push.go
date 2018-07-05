@@ -19,14 +19,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"net/url"
-	"os"
-	"strconv"
+	//"os"
 
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/v2"
 	"github.com/docker/docker/registry"
-	digest "github.com/opencontainers/go-digest"
 	"github.com/rs/zerolog/log"
 
 	cref "github.com/Senetas/crypto-cli/reference"
@@ -108,30 +105,30 @@ func PushManifest(token string, ref *reference.Named, manifest *types.ImageManif
 
 // PushLayer pushes a layer to the registry, checking if it exists
 func PushLayer(token string, ref *reference.Named, layerData *types.LayerJSON, endpoint *registry.APIEndpoint) (err error) {
-	layerExists, err := checkLayer(token, ref, layerData.Digest, endpoint)
+	canonical, err := reference.WithDigest(*ref, *layerData.Digest)
 	if err != nil {
 		return err
 	}
 
-	if layerExists {
+	bldr := v2.NewURLBuilder(endpoint.URL, false)
+
+	layerExists, err := checkLayer(token, &canonical, bldr)
+	if err != nil {
+		log.Info().Msg("error pushing layer")
+		return err
+	} else if layerExists {
 		log.Info().Msgf("Layer %s exists.", layerData.Digest)
 		return nil
 	}
 
 	// get the location to upload the blob
-
-	repo, _, err := cref.ResloveNamed(ref)
+	uploadURLStr, err := bldr.BuildBlobUploadURL(*ref, nil)
 	if err != nil {
 		return err
 	}
-	u := &url.URL{
-		Scheme: "https",
-		Host:   "registry-1.docker.io",
-		Path:   utils.PathTrailingJoin("v2", repo, "blobs", "uploads"),
-	}
 
 	client := &http.Client{}
-	req, err := http.NewRequest("POST", u.String(), nil)
+	req, err := http.NewRequest("POST", uploadURLStr, nil)
 	if err != nil {
 		return err
 	}
@@ -151,76 +148,85 @@ func PushLayer(token string, ref *reference.Named, layerData *types.LayerJSON, e
 	}
 
 	// now actually upload the blob
-	u, err = url.Parse(resp.Header.Get("Location"))
+	u := resp.Header.Get("Location")
+	if u == "" {
+		return errors.New("server did not return navigation link")
+	}
+
+	uuid := resp.Header.Get("Uuid")
+	if uuid == "" {
+		return errors.New("server did not return uuid")
+	}
+
+	bldr, err = v2.NewURLBuilderFromString(u, false)
 	if err != nil {
 		return err
 	}
 
-	q, err := url.ParseQuery(u.RawQuery)
-	if err != nil {
-		return err
-	}
-	q.Add("digest", layerData.Digest.String())
-	rawq, err := url.QueryUnescape(q.Encode())
-	if err != nil {
-		return err
-	}
-	u.RawQuery = rawq
-
-	// open the layer file to get size and upload
-	layerFH, err := os.Open(layerData.Filename)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		err = utils.CheckedClose(layerFH, err)
-	}()
-
-	stat, err := layerFH.Stat()
+	chunckURL, err := bldr.BuildBlobUploadChunkURL(*ref, uuid, nil)
 	if err != nil {
 		return err
 	}
 
-	req, err = http.NewRequest("PUT", u.String(), layerFH)
-	if err != nil {
-		return err
-	}
+	println(chunckURL)
 
-	req.Header.Add("Authorization", "Bearer "+token)
-	req.Header.Add("Content-Length", strconv.FormatInt(stat.Size(), 10))
-	req.Header.Add("Content-Type", "application/octect-stream")
+	//q, err := url.ParseQuery(u.RawQuery)
+	//if err != nil {
+	//return err
+	//}
+	//q.Add("digest", layerData.Digest.String())
+	//rawq, err := url.QueryUnescape(q.Encode())
+	//if err != nil {
+	//return err
+	//}
+	//u.RawQuery = rawq
 
-	resp, err = doRequest(client, req, false, true)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		err = utils.CheckedClose(resp.Body, err)
-	}()
+	//// open the layer file to get size and upload
+	//layerFH, err := os.Open(layerData.Filename)
+	//if err != nil {
+	//return err
+	//}
+	//defer func() {
+	//err = utils.CheckedClose(layerFH, err)
+	//}()
 
-	if resp.StatusCode != http.StatusCreated {
-		return errors.New("upload of layer " + layerData.Digest.String() + " failed")
-	}
+	//stat, err := layerFH.Stat()
+	//if err != nil {
+	//return err
+	//}
+
+	//req, err = http.NewRequest("PUT", u.String(), layerFH)
+	//if err != nil {
+	//return err
+	//}
+
+	//req.Header.Add("Authorization", "Bearer "+token)
+	//req.Header.Add("Content-Length", strconv.FormatInt(stat.Size(), 10))
+	//req.Header.Add("Content-Type", "application/octect-stream")
+
+	//resp, err = doRequest(client, req, false, true)
+	//if err != nil {
+	//return err
+	//}
+	//defer func() {
+	//err = utils.CheckedClose(resp.Body, err)
+	//}()
+
+	//if resp.StatusCode != http.StatusCreated {
+	//return errors.New("upload of layer " + layerData.Digest.String() + " failed")
+	//}
 
 	return nil
 }
 
-func checkLayer(token string, ref *reference.Named, d *digest.Digest, endpoint *registry.APIEndpoint) (b bool, err error) {
-
-	//canonical, err := reference.WithDigest(*ref, *d)
-	//if err != nil {
-	//return false, err
-	//}
-
-	builder := v2.NewURLBuilder(endpoint.URL, false)
-
-	urlStr, err := builder.BuildManifestURL(*ref)
+func checkLayer(token string, ref *reference.Canonical, bldr *v2.URLBuilder) (b bool, err error) {
+	layerURLStr, err := bldr.BuildBlobUploadURL(*ref, nil)
 	if err != nil {
 		return false, err
 	}
 
 	client := &http.Client{}
-	req, err := http.NewRequest("HEAD", urlStr, nil)
+	req, err := http.NewRequest("HEAD", layerURLStr, nil)
 	if err != nil {
 		return false, err
 	}
@@ -236,5 +242,12 @@ func checkLayer(token string, ref *reference.Named, d *digest.Digest, endpoint *
 		err = utils.CheckedClose(resp.Body, err)
 	}()
 
-	return resp.StatusCode == http.StatusOK, nil
+	if resp.StatusCode == http.StatusOK {
+		return true, nil
+	} else if resp.StatusCode == http.StatusNotFound {
+		return false, nil
+	} else {
+		log.Fatal().Msg("error testing exsistance of layer")
+	}
+	return false, nil
 }

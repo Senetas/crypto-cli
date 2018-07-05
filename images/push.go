@@ -15,7 +15,7 @@
 package images
 
 import (
-	"fmt"
+	//"fmt"
 	"os"
 
 	"github.com/docker/distribution/reference"
@@ -31,7 +31,7 @@ func PushImage(ref *reference.Named) (err error) {
 		return err
 	}
 
-	fmt.Println(endpoint)
+	//fmt.Println(endpoint)
 
 	manifest, err := CreateManifest(ref)
 	if err != nil {

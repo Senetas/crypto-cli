@@ -29,6 +29,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
 	digest "github.com/opencontainers/go-digest"
+	"github.com/rs/zerolog/log"
 	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/crypto"
@@ -41,16 +42,13 @@ import (
 // These are they ready to be uploaded to a regitry
 func CreateManifest(ref *reference.Named) (manifest *types.ImageManifestJSON, err error) {
 	repo, tag, err := cref.ResloveNamed(ref)
-	if err != nil {
-		return nil, err
-	}
+	handleErr(log.Fatal().Caller(), err, "could not resolve names")
 
 	layers, tarFH, err := getImgTarLayers(repo, tag)
-	if err != nil {
-		return nil, err
-	}
+	handleErr(log.Fatal().Caller(), err, "could not get img layers")
 	defer func() {
-		err = utils.CheckedClose(tarFH, err)
+		err = tarFH.Close()
+		handleErr(log.Error().Caller(), err, ("could not close file"))
 	}()
 
 	// output image
@@ -61,9 +59,8 @@ func CreateManifest(ref *reference.Named) (manifest *types.ImageManifestJSON, er
 	}
 
 	// extract image
-	if err = extractTarBall(tarFH, manifest); err != nil {
-		return nil, err
-	}
+	err = extractTarBall(tarFH, manifest)
+	handleErr(log.Fatal().Caller(), err, "could not extractTarBall")
 
 	configData, layerData, err := findLayers(repo, tag, manifest.DirName, layers)
 	if err != nil {

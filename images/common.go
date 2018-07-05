@@ -17,6 +17,8 @@ package images
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/rs/zerolog"
 )
 
 const labelString = "LABEL com.senetas.crypto.enabled=true"
@@ -32,3 +34,13 @@ const (
 )
 
 var path = filepath.Join(os.TempDir(), "com.senetas.crypto")
+
+func init() {
+	zerolog.TimeFieldFormat = ""
+}
+
+func handleErr(log *zerolog.Event, err error, msg string) {
+	if err != nil {
+		log.Err(err).Msg(msg)
+	}
+}

@@ -3,113 +3,14 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/Azure/go-ansiterm"
-  packages = [
-    ".",
-    "winterm"
-  ]
-  revision = "d6e3b3328b783f23731bc4d058875b0371ff8109"
-
-[[projects]]
-  name = "github.com/Microsoft/go-winio"
-  packages = ["."]
-  revision = "67921128fb397dd80339870d2193d6b1e6856fd4"
-  version = "v0.4.8"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/Nvveen/Gotty"
-  packages = ["."]
-  revision = "cd527374f1e5bff4938207604a14f2e38a9cf512"
-
-[[projects]]
-  name = "github.com/Sirupsen/logrus"
-  packages = ["."]
-  revision = "d682213848ed68c0a260ca37d6dd5ace8423f5ba"
-  version = "v1.0.4"
-
-[[projects]]
   name = "github.com/docker/distribution"
   packages = [
-    ".",
-    "context",
-    "digest",
+    "digestset",
     "reference",
     "registry/api/errcode",
-    "registry/api/v2",
-    "registry/client",
-    "registry/client/auth",
-    "registry/client/auth/challenge",
-    "registry/client/transport",
-    "registry/storage/cache",
-    "registry/storage/cache/memory",
-    "uuid"
+    "registry/api/v2"
   ]
-  revision = "48294d928ced5dd9b378f7fd7c6f5da3ff3f2c89"
-  version = "v2.6.2"
-
-[[projects]]
-  name = "github.com/docker/docker"
-  packages = [
-    "api",
-    "api/types",
-    "api/types/blkiodev",
-    "api/types/container",
-    "api/types/events",
-    "api/types/filters",
-    "api/types/image",
-    "api/types/mount",
-    "api/types/network",
-    "api/types/registry",
-    "api/types/strslice",
-    "api/types/swarm",
-    "api/types/time",
-    "api/types/versions",
-    "api/types/volume",
-    "cli/config",
-    "cli/config/configfile",
-    "client",
-    "opts",
-    "pkg/homedir",
-    "pkg/httputils",
-    "pkg/idtools",
-    "pkg/ioutils",
-    "pkg/jsonlog",
-    "pkg/jsonmessage",
-    "pkg/longpath",
-    "pkg/random",
-    "pkg/stringid",
-    "pkg/system",
-    "pkg/tarsum",
-    "pkg/term",
-    "pkg/term/windows",
-    "pkg/tlsconfig",
-    "registry"
-  ]
-  revision = "90d35abf7b3535c1c319c872900fbd76374e521c"
-  version = "v17.05.0-ce-rc3"
-
-[[projects]]
-  name = "github.com/docker/go-connections"
-  packages = [
-    "nat",
-    "sockets",
-    "tlsconfig"
-  ]
-  revision = "3ede32e2033de7505e6500d6c868c2b9ed9f169d"
-  version = "v0.3.0"
-
-[[projects]]
-  name = "github.com/docker/go-units"
-  packages = ["."]
-  revision = "47565b4f722fb6ceae66b95f853feed578a4a51c"
-  version = "v0.3.3"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/docker/libtrust"
-  packages = ["."]
-  revision = "aabc10ec26b754e797f9028f4589c5b7bd90dc20"
+  revision = "749f6afb4572201e3c37325d0ffedb6f32be8950"
 
 [[projects]]
   name = "github.com/fsnotify/fsnotify"
@@ -192,22 +93,10 @@
   version = "v1.0.0-rc1"
 
 [[projects]]
-  name = "github.com/opencontainers/runc"
-  packages = ["libcontainer/user"]
-  revision = "baf6536d6259209c3edfa2b22237af82942d3dfa"
-  version = "v0.1.1"
-
-[[projects]]
   name = "github.com/pelletier/go-toml"
   packages = ["."]
   revision = "c01d1270ff3e442a8a57cddc1c92dc1138598194"
   version = "v1.2.0"
-
-[[projects]]
-  name = "github.com/pkg/errors"
-  packages = ["."]
-  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
-  version = "v0.8.0"
 
 [[projects]]
   name = "github.com/rs/zerolog"
@@ -260,10 +149,10 @@
   version = "v1.0.2"
 
 [[projects]]
+  branch = "master"
   name = "github.com/udhos/equalfile"
   packages = ["."]
-  revision = "1fbb66f8eea48ae23e255307eb54f4258ec215cb"
-  version = "v0.1"
+  revision = "c92b0e41854b49e567ba269dcc572ada60e48e7b"
 
 [[projects]]
   branch = "master"
@@ -280,6 +169,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d9c482f32c9835b73730c014bd156879593d2c986e45a7007aadf133260decde"
+  inputs-digest = "e0a81b0e7a087cc81aef123552e0a90afb453d12edd22b5f0e31095ab4d54ae4"
   solver-name = "gps-cdcl"
   solver-version = 1

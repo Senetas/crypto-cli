@@ -2,21 +2,28 @@ package reference
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/registry"
 )
 
+const defaultPrefix = "docker.io/"
+
 // ResloveNamed parses a reference into a repo and tag
 func ResloveNamed(ref *reference.Named) (string, string, error) {
 	switch r := (*ref).(type) {
 	case reference.NamedTagged:
-		return reference.Path(r), r.Tag(), nil
+		return localName(ref), r.Tag(), nil
 	case reference.Named:
-		return reference.Path(r), "latest", nil
+		return localName(ref), "latest", nil
 	default:
 		return "", "", errors.New("invalid image name")
 	}
+}
+
+func localName(ref *reference.Named) string {
+	return strings.TrimPrefix((*ref).Name(), defaultPrefix)
 }
 
 // GetEndPoint returns the endpoint associted witht th reference

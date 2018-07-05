@@ -24,16 +24,11 @@
 #   go-tests = true
 #   unused-packages = true
 
-ignored = ["golang.org/x/*", "github.com/docker/docker", "github.com/docker/docker"]
+ignored = ["golang.org/x/*", "github.com/docker/docker/*"]
 
-
-#[[constraint]]
-  #name = "github.com/docker/distribution"
-  #version = "2.6.2"
-
-#[[constraint]]
-  #revision = ""
-  #name = "github.com/docker/docker"
+[[constraint]]
+  branch = "master"
+  name = "github.com/docker/distribution"
 
 [[constraint]]
   name = "github.com/google/uuid"
@@ -64,8 +59,8 @@ ignored = ["golang.org/x/*", "github.com/docker/docker", "github.com/docker/dock
   version = "1.0.2"
 
 [[constraint]]
+  branch = "master"
   name = "github.com/udhos/equalfile"
-  version = "0.1.0"
 
 [[constraint]]
   branch = "master"
