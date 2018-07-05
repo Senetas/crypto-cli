@@ -29,20 +29,29 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	"github.com/rs/zerolog/log"
 
+	cref "github.com/Senetas/crypto-cli/reference"
 	"github.com/Senetas/crypto-cli/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
 // PushImage pushes the config, layers and mainifest to the nominated registry, in that order
-func PushImage(user, repo, tag, service, authServer string, ref *reference.Named, manifest *types.ImageManifestJSON, endpoint *registry.APIEndpoint) error {
+func PushImage(user, service, authServer string, ref *reference.Named, manifest *types.ImageManifestJSON, endpoint *registry.APIEndpoint) error {
+	repo, _, err := cref.ResloveNamed(ref)
+	if err != nil {
+		return err
+	}
+
 	// Authenticate with the Auth server
 	token, err := Authenticate(user, service, repo, authServer)
+	if err != nil {
+		return err
+	}
 
-	if err = PushLayer(user, repo, tag, token, manifest.Config); err != nil {
+	if err = PushLayer(token, ref, manifest.Config, endpoint); err != nil {
 		return err
 	}
 	for _, l := range manifest.Layers {
-		if err = PushLayer(user, repo, tag, token, l); err != nil {
+		if err = PushLayer(token, ref, l, endpoint); err != nil {
 			return err
 		}
 	}
@@ -98,8 +107,8 @@ func PushManifest(token string, ref *reference.Named, manifest *types.ImageManif
 }
 
 // PushLayer pushes a layer to the registry, checking if it exists
-func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err error) {
-	layerExists, err := checkLayer(token, ref, layerData.Digest)
+func PushLayer(token string, ref *reference.Named, layerData *types.LayerJSON, endpoint *registry.APIEndpoint) (err error) {
+	layerExists, err := checkLayer(token, ref, layerData.Digest, endpoint)
 	if err != nil {
 		return err
 	}
@@ -110,10 +119,16 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 	}
 
 	// get the location to upload the blob
+
+	repo, _, err := cref.ResloveNamed(ref)
+	if err != nil {
+		return err
+	}
 	u := &url.URL{
 		Scheme: "https",
 		Host:   "registry-1.docker.io",
-		Path:   utils.PathTrailingJoin("v2", repo, "blobs", "uploads")}
+		Path:   utils.PathTrailingJoin("v2", repo, "blobs", "uploads"),
+	}
 
 	client := &http.Client{}
 	req, err := http.NewRequest("POST", u.String(), nil)
@@ -191,12 +206,14 @@ func PushLayer(user, repo, tag, token string, layerData *types.LayerJSON) (err e
 }
 
 func checkLayer(token string, ref *reference.Named, d *digest.Digest, endpoint *registry.APIEndpoint) (b bool, err error) {
-	canonical, err := reference.WithDigest(ref, d)
-	if err != nil {
-		return false, err
-	}
+
+	//canonical, err := reference.WithDigest(*ref, *d)
+	//if err != nil {
+	//return false, err
+	//}
 
 	builder := v2.NewURLBuilder(endpoint.URL, false)
+
 	urlStr, err := builder.BuildManifestURL(*ref)
 	if err != nil {
 		return false, err

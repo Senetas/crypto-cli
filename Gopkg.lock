@@ -25,8 +25,8 @@
 [[projects]]
   name = "github.com/Sirupsen/logrus"
   packages = ["."]
-  revision = "c155da19408a8799da419ed3eeb0cb5db0ad5dbc"
-  version = "v1.0.5"
+  revision = "d682213848ed68c0a260ca37d6dd5ace8423f5ba"
+  version = "v1.0.4"
 
 [[projects]]
   name = "github.com/docker/distribution"
@@ -272,53 +272,6 @@
   revision = "bd5444528f086b8f35e29a42c900bbc87e0e957b"
 
 [[projects]]
-  branch = "master"
-  name = "golang.org/x/crypto"
-  packages = [
-    "chacha20poly1305",
-    "internal/chacha20",
-    "internal/subtle",
-    "pbkdf2",
-    "poly1305",
-    "ssh/terminal"
-  ]
-  revision = "a49355c7e3f8fe157a85be2f77e6e269a0f89602"
-
-[[projects]]
-  branch = "master"
-  name = "golang.org/x/net"
-  packages = [
-    "context",
-    "context/ctxhttp",
-    "internal/socks",
-    "proxy"
-  ]
-  revision = "ed29d75add3d7c4bf7ca65aac0c6df3d1420216f"
-
-[[projects]]
-  branch = "master"
-  name = "golang.org/x/sys"
-  packages = [
-    "cpu",
-    "unix",
-    "windows"
-  ]
-  revision = "151529c776cdc58ddbe7963ba9af779f3577b419"
-
-[[projects]]
-  name = "golang.org/x/text"
-  packages = [
-    "internal/gen",
-    "internal/triegen",
-    "internal/ucd",
-    "transform",
-    "unicode/cldr",
-    "unicode/norm"
-  ]
-  revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
-  version = "v0.3.0"
-
-[[projects]]
   name = "gopkg.in/yaml.v2"
   packages = ["."]
   revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
@@ -327,6 +280,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b632250ff14da850e3c212b80349ef5c0ddfbc667e4aac4013f1a8869b0fbbe7"
+  inputs-digest = "d9c482f32c9835b73730c014bd156879593d2c986e45a7007aadf133260decde"
   solver-name = "gps-cdcl"
   solver-version = 1

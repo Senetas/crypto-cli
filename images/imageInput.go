@@ -28,6 +28,7 @@ import (
 	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/crypto"
+	cref "github.com/Senetas/crypto-cli/reference"
 	"github.com/Senetas/crypto-cli/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
@@ -35,7 +36,7 @@ import (
 // TarFromManifest takes a manifest and a target label for the images and create a tarball
 // that may be loaded with docker load. It downloads and decrypts the config and layers if necessary
 func TarFromManifest(manifest *types.ImageManifestJSON, target *reference.Named) (tarball string, err error) {
-	repo, tag, err := resloveNamed(target)
+	repo, tag, err := cref.ResloveNamed(target)
 	if err != nil {
 		return "", err
 	}

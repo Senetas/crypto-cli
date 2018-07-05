@@ -32,6 +32,7 @@ import (
 	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/crypto"
+	cref "github.com/Senetas/crypto-cli/reference"
 	"github.com/Senetas/crypto-cli/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
@@ -39,7 +40,7 @@ import (
 // CreateManifest creates a manifest and encrypts all necessary parts of it
 // These are they ready to be uploaded to a regitry
 func CreateManifest(ref *reference.Named) (manifest *types.ImageManifestJSON, err error) {
-	repo, tag, err := resloveNamed(ref)
+	repo, tag, err := cref.ResloveNamed(ref)
 	if err != nil {
 		return nil, err
 	}

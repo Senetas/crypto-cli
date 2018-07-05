@@ -20,17 +20,13 @@ import (
 
 	"github.com/docker/distribution/reference"
 
+	cref "github.com/Senetas/crypto-cli/reference"
 	"github.com/Senetas/crypto-cli/registry"
 )
 
 // PushImage encrypts then pushes an image
 func PushImage(ref *reference.Named) (err error) {
-	repo, tag, err := resloveNamed(ref)
-	if err != nil {
-		return err
-	}
-
-	endpoint, err := getEndPoint(ref)
+	endpoint, err := cref.GetEndPoint(ref)
 	if err != nil {
 		return err
 	}
@@ -43,7 +39,7 @@ func PushImage(ref *reference.Named) (err error) {
 	}
 
 	// Upload to registry
-	if err = registry.PushImage(user, repo, tag, service, authServer, manifest, endpoint); err != nil {
+	if err = registry.PushImage(user, service, authServer, ref, manifest, endpoint); err != nil {
 		return err
 	}
 

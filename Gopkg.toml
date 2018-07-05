@@ -24,14 +24,16 @@
 #   go-tests = true
 #   unused-packages = true
 
+ignored = ["golang.org/x/*", "github.com/docker/docker", "github.com/docker/docker"]
 
-[[constraint]]
-  name = "github.com/docker/distribution"
-  version = "2.6.2"
 
-[[constraint]]
-  name = "github.com/docker/docker"
-  version = "17.5.0-ce-rc3"
+#[[constraint]]
+  #name = "github.com/docker/distribution"
+  #version = "2.6.2"
+
+#[[constraint]]
+  #revision = ""
+  #name = "github.com/docker/docker"
 
 [[constraint]]
   name = "github.com/google/uuid"
@@ -68,10 +70,6 @@
 [[constraint]]
   branch = "master"
   name = "github.com/verybluebot/tarinator-go"
-
-[[constraint]]
-  branch = "master"
-  name = "golang.org/x/crypto"
 
 [prune]
   go-tests = true

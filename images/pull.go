@@ -20,12 +20,13 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/rs/zerolog/log"
 
+	cref "github.com/Senetas/crypto-cli/reference"
 	"github.com/Senetas/crypto-cli/registry"
 )
 
 // PullImage pulls an image from the registry
 func PullImage(ref *reference.Named) (err error) {
-	repo, tag, err := resloveNamed(ref)
+	repo, tag, err := cref.ResloveNamed(ref)
 	if err != nil {
 		return err
 	}
