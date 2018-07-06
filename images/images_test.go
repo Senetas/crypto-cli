@@ -21,6 +21,7 @@ import (
 	"github.com/docker/distribution/reference"
 
 	"github.com/Senetas/crypto-cli/images"
+	"github.com/Senetas/crypto-cli/registry"
 )
 
 func TestEncDecImage(t *testing.T) {
@@ -29,13 +30,18 @@ func TestEncDecImage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manifest, err := images.CreateManifest(&ref)
+	ref2, err := registry.ResolveNamed(ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	manifest, err := images.CreateManifest(ref2)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log(manifest)
 
-	if _, err = images.TarFromManifest(manifest, &ref); err != nil {
+	if _, err = images.TarFromManifest(manifest, ref2); err != nil {
 		t.Fatalf("%v\ne = %s", err, manifest.Config.Crypto)
 	}
 

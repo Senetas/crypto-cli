@@ -16,17 +16,19 @@ package registry
 
 import (
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path/filepath"
 
+	"github.com/pkg/errors"
+
+	"github.com/Senetas/crypto-cli/utils"
 	"github.com/docker/docker/cli/config"
 )
 
 // Authenticate against the given server, returning the bearer token
-func Authenticate(user, service, repo, authServer string) (string, error) {
+func Authenticate(user, service, authServer string, ref NamedRepository) (string, error) {
 	authToken, err := localAuthToken()
 	if err != nil {
 		return "", err
@@ -39,7 +41,7 @@ func Authenticate(user, service, repo, authServer string) (string, error) {
 	q := url.Values{}
 	q.Add("account", user)
 	q.Add("service", service)
-	q.Add("scope", "repository:"+repo+":pull,push")
+	q.Add("scope", "repository:"+ref.Path()+":pull,push")
 
 	rawQ, err := url.QueryUnescape(q.Encode())
 	if err != nil {
@@ -56,11 +58,13 @@ func Authenticate(user, service, repo, authServer string) (string, error) {
 
 	req.Header.Add("Authorization", "Basic "+authToken)
 
-	resp, err := client.Do(req)
+	resp, err := doRequest(client, req, true, false)
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		err = utils.CheckedClose(resp.Body, err)
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", errors.New("authentication failed with status: " + resp.Status)

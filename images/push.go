@@ -15,37 +15,40 @@
 package images
 
 import (
-	//"fmt"
 	"os"
 
 	"github.com/docker/distribution/reference"
+	"github.com/pkg/errors"
+	//"github.com/rs/zerolog/log"
 
-	cref "github.com/Senetas/crypto-cli/reference"
 	"github.com/Senetas/crypto-cli/registry"
 )
 
 // PushImage encrypts then pushes an image
-func PushImage(ref *reference.Named) (err error) {
-	endpoint, err := cref.GetEndPoint(ref)
+func PushImage(ref reference.Named) (err error) {
+	endpoint, err := registry.GetEndPoint(ref)
 	if err != nil {
 		return err
 	}
 
-	//fmt.Println(endpoint)
+	nTRep, err := registry.ResolveNamed(ref)
+	if err != nil {
+		return err
+	}
 
-	manifest, err := CreateManifest(ref)
+	manifest, err := CreateManifest(nTRep)
 	if err != nil {
 		return err
 	}
 
 	// Upload to registry
-	if err = registry.PushImage(user, service, authServer, ref, manifest, endpoint); err != nil {
+	if err = registry.PushImage(user, service, authServer, nTRep, manifest, endpoint); err != nil {
 		return err
 	}
 
 	// cleanup temporary files
 	if err = os.RemoveAll(manifest.DirName); err != nil {
-		return err
+		return errors.Wrap(err, "Warning: temporary files not removed!")
 	}
 
 	return nil

@@ -15,8 +15,9 @@
 package utils
 
 import (
-	"errors"
 	"io"
+
+	"github.com/pkg/errors"
 )
 
 // CheckedClose may be called on defer to properly close a resouce and log any errors

@@ -17,7 +17,6 @@ package images
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -25,30 +24,28 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
 	digest "github.com/opencontainers/go-digest"
-	"github.com/rs/zerolog/log"
+	"github.com/pkg/errors"
+	//"github.com/rs/zerolog/log"
 	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/crypto"
-	cref "github.com/Senetas/crypto-cli/reference"
+	"github.com/Senetas/crypto-cli/registry"
 	"github.com/Senetas/crypto-cli/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
 // CreateManifest creates a manifest and encrypts all necessary parts of it
 // These are they ready to be uploaded to a regitry
-func CreateManifest(ref *reference.Named) (manifest *types.ImageManifestJSON, err error) {
-	repo, tag, err := cref.ResloveNamed(ref)
-	handleErr(log.Fatal().Caller(), err, "could not resolve names")
-
-	layers, tarFH, err := getImgTarLayers(repo, tag)
-	handleErr(log.Fatal().Caller(), err, "could not get img layers")
+func CreateManifest(ref registry.NamedTaggedRepository) (manifest *types.ImageManifestJSON, err error) {
+	layers, tarFH, err := getImgTarLayers(ref.Path(), ref.Tag())
+	if err != nil {
+		return nil, err
+	}
 	defer func() {
-		err = tarFH.Close()
-		handleErr(log.Error().Caller(), err, ("could not close file"))
+		err = utils.CheckedClose(tarFH, err)
 	}()
 
 	// output image
@@ -59,10 +56,11 @@ func CreateManifest(ref *reference.Named) (manifest *types.ImageManifestJSON, er
 	}
 
 	// extract image
-	err = extractTarBall(tarFH, manifest)
-	handleErr(log.Fatal().Caller(), err, "could not extractTarBall")
+	if err = extractTarBall(tarFH, manifest); err != nil {
+		return nil, err
+	}
 
-	configData, layerData, err := findLayers(repo, tag, manifest.DirName, layers)
+	configData, layerData, err := findLayers(ref.Path(), ref.Tag(), manifest.DirName, layers)
 	if err != nil {
 		return nil, err
 	}
@@ -70,14 +68,14 @@ func CreateManifest(ref *reference.Named) (manifest *types.ImageManifestJSON, er
 	manifest.Config = configData
 	manifest.Layers = layerData
 
-	salt := fmt.Sprintf(configSalt, repo, tag)
+	salt := fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 
 	if err = manifest.Config.Crypto.Encrypt(pass, salt); err != nil {
 		return nil, err
 	}
 
 	for i, l := range manifest.Layers {
-		salt = fmt.Sprintf(layerSalt, repo, tag, i)
+		salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
 		if l.Crypto != nil {
 			if err = l.Crypto.Encrypt(pass, salt); err != nil {
 				return nil, err
@@ -94,13 +92,13 @@ func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
 	// TODO: fix hardcoded version/ check if necessary
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "")
 	}
 
 	// get the history
 	hist, err := cli.ImageHistory(ctx, repo+":"+tag)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "")
 	}
 
 	// obtain the most recent two complete images
@@ -124,7 +122,7 @@ func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
 	for _, x := range ids {
 		inspt, _, err := cli.ImageInspectWithRaw(ctx, x)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, errors.Wrapf(err, "inspecting layer %v", x)
 		}
 
 		for _, x := range inspt.RootFS.Layers {
@@ -141,12 +139,12 @@ func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
 
 	inspt, _, err := cli.ImageInspectWithRaw(ctx, repo+":"+tag)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "")
 	}
 
 	img, err := cli.ImageSave(ctx, []string{inspt.ID})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "")
 	}
 
 	return layers, img, nil

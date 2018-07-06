@@ -20,42 +20,42 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/rs/zerolog/log"
 
-	cref "github.com/Senetas/crypto-cli/reference"
 	"github.com/Senetas/crypto-cli/registry"
 )
 
 // PullImage pulls an image from the registry
-func PullImage(ref *reference.Named) (err error) {
-	repo, tag, err := cref.ResloveNamed(ref)
+func PullImage(ref reference.Named) (err error) {
+	nTRep, err := registry.ResolveNamed(ref)
 	if err != nil {
 		return err
 	}
 
-	token, err := registry.Authenticate(user, service, repo, authServer)
+	token, err := registry.Authenticate(user, service, authServer, nTRep)
 	if err != nil {
 		return err
 	}
 
-	manifest, err := registry.PullManifest(user, repo, tag, token)
+	manifest, err := registry.PullManifest(user, nTRep.Path(), nTRep.Tag(), token)
 	if err != nil {
 		return err
 	}
 
 	log.Info().Msgf("Obtaining config: %s\n", manifest.Config.Digest)
-	manifest.Config.Filename, err = registry.PullFromDigest(user, repo, token, manifest.Config.Digest)
+	manifest.Config.Filename, err = registry.PullFromDigest(user, nTRep.Path(), token, manifest.Config.Digest)
 	if err != nil {
 		return err
 	}
 
-	log.Info().Msg("Obtaining layers")
+	log.Info().Msg("Obtaining layers:")
 	for _, l := range manifest.Layers {
-		l.Filename, err = registry.PullFromDigest(user, repo, token, l.Digest)
+		log.Info().Msgf("Obtaining layer: %s", l.Digest)
+		l.Filename, err = registry.PullFromDigest(user, nTRep.Path(), token, l.Digest)
 		if err != nil {
 			return err
 		}
 	}
 
-	tarball, err := TarFromManifest(manifest, ref)
+	tarball, err := TarFromManifest(manifest, nTRep)
 	if err != nil {
 		return err
 	}

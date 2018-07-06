@@ -2,12 +2,12 @@ package utils_test
 
 import (
 	_ "crypto/sha256"
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/udhos/equalfile"
 
 	"github.com/Senetas/crypto-cli/utils"

@@ -16,7 +16,6 @@ package registry
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -25,6 +24,7 @@ import (
 	"path/filepath"
 
 	digest "github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 
 	"github.com/Senetas/crypto-cli/types"
 	"github.com/Senetas/crypto-cli/utils"

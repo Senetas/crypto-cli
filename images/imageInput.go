@@ -23,25 +23,24 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/client"
 	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/crypto"
-	cref "github.com/Senetas/crypto-cli/reference"
+	"github.com/Senetas/crypto-cli/registry"
 	"github.com/Senetas/crypto-cli/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
 // TarFromManifest takes a manifest and a target label for the images and create a tarball
 // that may be loaded with docker load. It downloads and decrypts the config and layers if necessary
-func TarFromManifest(manifest *types.ImageManifestJSON, target *reference.Named) (tarball string, err error) {
-	repo, tag, err := cref.ResloveNamed(target)
-	if err != nil {
-		return "", err
-	}
+func TarFromManifest(manifest *types.ImageManifestJSON, ref registry.NamedTaggedRepository) (tarball string, err error) {
+	//repo, tag, err := cref.ResloveNamed(target)
+	//if err != nil {
+	//return "", err
+	//}
 
-	salt := fmt.Sprintf(configSalt, repo, tag)
+	salt := fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 
 	// decrypt config key
 	if err := manifest.Config.Crypto.Decrypt(pass, salt); err != nil {
@@ -75,13 +74,13 @@ func TarFromManifest(manifest *types.ImageManifestJSON, target *reference.Named)
 
 	am := &types.ArchiveManifest{
 		Config:   d.Hex() + ".json",
-		RepoTags: []string{repo + ":" + tag},
+		RepoTags: []string{ref.Path() + ":" + ref.Tag()},
 		Layers:   make([]string, len(manifest.Layers))}
 
 	// decrypt keys and files for layers
 	for i, l := range manifest.Layers {
 		if l.Crypto != nil {
-			salt := fmt.Sprintf(layerSalt, repo, tag, i)
+			salt := fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
 			if err := l.Crypto.Decrypt(pass, salt); err != nil {
 				return "", err
 			}
