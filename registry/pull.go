@@ -86,7 +86,7 @@ func PullManifest(token string, ref reference.Named, bldr *v2.URLBuilder) (manif
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("manifest upload failed with status: " + resp.Status)
+		return nil, errors.New("manifest download failed with status: " + resp.Status)
 	}
 
 	body := json.NewDecoder(resp.Body)

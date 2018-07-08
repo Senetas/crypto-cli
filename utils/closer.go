@@ -25,7 +25,7 @@ func CheckedClose(c io.Closer, err error) error {
 	if err2 := c.Close(); err2 != nil {
 		return CombineErr([]error{err, err2})
 	}
-	return nil
+	return err
 }
 
 // CombineErr concatenates errors

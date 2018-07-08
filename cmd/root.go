@@ -44,7 +44,7 @@ to quickly create a Cobra application.`,
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal().Msgf("%+v", err)
-		os.Exit(1)
+		//os.Exit(1)
 	}
 }
 
@@ -74,8 +74,8 @@ func initConfig() {
 		// Find home directory.
 		home, err := homedir.Dir()
 		if err != nil {
-			log.Fatal().Err(err)
-			os.Exit(1)
+			log.Fatal().Msgf("%+v", err)
+			//os.Exit(1)
 		}
 
 		// Search config in home directory with name ".crypto-cli" (without extension).
