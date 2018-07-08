@@ -18,30 +18,56 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 
+	"github.com/docker/distribution/reference"
+	"github.com/docker/distribution/registry/api/v2"
+	"github.com/docker/docker/registry"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
-// PullManifest pulls a manifest from the registry and parses it
-func PullManifest(user, repo, tag, token string) (manifest *types.ImageManifestJSON, err error) {
-	regAddr := "registry-1.docker.io"
-	regPath := "v2"
+// PullImage pulls an image from a remote repository
+func PullImage(token string, ref reference.Named, endpoint *registry.APIEndpoint) (*types.ImageManifestJSON, error) {
+	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
-	u := url.URL{
-		Scheme: "https",
-		Host:   regAddr,
-		Path:   path.Join(regPath, repo, "manifests", tag)}
+	manifest, err := PullManifest(token, ref, bldr)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Info().Msgf("Obtaining config: %s\n", manifest.Config.Digest)
+	manifest.Config.Filename, err = PullFromDigest(token, ref, manifest.Config.Digest, bldr)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Info().Msg("Obtaining layers:")
+	for _, l := range manifest.Layers {
+		log.Info().Msgf("Obtaining layer: %s", l.Digest)
+		l.Filename, err = PullFromDigest(token, ref, l.Digest, bldr)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return manifest, nil
+}
+
+// PullManifest pulls a manifest from the registry and parses it
+func PullManifest(token string, ref reference.Named, bldr *v2.URLBuilder) (manifest *types.ImageManifestJSON, err error) {
+	urlStr, err := bldr.BuildManifestURL(ref)
+	if err != nil {
+		return nil, errors.Wrapf(err, "ref = %v", ref)
+	}
 
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -74,14 +100,17 @@ func PullManifest(user, repo, tag, token string) (manifest *types.ImageManifestJ
 
 // PullFromDigest downloads a blob (refereced by its digest) from the registry to a temporay file.
 // It verifies that the downloaded matches its digest, deleting if if it does not
-func PullFromDigest(user, repo, token string, d *digest.Digest) (fn string, err error) {
-	u := url.URL{
-		Scheme: "https",
-		Host:   regAddr,
-		Path:   path.Join(regPath, repo, "blobs", d.String())}
+func PullFromDigest(token string, ref reference.Named, d *digest.Digest, bldr *v2.URLBuilder) (fn string, err error) {
+	sep := SeperateRepository(ref)
+	can := digestedReference{sep, *d}
+
+	urlStr, err := bldr.BuildBlobURL(can)
+	if err != nil {
+		return "", errors.Wrapf(err, "%#v", ref)
+	}
 
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
 		return "", err
 	}
@@ -96,7 +125,7 @@ func PullFromDigest(user, repo, token string, d *digest.Digest) (fn string, err 
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", errors.New("Failed to download blob" + d.String())
+		return "", errors.New("Failed to download blob " + d.String())
 	}
 
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto")
@@ -132,10 +161,11 @@ func PullFromDigest(user, repo, token string, d *digest.Digest) (fn string, err 
 }
 
 func quitUnVerified(fn string, fh *os.File, err error) (string, error) {
-	_ = fh.Close()
-	err2 := errors.New("could not verify digest")
-	if err3 := os.Remove(fn); err3 != nil {
-		return "", utils.CombineErr([]error{err, err2, err3})
+	if err2 := os.Remove(fn); err != nil {
+		return "", errors.Wrapf(utils.CombineErr([]error{err, err2}), "digest verification failed, and unverified was NOT delete. To clean manaually delete: %s", fn)
 	}
-	return "", err
+	if err2 := fh.Close(); err2 != nil {
+		return "", errors.Wrap(utils.CombineErr([]error{err, err2}), "digest verification failed, failed to close, but unverified data was deleted")
+	}
+	return "", errors.Wrapf(err, "digest verification failed, unverified data deleted")
 }

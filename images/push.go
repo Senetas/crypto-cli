@@ -19,19 +19,18 @@ import (
 
 	"github.com/docker/distribution/reference"
 	"github.com/pkg/errors"
-	//"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/registry"
 )
 
 // PushImage encrypts then pushes an image
 func PushImage(ref reference.Named) (err error) {
-	endpoint, err := registry.GetEndPoint(ref)
+	nTRep, err := registry.ResolveNamed(ref)
 	if err != nil {
 		return err
 	}
 
-	nTRep, err := registry.ResolveNamed(ref)
+	endpoint, err := registry.GetEndPoint(ref)
 	if err != nil {
 		return err
 	}

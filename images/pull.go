@@ -18,7 +18,6 @@ import (
 	"os"
 
 	"github.com/docker/distribution/reference"
-	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/registry"
 )
@@ -30,29 +29,19 @@ func PullImage(ref reference.Named) (err error) {
 		return err
 	}
 
+	endpoint, err := registry.GetEndPoint(ref)
+	if err != nil {
+		return err
+	}
+
 	token, err := registry.Authenticate(user, service, authServer, nTRep)
 	if err != nil {
 		return err
 	}
 
-	manifest, err := registry.PullManifest(user, nTRep.Path(), nTRep.Tag(), token)
+	manifest, err := registry.PullImage(token, nTRep, endpoint)
 	if err != nil {
 		return err
-	}
-
-	log.Info().Msgf("Obtaining config: %s\n", manifest.Config.Digest)
-	manifest.Config.Filename, err = registry.PullFromDigest(user, nTRep.Path(), token, manifest.Config.Digest)
-	if err != nil {
-		return err
-	}
-
-	log.Info().Msg("Obtaining layers:")
-	for _, l := range manifest.Layers {
-		log.Info().Msgf("Obtaining layer: %s", l.Digest)
-		l.Filename, err = registry.PullFromDigest(user, nTRep.Path(), token, l.Digest)
-		if err != nil {
-			return err
-		}
 	}
 
 	tarball, err := TarFromManifest(manifest, nTRep)
