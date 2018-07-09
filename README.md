@@ -10,7 +10,7 @@ go get -u github.com/Senetas/crypto-cli
 Also a running docker engine is required on the system.
 
 Unfortunately, because the repository is private, the `go get` command may not work if you use ssh keys.
-Furthermore, because of the way the dependencies are currently set up, the semi-official package manager `dep` must also be installed. It is called `dep-go` in Ubuntu 18.04.
+Furthermore, because of the way the dependencies are currently set up, the semi-official package manager `dep` must also be installed. It is called `go-dep` in Ubuntu 18.04.
 
 Then the full sequence of commands is
 ```bash
@@ -39,7 +39,6 @@ The user must be able to `pull` and `push` to `registry-1.docker.io` (aka Docker
 docker login -u <docker-hub-username>
 ```
 and entered the password in `STDIN`. See also the privacy note below.
-
 
 ## Privacy
 The user MUST be logged into a docker hub account. Because `docker login` stores and encoded username and password, the clear text password is exposed to this utility. While the password is not transmitted anywhere other then Docker Hub in either a clear, encoded or encrypted form, it may be logged to `STDOUT` in certain situations. Thus, it is strongly recommended to set up a temporary Docker Hub account and login to it with `docker login` prior to running this utility while it is under development.
