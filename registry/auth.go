@@ -26,7 +26,6 @@ import (
 	"github.com/docker/distribution/registry/api/v2"
 	"github.com/docker/docker/registry"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/utils"
 )
@@ -39,7 +38,6 @@ func Authenticate(ref NamedRepository, repoInfo registry.RepositoryInfo, endpoin
 	}
 
 	authConfig := registry.ResolveAuthConfig(confFile.AuthConfigs, repoInfo.Index)
-	log.Info().Msgf("%#v", authConfig)
 
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
