@@ -18,6 +18,7 @@ import (
 	"os"
 
 	"github.com/docker/distribution/reference"
+	dockerregistry "github.com/docker/docker/registry"
 	"github.com/pkg/errors"
 
 	"github.com/Senetas/crypto-cli/registry"
@@ -30,7 +31,17 @@ func PushImage(ref reference.Named) (err error) {
 		return err
 	}
 
-	endpoint, err := registry.GetEndPoint(ref)
+	repoInfo, err := dockerregistry.ParseRepositoryInfo(ref)
+	if err != nil {
+		return err
+	}
+
+	endpoint, err := registry.GetEndPoint(ref, *repoInfo)
+	if err != nil {
+		return err
+	}
+
+	token, err := registry.Authenticate(nTRep, *repoInfo, endpoint)
 	if err != nil {
 		return err
 	}
@@ -41,7 +52,7 @@ func PushImage(ref reference.Named) (err error) {
 	}
 
 	// Upload to registry
-	if err = registry.PushImage(user, service, authServer, nTRep, manifest, endpoint); err != nil {
+	if err = registry.PushImage(token, nTRep, manifest, &endpoint); err != nil {
 		return err
 	}
 

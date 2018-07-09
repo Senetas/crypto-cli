@@ -24,28 +24,23 @@ import (
 )
 
 // GetEndPoint returns the endpoint associted with the reference
-func GetEndPoint(ref reference.Named) (*registry.APIEndpoint, error) {
-	repoInfo, err := registry.ParseRepositoryInfo(ref)
-	if err != nil {
-		return nil, err
-	}
-
+func GetEndPoint(ref reference.Named, repoInfo registry.RepositoryInfo) (registry.APIEndpoint, error) {
 	options := registry.ServiceOptions{}
 	options.InsecureRegistries = append(options.InsecureRegistries, "0.0.0.0/0")
 	registryService, err := registry.NewService(options)
 	if err != nil {
-		return nil, err
+		return registry.APIEndpoint{}, errors.Wrapf(err, "opts = %#v", options)
 	}
 
 	endpoints, err := registryService.LookupPushEndpoints(repoInfo.Index.Name)
 	if err != nil {
-		return nil, err
+		return registry.APIEndpoint{}, errors.Wrapf(err, "index name = %#v", repoInfo.Index.Name)
 	}
 
 	// should copy out so the array can be freed?
 	endpoint := endpoints[0]
 
-	return &endpoint, nil
+	return endpoint, nil
 }
 
 // TrimNamed removes a tag from a Named

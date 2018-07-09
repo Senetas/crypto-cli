@@ -19,6 +19,7 @@ import (
 	"net/http/httputil"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -41,4 +42,8 @@ func doRequest(client *http.Client, req *http.Request, reqBody, respBody bool) (
 	log.Debug().Msgf("\n%s", dump)
 
 	return resp, nil
+}
+
+func init() {
+	zerolog.TimeFieldFormat = ""
 }

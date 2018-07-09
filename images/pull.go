@@ -18,6 +18,7 @@ import (
 	"os"
 
 	"github.com/docker/distribution/reference"
+	dockerregistry "github.com/docker/docker/registry"
 
 	"github.com/Senetas/crypto-cli/registry"
 )
@@ -29,17 +30,22 @@ func PullImage(ref reference.Named) (err error) {
 		return err
 	}
 
-	endpoint, err := registry.GetEndPoint(ref)
+	repoInfo, err := dockerregistry.ParseRepositoryInfo(ref)
 	if err != nil {
 		return err
 	}
 
-	token, err := registry.Authenticate(user, service, authServer, nTRep)
+	endpoint, err := registry.GetEndPoint(ref, *repoInfo)
 	if err != nil {
 		return err
 	}
 
-	manifest, err := registry.PullImage(token, nTRep, endpoint)
+	token, err := registry.Authenticate(nTRep, *repoInfo, endpoint)
+	if err != nil {
+		return err
+	}
+
+	manifest, err := registry.PullImage(token, nTRep, &endpoint)
 	if err != nil {
 		return err
 	}

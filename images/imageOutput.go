@@ -112,7 +112,7 @@ func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
 		return nil, nil, errors.New("no " + labelString + " in Dockerfile")
 	}
 	if hist[i+1].ID == "<missing>" {
-		return nil, nil, errors.New("images not built on this Machine")
+		return nil, nil, errors.New("image not built on this Machine")
 	}
 	ids = append(ids, hist[i+1].ID)
 

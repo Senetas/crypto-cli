@@ -24,10 +24,7 @@ import (
 const labelString = "LABEL com.senetas.crypto.enabled=true"
 
 const (
-	user       = "narthanaepa1"
 	pass       = "hunter2"
-	service    = "registry.docker.io"
-	authServer = "auth.docker.io"
 	saltBase   = "com.senetas.crypto/%s/%s"
 	configSalt = saltBase + "/config"
 	layerSalt  = saltBase + "/layer%d"
@@ -37,10 +34,4 @@ var path = filepath.Join(os.TempDir(), "com.senetas.crypto")
 
 func init() {
 	zerolog.TimeFieldFormat = ""
-}
-
-func handleErr(log *zerolog.Event, err error, msg string) {
-	if err != nil {
-		log.Err(err).Msg(msg)
-	}
 }

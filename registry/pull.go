@@ -66,7 +66,6 @@ func PullManifest(token string, ref reference.Named, bldr *v2.URLBuilder) (manif
 		return nil, errors.Wrapf(err, "ref = %v", ref)
 	}
 
-	client := &http.Client{}
 	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
 		return nil, err
@@ -77,7 +76,7 @@ func PullManifest(token string, ref reference.Named, bldr *v2.URLBuilder) (manif
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := doRequest(client, req, true, true)
+	resp, err := doRequest(&http.Client{}, req, true, true)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +108,6 @@ func PullFromDigest(token string, ref reference.Named, d *digest.Digest, bldr *v
 		return "", errors.Wrapf(err, "%#v", ref)
 	}
 
-	client := &http.Client{}
 	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
 		return "", err
@@ -119,7 +117,7 @@ func PullFromDigest(token string, ref reference.Named, d *digest.Digest, bldr *v
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := doRequest(client, req, true, false)
+	resp, err := doRequest(&http.Client{}, req, true, false)
 	if err != nil {
 		return "", err
 	}

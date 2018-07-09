@@ -33,20 +33,14 @@ import (
 )
 
 // PushImage pushes the config, layers and mainifest to the nominated registry, in that order
-func PushImage(user, service, authServer string, ref NamedTaggedRepository, manifest *types.ImageManifestJSON, endpoint *registry.APIEndpoint) error {
-	// Authenticate with the Auth server
-	token, err := Authenticate(user, service, authServer, ref)
-	if err != nil {
-		return err
-	}
-
+func PushImage(token string, ref NamedTaggedRepository, manifest *types.ImageManifestJSON, endpoint *registry.APIEndpoint) error {
 	trimed := reference.TrimNamed(ref)
 
-	if err = PushLayer(token, trimed, manifest.Config, endpoint); err != nil {
+	if err := PushLayer(token, trimed, manifest.Config, endpoint); err != nil {
 		return err
 	}
 	for _, l := range manifest.Layers {
-		if err = PushLayer(token, trimed, l, endpoint); err != nil {
+		if err := PushLayer(token, trimed, l, endpoint); err != nil {
 			return err
 		}
 	}
@@ -74,7 +68,6 @@ func PushManifest(token string, ref reference.Named, manifest *types.ImageManife
 		return "", errors.Wrapf(err, "ref = %v", ref)
 	}
 
-	client := &http.Client{}
 	req, err := http.NewRequest("PUT", urlStr, bytes.NewReader(manifestJSON))
 	if err != nil {
 		return "", errors.Wrapf(err, "url = %v", urlStr)
@@ -85,7 +78,7 @@ func PushManifest(token string, ref reference.Named, manifest *types.ImageManife
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
 
-	resp, err := doRequest(client, req, true, true)
+	resp, err := doRequest(&http.Client{}, req, true, true)
 	if err != nil {
 		return "", err
 	}
@@ -123,7 +116,6 @@ func PushLayer(token string, ref reference.Named, layerData *types.LayerJSON, en
 		return errors.Wrapf(err, "%#v", dig)
 	}
 
-	client := &http.Client{}
 	req, err := http.NewRequest("POST", uploadURLStr, nil)
 	if err != nil {
 		return err
@@ -131,7 +123,7 @@ func PushLayer(token string, ref reference.Named, layerData *types.LayerJSON, en
 
 	req.Header.Add("Authorization", "Bearer "+token)
 
-	resp, err := doRequest(client, req, true, true)
+	resp, err := doRequest(&http.Client{}, req, true, true)
 	if err != nil {
 		return err
 	}
@@ -172,9 +164,7 @@ func PushLayer(token string, ref reference.Named, layerData *types.LayerJSON, en
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err = utils.CheckedClose(layerFH, err)
-	}()
+	// file will be closed by the http client
 
 	req, err = http.NewRequest("PUT", u.String(), layerFH)
 	if err != nil {
@@ -185,7 +175,7 @@ func PushLayer(token string, ref reference.Named, layerData *types.LayerJSON, en
 	req.Header.Add("Content-Length", strconv.FormatInt(layerData.Size, 10))
 	req.Header.Add("Content-Type", "application/octect-stream")
 
-	resp, err = doRequest(client, req, false, true)
+	resp, err = doRequest(&http.Client{}, req, false, true)
 	if err != nil {
 		return err
 	}
@@ -206,7 +196,6 @@ func checkLayer(token string, ref reference.Canonical, bldr *v2.URLBuilder) (b b
 		return false, errors.Wrapf(err, "%#v", ref)
 	}
 
-	client := &http.Client{}
 	req, err := http.NewRequest("HEAD", layerURLStr, nil)
 	if err != nil {
 		return false, errors.Wrapf(err, "%v", layerURLStr)
@@ -214,7 +203,7 @@ func checkLayer(token string, ref reference.Canonical, bldr *v2.URLBuilder) (b b
 
 	req.Header.Add("Authorization", "Bearer "+token)
 
-	resp, err := doRequest(client, req, true, true)
+	resp, err := doRequest(&http.Client{}, req, true, true)
 	if err != nil {
 		return false, errors.Wrapf(err, "%v", req)
 	}

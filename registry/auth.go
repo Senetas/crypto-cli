@@ -20,26 +20,76 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"regexp"
 
+	"github.com/docker/cli/cli/config"
+	"github.com/docker/distribution/registry/api/v2"
+	"github.com/docker/docker/registry"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/utils"
-	"github.com/docker/docker/cli/config"
 )
 
 // Authenticate against the given server, returning the bearer token
-func Authenticate(user, service, authServer string, ref NamedRepository) (string, error) {
+func Authenticate(ref NamedRepository, repoInfo registry.RepositoryInfo, endpoint registry.APIEndpoint) (string, error) {
+	confFile, err := config.Load("")
+	if err != nil {
+		return "", err
+	}
+
+	authConfig := registry.ResolveAuthConfig(confFile.AuthConfigs, repoInfo.Index)
+	log.Info().Msgf("%#v", authConfig)
+
+	bldr := v2.NewURLBuilder(endpoint.URL, false)
+
+	urlStr, err := bldr.BuildBaseURL()
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest("GET", urlStr, nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := doRequest(&http.Client{}, req, true, false)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		err = utils.CheckedClose(resp.Body, err)
+	}()
+
+	var auth string
+	if resp.StatusCode == http.StatusUnauthorized {
+		auth = resp.Header.Get("Www-Authenticate")
+		if auth == "" {
+			return "", errors.New("login error")
+		}
+	} else if resp.StatusCode == http.StatusOK {
+		return "", nil
+	} else {
+		return "", errors.New("login not supported")
+	}
+
+	re := regexp.MustCompile("realm=\"(?P<realm>.*)\",service=\"(?P<service>.*)\"")
+	matches := re.FindAllStringSubmatch("Bearer realm=\"https://auth.docker.io/token\",service=\"registry.docker.io\"", -1)
+	realm := matches[0][1]
+	service := matches[0][2]
+
 	authToken, err := localAuthToken()
 	if err != nil {
 		return "", err
 	}
 
-	u := url.URL{
-		Scheme: "https",
-		Host:   authServer,
-		Path:   "token"}
+	u, err := url.Parse(realm)
+	if err != nil {
+		return "", err
+	}
+
 	q := url.Values{}
-	q.Add("account", user)
+	q.Add("account", authConfig.Username)
 	q.Add("service", service)
 	q.Add("scope", "repository:"+ref.Path()+":pull,push")
 
@@ -50,15 +100,14 @@ func Authenticate(user, service, authServer string, ref NamedRepository) (string
 
 	u.RawQuery = rawQ
 
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err = http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return "", err
 	}
 
 	req.Header.Add("Authorization", "Basic "+authToken)
 
-	resp, err := doRequest(client, req, true, false)
+	resp, err = doRequest(&http.Client{}, req, true, false)
 	if err != nil {
 		return "", err
 	}
