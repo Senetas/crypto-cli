@@ -57,6 +57,10 @@ func PushImage(ref reference.Named) (err error) {
 	}
 
 	// cleanup temporary files
+	if err = os.RemoveAll(manifest.DirName + ".tar"); err != nil {
+		return errors.Wrap(err, "Warning: temporary files not removed!")
+	}
+
 	if err = os.RemoveAll(manifest.DirName); err != nil {
 		return errors.Wrap(err, "Warning: temporary files not removed!")
 	}

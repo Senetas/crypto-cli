@@ -16,9 +16,12 @@ package images
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/docker/distribution/reference"
 	dockerregistry "github.com/docker/docker/registry"
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
 
 	"github.com/Senetas/crypto-cli/registry"
 )
@@ -45,7 +48,12 @@ func PullImage(ref reference.Named) (err error) {
 		return err
 	}
 
-	manifest, err := registry.PullImage(token, nTRep, &endpoint)
+	dir := filepath.Join(tempRoot, uuid.New().String())
+	if err = os.MkdirAll(dir, 0755); err != nil {
+		return errors.Wrapf(err, "dir = %s", dir)
+	}
+
+	manifest, err := registry.PullImage(token, nTRep, &endpoint, dir)
 	if err != nil {
 		return err
 	}
@@ -60,7 +68,7 @@ func PullImage(ref reference.Named) (err error) {
 	}
 
 	// cleanup temporary files
-	if err = os.RemoveAll(path); err != nil {
+	if err = os.RemoveAll(dir); err != nil {
 		return err
 	}
 

@@ -28,17 +28,26 @@ import (
 )
 
 func TestFile(t *testing.T) {
-	dir, err := ioutil.TempDir("", "com.senetas.crypto")
+	dir := filepath.Join(os.TempDir(), "com.senetas.crypto")
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Error(err)
+	}
+
 	fn := filepath.Join(dir, "plain")
 	fh, err := os.Create(fn)
+	if err != nil {
+		t.Error(err)
+	}
+
 	r := rand.Reader
 	_, err = io.CopyN(fh, r, 1024)
 	if err != nil {
-		t.Errorf("Could not read random data into file")
+		t.Error(err)
 	}
 
 	if err = fh.Close(); err != nil {
-		t.Logf(err.Error())
+		t.Log(err)
 	}
 
 	encpath := filepath.Join(dir, "enc")
@@ -50,36 +59,37 @@ func TestFile(t *testing.T) {
 	}
 
 	if _, _, err = crypto.EncFile(fn, filepath.Join(dir, "enc"), key); err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 
 	t.Logf("%v\n", key)
 
 	if err = crypto.DecFile(encpath, decpath, key); err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
 
 	cmp := equalfile.New(nil, equalfile.Options{})
 	equal, err := cmp.CompareFile(fn, decpath)
 	if err != nil {
-		t.Errorf("%v\n", err)
+		t.Error(err)
 	}
+
 	if !equal {
 		fha, err := os.Open(fn)
 		if err != nil {
-			t.Errorf(err.Error())
+			t.Error(err)
 		}
 		a, err := ioutil.ReadAll(fha)
 		if err != nil {
-			t.Errorf(err.Error())
+			t.Error(err)
 		}
 		fhb, err := os.Open(decpath)
 		if err != nil {
-			t.Errorf(err.Error())
+			t.Error(err)
 		}
 		b, err := ioutil.ReadAll(fhb)
 		if err != nil {
-			t.Errorf(err.Error())
+			t.Error(err)
 		}
 		t.Errorf("decryption is not inverting encryption:\nPlaintext: %v\nDecrypted: %v", a, b)
 	}

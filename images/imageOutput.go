@@ -28,7 +28,6 @@ import (
 	"github.com/google/uuid"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
-	//"github.com/rs/zerolog/log"
 	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/crypto"
@@ -52,7 +51,7 @@ func CreateManifest(ref registry.NamedTaggedRepository) (manifest *types.ImageMa
 	manifest = &types.ImageManifestJSON{
 		SchemaVersion: 2,
 		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
-		DirName:       path + uuid.New().String(),
+		DirName:       filepath.Join(tempRoot, uuid.New().String()),
 	}
 
 	// extract image

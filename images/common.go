@@ -30,7 +30,7 @@ const (
 	layerSalt  = saltBase + "/layer%d"
 )
 
-var path = filepath.Join(os.TempDir(), "com.senetas.crypto")
+var tempRoot = filepath.Join(os.TempDir(), "com.senetas.crypto")
 
 func init() {
 	zerolog.TimeFieldFormat = ""

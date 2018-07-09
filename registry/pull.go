@@ -33,7 +33,7 @@ import (
 )
 
 // PullImage pulls an image from a remote repository
-func PullImage(token string, ref reference.Named, endpoint *registry.APIEndpoint) (*types.ImageManifestJSON, error) {
+func PullImage(token string, ref reference.Named, endpoint *registry.APIEndpoint, downloadDir string) (*types.ImageManifestJSON, error) {
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
 	manifest, err := PullManifest(token, ref, bldr)
@@ -42,7 +42,7 @@ func PullImage(token string, ref reference.Named, endpoint *registry.APIEndpoint
 	}
 
 	log.Info().Msgf("Obtaining config: %s\n", manifest.Config.Digest)
-	manifest.Config.Filename, err = PullFromDigest(token, ref, manifest.Config.Digest, bldr)
+	manifest.Config.Filename, err = PullFromDigest(token, ref, manifest.Config.Digest, bldr, downloadDir)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func PullImage(token string, ref reference.Named, endpoint *registry.APIEndpoint
 	log.Info().Msg("Obtaining layers:")
 	for _, l := range manifest.Layers {
 		log.Info().Msgf("Obtaining layer: %s", l.Digest)
-		l.Filename, err = PullFromDigest(token, ref, l.Digest, bldr)
+		l.Filename, err = PullFromDigest(token, ref, l.Digest, bldr, downloadDir)
 		if err != nil {
 			return nil, err
 		}
@@ -68,7 +68,7 @@ func PullManifest(token string, ref reference.Named, bldr *v2.URLBuilder) (manif
 
 	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "GET %s", urlStr)
 	}
 
 	// TODO: Handle list manifests
@@ -78,7 +78,7 @@ func PullManifest(token string, ref reference.Named, bldr *v2.URLBuilder) (manif
 
 	resp, err := doRequest(&http.Client{}, req, true, true)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "req = %#v", req)
 	}
 	defer func() {
 		err = utils.CheckedClose(resp.Body, err)
@@ -91,7 +91,7 @@ func PullManifest(token string, ref reference.Named, bldr *v2.URLBuilder) (manif
 	body := json.NewDecoder(resp.Body)
 	manifest = &types.ImageManifestJSON{}
 	if err = body.Decode(manifest); err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "body = %#v", body)
 	}
 
 	return manifest, nil
@@ -99,7 +99,7 @@ func PullManifest(token string, ref reference.Named, bldr *v2.URLBuilder) (manif
 
 // PullFromDigest downloads a blob (refereced by its digest) from the registry to a temporay file.
 // It verifies that the downloaded matches its digest, deleting if if it does not
-func PullFromDigest(token string, ref reference.Named, d *digest.Digest, bldr *v2.URLBuilder) (fn string, err error) {
+func PullFromDigest(token string, ref reference.Named, d *digest.Digest, bldr *v2.URLBuilder, dir string) (fn string, err error) {
 	sep := SeperateRepository(ref)
 	can := digestedReference{sep, *d}
 
@@ -110,7 +110,7 @@ func PullFromDigest(token string, ref reference.Named, d *digest.Digest, bldr *v
 
 	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "GET %s", urlStr)
 	}
 
 	req.Header.Set("Accept", "application/vnd.docker.image.rootfs.diff.tar.gzip")
@@ -119,22 +119,17 @@ func PullFromDigest(token string, ref reference.Named, d *digest.Digest, bldr *v
 
 	resp, err := doRequest(&http.Client{}, req, true, false)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "req = %#v", req)
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		return "", errors.New("Failed to download blob " + d.String())
 	}
 
-	dir := filepath.Join(os.TempDir(), "com.senetas.crypto")
-	if err = os.MkdirAll(dir, 0755); err != nil {
-		return "", err
-	}
-
 	fn = filepath.Join(dir, d.Encoded())
 	fh, err := os.Create(fn)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "filename = %s", fn)
 	}
 	defer func() {
 		err = utils.CheckedClose(fh, err)
@@ -144,11 +139,11 @@ func PullFromDigest(token string, ref reference.Named, d *digest.Digest, bldr *v
 	mw := io.MultiWriter(vw, fh)
 
 	if _, err = io.Copy(mw, resp.Body); err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "filename = %s", fn)
 	}
 
 	if err = resp.Body.Close(); err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "resp = %#v", resp)
 	}
 
 	if !vw.Verified() {
