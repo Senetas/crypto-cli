@@ -28,6 +28,10 @@ ignored = ["golang.org/x/*", "github.com/docker/docker/*"]
 
 [[constraint]]
   branch = "master"
+  name = "github.com/docker/cli"
+
+[[constraint]]
+  branch = "master"
   name = "github.com/docker/distribution"
 
 [[constraint]]

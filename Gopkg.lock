@@ -3,6 +3,17 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/docker/cli"
+  packages = [
+    "cli/config",
+    "cli/config/configfile",
+    "cli/config/credentials",
+    "opts"
+  ]
+  revision = "2b221d8f1cd6420122634a4922fef30313659d78"
+
+[[projects]]
+  branch = "master"
   name = "github.com/docker/distribution"
   packages = [
     "digestset",
@@ -11,6 +22,27 @@
     "registry/api/v2"
   ]
   revision = "749f6afb4572201e3c37325d0ffedb6f32be8950"
+
+[[projects]]
+  name = "github.com/docker/docker-credential-helpers"
+  packages = [
+    "client",
+    "credentials"
+  ]
+  revision = "5241b46610f2491efdf9d1c85f1ddf5b02f6d962"
+  version = "v0.6.1"
+
+[[projects]]
+  name = "github.com/docker/go-connections"
+  packages = ["nat"]
+  revision = "3ede32e2033de7505e6500d6c868c2b9ed9f169d"
+  version = "v0.3.0"
+
+[[projects]]
+  name = "github.com/docker/go-units"
+  packages = ["."]
+  revision = "47565b4f722fb6ceae66b95f853feed578a4a51c"
+  version = "v0.3.3"
 
 [[projects]]
   name = "github.com/fsnotify/fsnotify"
@@ -99,6 +131,12 @@
   version = "v1.2.0"
 
 [[projects]]
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
+
+[[projects]]
   name = "github.com/rs/zerolog"
   packages = [
     ".",
@@ -108,6 +146,12 @@
   ]
   revision = "77db4b4f350e31be66a57c332acb7721cf9ff9bb"
   version = "v1.8.0"
+
+[[projects]]
+  name = "github.com/sirupsen/logrus"
+  packages = ["."]
+  revision = "c155da19408a8799da419ed3eeb0cb5db0ad5dbc"
+  version = "v1.0.5"
 
 [[projects]]
   name = "github.com/spf13/afero"
@@ -169,6 +213,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "e0a81b0e7a087cc81aef123552e0a90afb453d12edd22b5f0e31095ab4d54ae4"
+  inputs-digest = "22598077db86737ef7cdf89e00b3a7e360c1829edd208fca6ea62dc4e3dec9fc"
   solver-name = "gps-cdcl"
   solver-version = 1
