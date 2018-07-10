@@ -26,7 +26,7 @@ Add the lines
 export GOPATH=$HOME/go
 export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 ```
-to the file `\~/.bashrc`. A relogin may be necessary to complete the process.
+to the file `~/.bashrc`. A relogin may be necessary to complete the process.
 
 ## Installation
 ```bash
@@ -44,6 +44,7 @@ $ dep ensure
 $ go get -u github.com/Senetas/crypto-cli
 ```
 Note: use `https://github.com/Senetas/crypto-cli.git` if not using ssh keys for authentication.
+The `go get` and `dep ensure` commands will take a long time to execute.
 
 ## Usage
 For now the syntax is limited and some parameters are hard coded.
@@ -54,7 +55,7 @@ Here, `NAME` is the name of a repository and `TAG` is a mandatory tag. For a `pu
 ```bash
 LABEL com.senetas.crypto.enabled=true
 ```
-In their `Dockerfile` will be supported.
+in their `Dockerfile` will be supported.
 For the moment, only images that were built on the same machine and have never been removed from it are supported.
 This means that the ideal test image is one that was freshly built.
 A compliant Dockerfile is provided in the `test` directory.
