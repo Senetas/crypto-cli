@@ -33,9 +33,9 @@ to the file `~/.bashrc`. A relogin may be necessary to complete the process.
 $ go get github.com/Senetas/crypto-cli
 ```
 Unfortunately, because the repository is private, the `go get` command may not work if you use ssh keys.
-Furthermore, because of the way the dependencies are currently set up, the semi-official package manager `dep` must be used as well.
+Furthermore, because of the way the dependencies are currently set up, the semi-official package manager `dep` may need to be used as well.
 
-The following sequence of commands should complete the installation after the faiulre of the previous one.
+If the previous command fails, the following sequence of commands should rectify it.
 ```bash
 $ cd $GOPATH/src/github.com/Senetas
 $ git clone git@github.com:Senetas/crypto-cli.git
