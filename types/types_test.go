@@ -29,13 +29,13 @@ func TestCrypto(t *testing.T) {
 		DecKey:     plaintext,
 	}
 
-	if err := c.Encrypt("hunter2", "saltysaltysaltysalty"); err != nil {
+	if err := c.Encrypt("hunter2", "saltysaltysaltysalty", crypto.Pbkdf2Aes256Gcm); err != nil {
 		t.Error(err)
 	}
 
 	d := c // make a copy
 
-	if err := d.Decrypt("hunter2", "saltysaltysaltysalty"); err != nil {
+	if err := d.Decrypt("hunter2", "saltysaltysaltysalty", crypto.Pbkdf2Aes256Gcm); err != nil {
 		t.Error(err)
 	}
 

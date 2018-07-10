@@ -21,11 +21,12 @@ import (
 	dockerregistry "github.com/docker/docker/registry"
 	"github.com/pkg/errors"
 
+	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/registry"
 )
 
 // PushImage encrypts then pushes an image
-func PushImage(ref reference.Named) (err error) {
+func PushImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo) (err error) {
 	nTRep, err := registry.ResolveNamed(ref)
 	if err != nil {
 		return err
@@ -46,7 +47,7 @@ func PushImage(ref reference.Named) (err error) {
 		return err
 	}
 
-	manifest, err := CreateManifest(nTRep)
+	manifest, err := CreateManifest(nTRep, passphrase, cryptotype)
 	if err != nil {
 		return err
 	}

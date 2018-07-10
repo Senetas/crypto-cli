@@ -17,15 +17,25 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"syscall"
 
 	homedir "github.com/mitchellh/go-homedir"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"golang.org/x/crypto/ssh/terminal"
+
+	"github.com/Senetas/crypto-cli/crypto"
 )
 
-var cfgFile string
+var (
+	passphrase string
+	ctstr      string
+	cfgFile    string
+)
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -34,6 +44,7 @@ var rootCmd = &cobra.Command{
 	Long: `Crypto-Cli is a command line utility to encrypt and decrypt docker images and stores
 them in repositories online. It maybe used to distribute docker images
 confidentially. It does not sign images so cannot garuntee identities.
+
 
 Its basic operations emulated docker push and docker pull and will encrypt then
 MAC the images before uploading them, and check the MAC and decrypt after
@@ -47,7 +58,6 @@ downloading them.`,
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal().Msgf("%+v", err)
-		//os.Exit(1)
 	}
 }
 
@@ -78,7 +88,6 @@ func initConfig() {
 		home, err := homedir.Dir()
 		if err != nil {
 			log.Fatal().Msgf("%+v", err)
-			//os.Exit(1)
 		}
 
 		// Search config in home directory with name ".crypto-cli" (without extension).
@@ -92,4 +101,33 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
+}
+
+func checkFlags(f *pflag.Flag) {
+	switch f.Name {
+	case "pass":
+		if !f.Changed {
+			passphrase = getPassSTDIN()
+		}
+	default:
+	}
+}
+
+func getPassSTDIN() string {
+	fmt.Print("Enter Passpharase: ")
+	passphrase, err := terminal.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		log.Fatal().Err(errors.Wrapf(err, "password typed: %s", passphrase)).Msg("")
+	}
+	fmt.Println()
+	return string(passphrase)
+}
+
+func validateCryptoType(ctstr string) (crypto.EncAlgo, error) {
+	if ctstr == string(crypto.None) {
+		return crypto.None, nil
+	} else if ctstr == string(crypto.Pbkdf2Aes256Gcm) {
+		return crypto.Pbkdf2Aes256Gcm, nil
+	}
+	return crypto.EncAlgo(""), errors.New("invalid encryption type")
 }

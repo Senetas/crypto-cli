@@ -38,7 +38,7 @@ import (
 
 // CreateManifest creates a manifest and encrypts all necessary parts of it
 // These are they ready to be uploaded to a regitry
-func CreateManifest(ref registry.NamedTaggedRepository) (manifest *types.ImageManifestJSON, err error) {
+func CreateManifest(ref registry.NamedTaggedRepository, passphrase string, cryptotype crypto.EncAlgo) (manifest *types.ImageManifestJSON, err error) {
 	layers, tarFH, err := getImgTarLayers(ref.Path(), ref.Tag())
 	if err != nil {
 		return nil, err
@@ -69,14 +69,14 @@ func CreateManifest(ref registry.NamedTaggedRepository) (manifest *types.ImageMa
 
 	salt := fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 
-	if err = manifest.Config.Crypto.Encrypt(pass, salt); err != nil {
+	if err = manifest.Config.Crypto.Encrypt(passphrase, salt, cryptotype); err != nil {
 		return nil, err
 	}
 
 	for i, l := range manifest.Layers {
 		salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
 		if l.Crypto != nil {
-			if err = l.Crypto.Encrypt(pass, salt); err != nil {
+			if err = l.Crypto.Encrypt(passphrase, salt, cryptotype); err != nil {
 				return nil, err
 			}
 		}

@@ -20,6 +20,7 @@ import (
 
 	"github.com/docker/distribution/reference"
 
+	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/images"
 	"github.com/Senetas/crypto-cli/registry"
 )
@@ -35,13 +36,13 @@ func TestEncDecImage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manifest, err := images.CreateManifest(ref2)
+	manifest, err := images.CreateManifest(ref2, "hunter2", crypto.Pbkdf2Aes256Gcm)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log(manifest)
 
-	if _, err = images.TarFromManifest(manifest, ref2); err != nil {
+	if _, err = images.TarFromManifest(manifest, ref2, "hunter2", crypto.Pbkdf2Aes256Gcm); err != nil {
 		t.Fatalf("%v\ne = %s", err, manifest.Config.Crypto)
 	}
 

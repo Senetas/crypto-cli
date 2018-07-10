@@ -18,8 +18,14 @@ import (
 	"encoding/base64"
 
 	digest "github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 
 	"github.com/Senetas/crypto-cli/crypto"
+)
+
+var (
+	errDecrypt = errors.New("could not decrypt")
+	errEncrypt = errors.New("could not encrypt")
 )
 
 // ArchiveManifest represents the json manifest in an image archive
@@ -62,27 +68,32 @@ type DeCryptoData struct {
 }
 
 // Encrypt creates a new CryptoJSON struct by encrypting a plaintext key with a passphrase and salt
-func (c *CryptoJSON) Encrypt(pass, salt string) error {
+func (c *CryptoJSON) Encrypt(pass, salt string, cryptotype crypto.EncAlgo) error {
 	ciphertextKey, err := crypto.Enckey(c.DecKey, pass, salt)
 	if err != nil {
 		return err
 	}
 
 	c.EncKey = base64.URLEncoding.EncodeToString(ciphertextKey)
+	c.CryptoType = cryptotype
 
 	return nil
 }
 
 // Decrypt is the inverse function of Encrypt (up to error, types etc)
-func (c *CryptoJSON) Decrypt(pass, salt string) error {
+func (c *CryptoJSON) Decrypt(pass, salt string, cryptotype crypto.EncAlgo) error {
+	if c.CryptoType != cryptotype {
+		return errors.New("encryption type does not match decryption type")
+	}
+
 	decoded, err := base64.URLEncoding.DecodeString(c.EncKey)
 	if err != nil {
-		return err
+		return errDecrypt
 	}
 
 	c.DecKey, err = crypto.Deckey(decoded, pass, salt)
 	if err != nil {
-		return err
+		return errDecrypt
 	}
 
 	return nil

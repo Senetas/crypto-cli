@@ -17,21 +17,13 @@ package images
 import (
 	"os"
 	"path/filepath"
-
-	"github.com/rs/zerolog"
 )
 
-const labelString = "LABEL com.senetas.crypto.enabled=true"
-
 const (
-	pass       = "hunter2"
-	saltBase   = "com.senetas.crypto/%s/%s"
-	configSalt = saltBase + "/config"
-	layerSalt  = saltBase + "/layer%d"
+	labelString = "LABEL com.senetas.crypto.enabled=true"
+	saltBase    = "com.senetas.crypto/%s/%s"
+	configSalt  = saltBase + "/config"
+	layerSalt   = saltBase + "/layer%d"
 )
 
 var tempRoot = filepath.Join(os.TempDir(), "com.senetas.crypto")
-
-func init() {
-	zerolog.TimeFieldFormat = ""
-}

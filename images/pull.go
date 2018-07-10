@@ -23,11 +23,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
+	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/registry"
 )
 
 // PullImage pulls an image from the registry
-func PullImage(ref reference.Named) (err error) {
+func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo) (err error) {
 	nTRep, err := registry.ResolveNamed(ref)
 	if err != nil {
 		return err
@@ -58,7 +59,7 @@ func PullImage(ref reference.Named) (err error) {
 		return err
 	}
 
-	tarball, err := TarFromManifest(manifest, nTRep)
+	tarball, err := TarFromManifest(manifest, nTRep, passphrase, cryptotype)
 	if err != nil {
 		return err
 	}

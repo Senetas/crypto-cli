@@ -15,10 +15,10 @@
 package cmd
 
 import (
+	"github.com/Senetas/crypto-cli/crypto"
+	"github.com/Senetas/crypto-cli/images"
 	"github.com/docker/distribution/reference"
 	"github.com/spf13/cobra"
-
-	"github.com/Senetas/crypto-cli/images"
 )
 
 // pullCmd represents the pull command
@@ -29,18 +29,23 @@ var pullCmd = &cobra.Command{
 load that images into the local docker engine. It is then avaliable to be run under the same
 name as it was downloaded.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runPull(args[0])
+		cmd.Flags().VisitAll(checkFlags)
+		cryptotype, err := validateCryptoType(ctstr)
+		if err != nil {
+			return err
+		}
+		return runPull(args[0], passphrase, cryptotype)
 	},
 	Args: cobra.ExactArgs(1),
 }
 
-func runPull(remote string) error {
+func runPull(remote, passphrase string, cryptotype crypto.EncAlgo) error {
 	ref, err := reference.ParseNormalizedNamed(remote)
 	if err != nil {
 		return err
 	}
 
-	if err = images.PullImage(ref); err != nil {
+	if err = images.PullImage(ref, passphrase, cryptotype); err != nil {
 		return err
 	}
 
@@ -51,5 +56,5 @@ func init() {
 	rootCmd.AddCommand(pullCmd)
 
 	pullCmd.Flags().StringVarP(&passphrase, "pass", "p", "", "Specifies the passphrase to use if passphrase encryption is selected")
-	pullCmd.Flags().StringVarP(&cryptotype, "type", "t", "", "Specifies the type of encryption to use.")
+	pullCmd.Flags().StringVarP(&ctstr, "type", "t", string(crypto.Pbkdf2Aes256Gcm), "Specifies the type of encryption to use.")
 }

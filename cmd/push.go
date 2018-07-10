@@ -17,36 +17,36 @@ package cmd
 import (
 	"github.com/docker/distribution/reference"
 	"github.com/spf13/cobra"
-	//"golang.org/x/crypto/ssh/terminal"
 
+	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/images"
 )
 
 // pushCmd represents the push command
-var (
-	pushCmd = &cobra.Command{
-		Use:   "push [OPTIONS] NAME[:TAG]",
-		Short: "Encrypt an image and then pushed it to a remote repository.",
-		Long: `push will encrypt a docker images and upload it
+var pushCmd = &cobra.Command{
+	Use:   "push [OPTIONS] NAME[:TAG]",
+	Short: "Encrypt an image and then pushed it to a remote repository.",
+	Long: `push will encrypt a docker images and upload it
 to a remote repositories. It maybe used to distribute docker images
 confidentially. It does not sign images so cannot garuntee identities.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runPush(args[0])
-		},
-		Args: cobra.ExactArgs(1),
-	}
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.Flags().VisitAll(checkFlags)
+		cryptotype, err := validateCryptoType(ctstr)
+		if err != nil {
+			return err
+		}
+		return runPush(args[0], passphrase, cryptotype)
+	},
+	Args: cobra.ExactArgs(1),
+}
 
-	passphrase string
-	cryptotype string
-)
-
-func runPush(remote string) error {
+func runPush(remote, passphrase string, cryptotype crypto.EncAlgo) error {
 	ref, err := reference.ParseNormalizedNamed(remote)
 	if err != nil {
 		return err
 	}
 
-	if err = images.PushImage(ref); err != nil {
+	if err = images.PushImage(ref, passphrase, cryptotype); err != nil {
 		return err
 	}
 
@@ -57,5 +57,5 @@ func init() {
 	rootCmd.AddCommand(pushCmd)
 
 	pushCmd.Flags().StringVarP(&passphrase, "pass", "p", "", "Specifies the passphrase to use if passphrase encryption is selected")
-	pushCmd.Flags().StringVarP(&cryptotype, "type", "t", "", "Specifies the type of encryption to use.")
+	pushCmd.Flags().StringVarP(&ctstr, "type", "t", string(crypto.Pbkdf2Aes256Gcm), "Specifies the type of encryption to use.")
 }

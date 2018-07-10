@@ -34,16 +34,11 @@ import (
 
 // TarFromManifest takes a manifest and a target label for the images and create a tarball
 // that may be loaded with docker load. It downloads and decrypts the config and layers if necessary
-func TarFromManifest(manifest *types.ImageManifestJSON, ref registry.NamedTaggedRepository) (tarball string, err error) {
-	//repo, tag, err := cref.ResloveNamed(target)
-	//if err != nil {
-	//return "", err
-	//}
-
+func TarFromManifest(manifest *types.ImageManifestJSON, ref registry.NamedTaggedRepository, passphrase string, cryptotype crypto.EncAlgo) (tarball string, err error) {
 	salt := fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 
 	// decrypt config key
-	if err := manifest.Config.Crypto.Decrypt(pass, salt); err != nil {
+	if err := manifest.Config.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
 		return "", err
 	}
 
@@ -81,7 +76,7 @@ func TarFromManifest(manifest *types.ImageManifestJSON, ref registry.NamedTagged
 	for i, l := range manifest.Layers {
 		if l.Crypto != nil {
 			salt := fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
-			if err := l.Crypto.Decrypt(pass, salt); err != nil {
+			if err := l.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
 				return "", err
 			}
 		}
