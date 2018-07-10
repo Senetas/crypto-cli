@@ -363,6 +363,53 @@
   revision = "bd5444528f086b8f35e29a42c900bbc87e0e957b"
 
 [[projects]]
+  branch = "master"
+  name = "golang.org/x/crypto"
+  packages = [
+    "chacha20poly1305",
+    "internal/chacha20",
+    "internal/subtle",
+    "pbkdf2",
+    "poly1305",
+    "ssh/terminal"
+  ]
+  revision = "a49355c7e3f8fe157a85be2f77e6e269a0f89602"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/net"
+  packages = [
+    "context",
+    "context/ctxhttp",
+    "internal/socks",
+    "proxy"
+  ]
+  revision = "6a8eb5e2b1816b30aa88d7e3ecf9eb7c4559d9e6"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/sys"
+  packages = [
+    "cpu",
+    "unix",
+    "windows"
+  ]
+  revision = "1b2967e3c290b7c545b3db0deeda16e9be4f98a2"
+
+[[projects]]
+  name = "golang.org/x/text"
+  packages = [
+    "internal/gen",
+    "internal/triegen",
+    "internal/ucd",
+    "transform",
+    "unicode/cldr",
+    "unicode/norm"
+  ]
+  revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
+  version = "v0.3.0"
+
+[[projects]]
   name = "gopkg.in/yaml.v2"
   packages = ["."]
   revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
@@ -371,6 +418,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "a58b31697746f3348777715baafea543e1b1d72e0d811a68bd09aa51ba6caa8a"
+  inputs-digest = "3ead3e29f03999ce5fc20e1d0fd07b9fd1d8471b765cf44afd000b36309e4e72"
   solver-name = "gps-cdcl"
   solver-version = 1
