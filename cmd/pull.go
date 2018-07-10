@@ -24,13 +24,10 @@ import (
 // pullCmd represents the pull command
 var pullCmd = &cobra.Command{
 	Use:   "pull [OPTIONS] NAME[:TAG]",
-	Short: "Pull an image from a remote repository, decrypting if necessary.",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Download an image from a remote repository, decrypting if necessary.",
+	Long: `pull is used to download an image from a repository, decrypt it if necessary and
+load that images into the local docker engine. It is then avaliable to be run under the same
+name as it was downloaded.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runPull(args[0])
 	},
