@@ -11,32 +11,32 @@ Follow these instructions: <https://docs.docker.com/install/linux/docker-ce/ubun
 It is convenient to run `docker` as a non-privileged user: <https://docs.docker.com/install/linux/linux-postinstall/>.
 
 ### Go
-```bash
+```console
 $ sudo apt-get install golang
 ```
 
 ### Dep
-```bash
+```console
 $ sudo apt-get install go-dep
 ```
 
-### $GOPATH, etc
+### \$GOPATH, etc
 Add the lines
-```bash
+```
 export GOPATH=$HOME/go
 export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 ```
 to the file `~/.bashrc`. A relogin may be necessary to complete the process.
 
 ## Installation
-```bash
+```console
 $ go get github.com/Senetas/crypto-cli
 ```
 Unfortunately, because the repository is private, the `go get` command may not work if you use ssh keys.
 Furthermore, because of the way the dependencies are currently set up, the semi-official package manager `dep` may need to be used as well.
 
 If the previous command fails, the following sequence of commands should rectify it.
-```bash
+```console
 $ cd $GOPATH/src/github.com/Senetas
 $ git clone git@github.com:Senetas/crypto-cli.git
 $ cd crypto-cli
@@ -48,11 +48,11 @@ The `go get` and `dep ensure` commands will take a long time to execute.
 
 ## Usage
 For now the syntax is limited and some parameters are hard coded.
-```bash
+```
 crypto-cli (push|pull) NAME:TAG
 ```
 Here, `NAME` is the name of a repository and `TAG` is a mandatory tag. For a `push` command, the image `NAME:TAG` must be present in the local docker engine. Furthermore, only images that were built with at least one occurrence of:
-```bash
+```Dockerfile
 LABEL com.senetas.crypto.enabled=true
 ```
 in their `Dockerfile` will be supported.
@@ -60,9 +60,9 @@ For the moment, only images that were built on the same machine and have never b
 This means that the ideal test image is one that was freshly built.
 A compliant Dockerfile is provided in the `test` directory.
 
-### Creditials
+### Credentials
 The user must be able to `pull` and `push` to `registry-1.docker.io` (aka Docker Hub/Cloud). To do this, they should have logged in via the command:
-```bash
+```console
 $ docker login -u <docker-hub-username>
 ```
 and entered the password in `STDIN`. See also the privacy note below.
