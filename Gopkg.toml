@@ -24,10 +24,6 @@
 #   go-tests = true
 #   unused-packages = true
 
-#ignored = ["golang.org/x/*", "github.com/docker/docker/*"]
-
-#required = ["github.com/prometheus/client_golang/prometheus"]
-
 [[override]]
   branch = "master"
   name = "github.com/prometheus/client_golang"
