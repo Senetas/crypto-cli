@@ -16,9 +16,9 @@ package registry
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"regexp"
 
@@ -117,30 +117,32 @@ func Authenticate(ref NamedRepository, repoInfo registry.RepositoryInfo, endpoin
 		return "", errors.New("authentication failed with status: " + resp.Status)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", nil
-	}
-
 	var bodyJSON map[string]interface{}
-	if err = json.Unmarshal(body, &bodyJSON); err != nil {
-		return "", errors.Wrapf(err, "could not unmarshal: %v", body)
+	dec := json.NewDecoder(resp.Body)
+	if err = dec.Decode(&bodyJSON); err != nil {
+		return "", errors.Wrapf(err, "could not decode: %v", resp)
 	}
 
 	return bodyJSON["token"].(string), nil
 }
 
-func localAuthToken() (string, error) {
-	dat, err := ioutil.ReadFile(filepath.Join(config.Dir(), "config.json"))
+func localAuthToken() (tok string, err error) {
+	conffile := filepath.Join(config.Dir(), "config.json")
+	confH, err := os.Open(conffile)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "could not open file: %s", conffile)
 	}
+	defer func() {
+		err = utils.CheckedClose(confH, err)
+	}()
 
 	var config map[string]interface{}
-	if err = json.Unmarshal(dat, &config); err != nil {
-		return "", nil
+	dec := json.NewDecoder(confH)
+	if err = dec.Decode(&config); err != nil {
+		return "", errors.Wrapf(err, "could not decode: %s", conffile)
 	}
 
+	// return the first entry if any
 	for _, v := range config["auths"].(map[string]interface{}) {
 		return (v.(map[string]interface{})["auth"]).(string), nil
 	}
