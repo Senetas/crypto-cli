@@ -53,10 +53,6 @@
   name = "github.com/minio/sio"
 
 [[constraint]]
-  branch = "master"
-  name = "github.com/mitchellh/go-homedir"
-
-[[constraint]]
   name = "github.com/opencontainers/go-digest"
   version = "1.0.0-rc1"
 
@@ -67,10 +63,6 @@
 [[constraint]]
   name = "github.com/spf13/cobra"
   version = "0.0.3"
-
-[[constraint]]
-  name = "github.com/spf13/viper"
-  version = "1.0.2"
 
 [[constraint]]
   branch = "master"
