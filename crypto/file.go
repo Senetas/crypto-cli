@@ -23,6 +23,7 @@ import (
 
 	"github.com/minio/sio"
 	digest "github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/pbkdf2"
 
 	"github.com/Senetas/crypto-cli/utils"
@@ -121,8 +122,13 @@ func DecFile(infile, outfile string, datakey []byte) (err error) {
 		Key:          datakey}
 
 	if _, err = sio.Decrypt(outFH, inFH, cfg); err != nil {
-		outFH.Close()
-		os.Remove(outfile)
+		if err2 := outFH.Close(); err2 != nil {
+			err = utils.CombineErr([]error{err, err2})
+		}
+		if err2 := os.Remove(outfile); err2 != nil {
+			err2 = errors.Wrapf(err2, "warning, unauthenticated file could not be removed: %s", outfile)
+			err = utils.CombineErr([]error{err, err2})
+		}
 		return err
 	}
 

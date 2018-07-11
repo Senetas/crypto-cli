@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 
 	"github.com/docker/docker/client"
+	"github.com/pkg/errors"
 	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/crypto"
@@ -38,17 +39,17 @@ func TarFromManifest(manifest *types.ImageManifestJSON, ref registry.NamedTagged
 	salt := fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 
 	// decrypt config key
-	if err := manifest.Config.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
+	if err = manifest.Config.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
 		return "", err
 	}
 
 	dir := filepath.Dir(manifest.Config.Filename)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err = os.MkdirAll(dir, 0755); err != nil {
 		return "", err
 	}
 
 	// decrypt config file
-	if err := crypto.DecFile(manifest.Config.Filename, manifest.Config.Filename+".dec", manifest.Config.Crypto.DecKey); err != nil {
+	if err = crypto.DecFile(manifest.Config.Filename, manifest.Config.Filename+".dec", manifest.Config.Crypto.DecKey); err != nil {
 		return "", err
 	}
 
@@ -59,7 +60,7 @@ func TarFromManifest(manifest *types.ImageManifestJSON, ref registry.NamedTagged
 	}
 
 	newDir := filepath.Join(dir, "new")
-	if err := os.MkdirAll(newDir, 0755); err != nil {
+	if err = os.MkdirAll(newDir, 0755); err != nil {
 		return "", err
 	}
 
@@ -76,7 +77,7 @@ func TarFromManifest(manifest *types.ImageManifestJSON, ref registry.NamedTagged
 	for i, l := range manifest.Layers {
 		if l.Crypto != nil {
 			salt := fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
-			if err := l.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
+			if err = l.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
 				return "", err
 			}
 		}
@@ -86,13 +87,13 @@ func TarFromManifest(manifest *types.ImageManifestJSON, ref registry.NamedTagged
 		// decrypt layer file
 		if l.Crypto != nil {
 			layerfilename = l.Filename + ".dec"
-			if err := crypto.DecFile(l.Filename, layerfilename, l.Crypto.DecKey); err != nil {
+			if err = crypto.DecFile(l.Filename, layerfilename, l.Crypto.DecKey); err != nil {
 				return "", err
 			}
 		}
 
 		// decompress layer file
-		d, err := utils.Decompress(layerfilename)
+		d, err = utils.Decompress(layerfilename)
 		if err != nil {
 			return "", err
 		}
@@ -141,19 +142,21 @@ func importImage(tarball string) error {
 	// TODO: fix hardcoded version/ check if necessary
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "could not load client: %v", client.FromEnv)
 	}
 
 	fh, err := os.Open(tarball)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "error opening file: %s", tarball)
 	}
 
 	resp, err := cli.ImageLoad(ctx, fh, false)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "error loading image tarball: %s", tarball)
 	}
-	resp.Body.Close()
+	if err = resp.Body.Close(); err != nil {
+		return errors.Wrapf(err, "error closing response body: %v", resp)
+	}
 
 	return nil
 }

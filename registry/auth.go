@@ -123,7 +123,9 @@ func Authenticate(ref NamedRepository, repoInfo registry.RepositoryInfo, endpoin
 	}
 
 	var bodyJSON map[string]interface{}
-	json.Unmarshal(body, &bodyJSON)
+	if err = json.Unmarshal(body, &bodyJSON); err != nil {
+		return "", errors.Wrapf(err, "could not unmarshal: %v", body)
+	}
 
 	return bodyJSON["token"].(string), nil
 }
