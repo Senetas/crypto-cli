@@ -28,6 +28,7 @@ import (
 	"github.com/google/uuid"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/crypto"
@@ -188,6 +189,8 @@ func findLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*t
 		layerSet[x] = true
 	}
 
+	log.Debug().Msgf("layerSet = %+v", layerSet)
+
 	// read the archive manifest
 	manifestfile := filepath.Join(path, "manifest.json")
 	dat, err := ioutil.ReadFile(manifestfile)
@@ -231,7 +234,10 @@ func findLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*t
 			return nil, nil, errors.Wrapf(err, "could not calculate digest: %s", basename)
 		}
 
-		if layerSet[d.Encoded()] {
+		log.Debug().Msgf("diffID = %s", d.String())
+
+		if layerSet[d.String()] {
+			log.Debug().Msgf("encrypting %s", d)
 			filename, d, size, key, err := encryptLayer(basename)
 			if err != nil {
 				return nil, nil, err
