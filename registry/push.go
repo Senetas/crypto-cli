@@ -104,11 +104,11 @@ func PushLayer(token string, ref reference.Named, layerData *types.LayerJSON, en
 	if err != nil {
 		return err
 	} else if layerExists {
-		log.Info().Msgf("Layer %s exists.", layerData.Digest)
+		log.Info().Msgf("Blob %s exists.", layerData.Digest)
 		return nil
 	}
 
-	log.Debug().Msg("new layer, proceed to upload")
+	log.Info().Msgf("Blob %s is new, proceed to upload", layerData.Digest)
 
 	// get the location to upload the blob
 	uploadURLStr, err := bldr.BuildBlobUploadURL(dig, nil)
@@ -208,7 +208,6 @@ func checkLayer(token string, ref reference.Canonical, bldr *v2.URLBuilder) (b b
 		return false, errors.Wrapf(err, "%v", req)
 	}
 	defer func() {
-		b = false
 		err = utils.CheckedClose(resp.Body, err)
 	}()
 
@@ -217,5 +216,6 @@ func checkLayer(token string, ref reference.Canonical, bldr *v2.URLBuilder) (b b
 	} else if resp.StatusCode == http.StatusNotFound {
 		return false, nil
 	}
+
 	return false, errors.New("error testing exsistance of layer")
 }
