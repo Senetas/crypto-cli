@@ -20,6 +20,7 @@ import (
 	"crypto/rand"
 
 	"github.com/Senetas/crypto-cli/utils"
+	"github.com/pkg/errors"
 )
 
 // EncAlgo represents the collection of algorithms used for encryption and authentication
@@ -44,17 +45,17 @@ func Deckey(ciphertext []byte, pass, salt string) ([]byte, error) {
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("error decrypting")
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("error decrypting")
 	}
 
 	plaintext, err := aesgcm.Open(nil, nonce, ckey, bsalt)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("error decrypting")
 	}
 
 	return plaintext, nil
@@ -68,17 +69,17 @@ func Enckey(plaintext []byte, pass, salt string) ([]byte, error) {
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("error encrypting")
 	}
 
 	nonce := make([]byte, 12)
 	if _, err := rand.Read(nonce); err != nil {
-		return nil, err
+		return nil, errors.New("error encrypting")
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("error encrypting")
 	}
 
 	ciphertext := aesgcm.Seal(nil, nonce, plaintext, bsalt)

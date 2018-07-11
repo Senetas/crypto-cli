@@ -45,7 +45,7 @@ func TarFromManifest(manifest *types.ImageManifestJSON, ref registry.NamedTagged
 
 	dir := filepath.Dir(manifest.Config.Filename)
 	if err = os.MkdirAll(dir, 0755); err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "dir name = %s", dir)
 	}
 
 	// decrypt config file
@@ -61,11 +61,11 @@ func TarFromManifest(manifest *types.ImageManifestJSON, ref registry.NamedTagged
 
 	newDir := filepath.Join(dir, "new")
 	if err = os.MkdirAll(newDir, 0755); err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "dir name = %s", newDir)
 	}
 
 	if err = os.Rename(manifest.Config.Filename+".dec.dec", filepath.Join(newDir, d.Hex()+".json")); err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "could not rename %s to %s", manifest.Config.Filename+".dec.dec", filepath.Join(newDir, d.Hex()+".json"))
 	}
 
 	am := &types.ArchiveManifest{
@@ -102,7 +102,7 @@ func TarFromManifest(manifest *types.ImageManifestJSON, ref registry.NamedTagged
 		layernewname := filepath.Join(newDir, d.Hex()+".tar")
 
 		if err = os.Rename(layerfilename, layernewname); err != nil {
-			return "", err
+			return "", errors.Wrapf(err, "could not rename %s to %s", layerfilename, layernewname)
 		}
 
 		am.Layers[i] = d.Hex() + ".tar"
@@ -110,22 +110,24 @@ func TarFromManifest(manifest *types.ImageManifestJSON, ref registry.NamedTagged
 
 	amJSON, err := json.Marshal([]*types.ArchiveManifest{am})
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "archive manifest = %v", am)
 	}
 
+	manifestfilename := filepath.Join(newDir, "manifest.json")
 	amr := bytes.NewReader(amJSON)
-	amFH, err := os.Create(filepath.Join(newDir, "manifest.json"))
+	amFH, err := os.Create(manifestfilename)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "filename = %s", manifestfilename)
 	}
 
 	if _, err = io.Copy(amFH, amr); err != nil {
-		return "", err
+		return "", errors.Wrap(err, "")
 	}
 
-	files, err := filepath.Glob(filepath.Join(newDir, "*"))
+	path := filepath.Join(newDir, "*")
+	files, err := filepath.Glob(path)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "path = %s", path)
 	}
 
 	tarball = filepath.Join(dir, "new.tar")

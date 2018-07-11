@@ -20,6 +20,7 @@ import (
 	"os"
 
 	digest "github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 )
 
 // Compress a file as gz, should already be tarred
@@ -27,7 +28,7 @@ import (
 func Compress(file string) (err error) {
 	out, err := os.Create(file + ".gz")
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "could not create: %s.gz", file)
 	}
 	defer func() {
 		err = CheckedClose(out, err)
@@ -40,14 +41,14 @@ func Compress(file string) (err error) {
 
 	in, err := os.Open(file)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "could not open: %s", file)
 	}
 	defer func() {
 		err = CheckedClose(in, err)
 	}()
 
 	if _, err = io.Copy(w, in); err != nil {
-		return err
+		return errors.Wrapf(err, "error compressing %s to %s.gz", file, file)
 	}
 
 	return nil
@@ -58,7 +59,7 @@ func Compress(file string) (err error) {
 func CompressWithDigest(file string) (d *digest.Digest, err error) {
 	in, err := os.Open(file)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "could not open: %s", file)
 	}
 	defer func() {
 		err = CheckedClose(in, err)
@@ -66,7 +67,7 @@ func CompressWithDigest(file string) (d *digest.Digest, err error) {
 
 	out, err := os.Create(file + ".gz")
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "could not create: %s.gz", file)
 	}
 	defer func() {
 		err = CheckedClose(out, err)
@@ -77,7 +78,7 @@ func CompressWithDigest(file string) (d *digest.Digest, err error) {
 	zw := gzip.NewWriter(mw)
 
 	if _, err = io.Copy(zw, in); err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "error decompressing %s.gz to %s", file, file)
 	}
 
 	if err = zw.Close(); err != nil {

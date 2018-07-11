@@ -71,7 +71,7 @@ type DeCryptoData struct {
 func (c *CryptoJSON) Encrypt(pass, salt string, cryptotype crypto.EncAlgo) error {
 	ciphertextKey, err := crypto.Enckey(c.DecKey, pass, salt)
 	if err != nil {
-		return err
+		return errEncrypt
 	}
 
 	c.EncKey = base64.URLEncoding.EncodeToString(ciphertextKey)

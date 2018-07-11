@@ -36,12 +36,12 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 
 	repoInfo, err := dockerregistry.ParseRepositoryInfo(ref)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "could not parse ref = %v", ref)
 	}
 
 	endpoint, err := registry.GetEndPoint(ref, *repoInfo)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "could not get endpoint ref = %v, repoInfo = %v", ref, *repoInfo)
 	}
 
 	token, err := registry.Authenticate(nTRep, *repoInfo, endpoint)
@@ -70,7 +70,7 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 
 	// cleanup temporary files
 	if err = os.RemoveAll(dir); err != nil {
-		return err
+		return errors.Wrapf(err, "could not clean up temp files in: %s", dir)
 	}
 
 	return nil

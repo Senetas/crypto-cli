@@ -88,7 +88,7 @@ func PushManifest(token string, ref reference.Named, manifest *types.ImageManife
 	}
 
 	if err = resp.Body.Close(); err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "error closing resp = %v", resp)
 	}
 
 	return resp.Header.Get("Docker-Content-Digest"), nil
@@ -118,7 +118,7 @@ func PushLayer(token string, ref reference.Named, layerData *types.LayerJSON, en
 
 	req, err := http.NewRequest("POST", uploadURLStr, nil)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "could not make req = %v", req)
 	}
 
 	req.Header.Add("Authorization", "Bearer "+token)
@@ -155,20 +155,20 @@ func PushLayer(token string, ref reference.Named, layerData *types.LayerJSON, en
 	q.Add("digest", layerData.Digest.String())
 	rawq, err := url.QueryUnescape(q.Encode())
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "could not extract uescape url query: %s", q.Encode())
 	}
 	u.RawQuery = rawq
 
 	// open the layer file to get size and upload
 	layerFH, err := os.Open(layerData.Filename)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "could not open: %s", layerData.Filename)
 	}
 	// file will be closed by the http client
 
 	req, err = http.NewRequest("PUT", u.String(), layerFH)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "could not make req = %v", req)
 	}
 
 	req.Header.Add("Authorization", "Bearer "+token)

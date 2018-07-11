@@ -17,7 +17,6 @@ package crypto
 import (
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/hex"
 	"io"
 	"os"
 
@@ -28,24 +27,6 @@ import (
 
 	"github.com/Senetas/crypto-cli/utils"
 )
-
-// Sha256sum calculates the sha256 incrementally, returns a string
-func Sha256sum(file string) (s string, err error) {
-	f, err := os.Open(file)
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		err = utils.CheckedClose(f, err)
-	}()
-
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
 
 // PassSalt2Key deterministically returns a 32 byte encryption key given a passphrase and a salt
 func PassSalt2Key(pass string, salt []byte) []byte {
@@ -66,7 +47,7 @@ func GenDataKey() ([]byte, error) {
 func EncFile(infile, outfile string, key []byte) (d *digest.Digest, size int64, err error) {
 	inFH, err := os.Open(infile)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, errors.Wrapf(err, "could not open file %s", infile)
 	}
 	defer func() {
 		err = utils.CheckedClose(inFH, err)
@@ -74,7 +55,7 @@ func EncFile(infile, outfile string, key []byte) (d *digest.Digest, size int64, 
 
 	outFH, err := os.Create(outfile)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, errors.Wrapf(err, "could not create file %s", outfile)
 	}
 	defer func() {
 		err = utils.CheckedClose(outFH, err)
@@ -89,7 +70,16 @@ func EncFile(infile, outfile string, key []byte) (d *digest.Digest, size int64, 
 
 	digester := digest.Canonical.Digester()
 	mw := io.MultiWriter(digester.Hash(), outFH)
-	size, err = sio.Encrypt(mw, inFH, cfg)
+	if size, err = sio.Encrypt(mw, inFH, cfg); err != nil {
+		if err2 := outFH.Close(); err2 != nil {
+			err = utils.CombineErr([]error{err, err2})
+		}
+		if err2 := os.Remove(outfile); err2 != nil {
+			err2 = errors.Wrapf(err2, "warning, unauthenticated file could not be removed: %s", outfile)
+			err = utils.CombineErr([]error{err, err2})
+		}
+		return nil, 0, errors.New("could not encrypt")
+	}
 
 	ds := digester.Digest()
 	return &ds, size, nil
@@ -101,7 +91,7 @@ func EncFile(infile, outfile string, key []byte) (d *digest.Digest, size int64, 
 func DecFile(infile, outfile string, datakey []byte) (err error) {
 	inFH, err := os.Open(infile)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "could not open file %s", infile)
 	}
 	defer func() {
 		err = utils.CheckedClose(inFH, err)
@@ -109,7 +99,7 @@ func DecFile(infile, outfile string, datakey []byte) (err error) {
 
 	outFH, err := os.Create(outfile)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "could not create file %s", outfile)
 	}
 	defer func() {
 		err = utils.CheckedClose(outFH, err)
@@ -119,7 +109,8 @@ func DecFile(infile, outfile string, datakey []byte) (err error) {
 		MinVersion:   sio.Version20,
 		MaxVersion:   sio.Version20,
 		CipherSuites: []byte{sio.AES_256_GCM},
-		Key:          datakey}
+		Key:          datakey,
+	}
 
 	if _, err = sio.Decrypt(outFH, inFH, cfg); err != nil {
 		if err2 := outFH.Close(); err2 != nil {
@@ -129,7 +120,7 @@ func DecFile(infile, outfile string, datakey []byte) (err error) {
 			err2 = errors.Wrapf(err2, "warning, unauthenticated file could not be removed: %s", outfile)
 			err = utils.CombineErr([]error{err, err2})
 		}
-		return err
+		return errors.New("could not decrypt")
 	}
 
 	return nil

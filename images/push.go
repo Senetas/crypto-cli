@@ -34,12 +34,12 @@ func PushImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 
 	repoInfo, err := dockerregistry.ParseRepositoryInfo(ref)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "could not parse ref = %v", ref)
 	}
 
 	endpoint, err := registry.GetEndPoint(ref, *repoInfo)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "could not parse ref = %v", ref)
 	}
 
 	token, err := registry.Authenticate(nTRep, *repoInfo, endpoint)
@@ -59,11 +59,11 @@ func PushImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 
 	// cleanup temporary files
 	if err = os.RemoveAll(manifest.DirName + ".tar"); err != nil {
-		return errors.Wrap(err, "Warning: temporary files not removed!")
+		return errors.Wrapf(err, "could not clean up temp file: %s", manifest.DirName+".tar")
 	}
 
 	if err = os.RemoveAll(manifest.DirName); err != nil {
-		return errors.Wrap(err, "Warning: temporary files not removed!")
+		return errors.Wrapf(err, "could not clean up temp files in: %s", manifest.DirName+".tar")
 	}
 
 	return nil

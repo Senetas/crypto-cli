@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"github.com/docker/distribution/reference"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/Senetas/crypto-cli/crypto"
@@ -43,11 +44,11 @@ confidentially. It does not sign images so cannot garuntee identities.`,
 func runPush(remote, passphrase string, cryptotype crypto.EncAlgo) error {
 	ref, err := reference.ParseNormalizedNamed(remote)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "remote = ", remote)
 	}
 
 	if err = images.PushImage(ref, passphrase, cryptotype); err != nil {
-		return err
+		return errors.Wrapf(err, "ref = %v, cryptotype = %v", ref, cryptotype)
 	}
 
 	return nil

@@ -18,6 +18,7 @@ import (
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/images"
 	"github.com/docker/distribution/reference"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -42,11 +43,11 @@ name as it was downloaded.`,
 func runPull(remote, passphrase string, cryptotype crypto.EncAlgo) error {
 	ref, err := reference.ParseNormalizedNamed(remote)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "remote = ", remote)
 	}
 
 	if err = images.PullImage(ref, passphrase, cryptotype); err != nil {
-		return err
+		return errors.Wrapf(err, "ref = %v, cryptotype = %v", ref, cryptotype)
 	}
 
 	return nil

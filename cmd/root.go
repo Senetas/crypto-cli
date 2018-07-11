@@ -19,13 +19,11 @@ import (
 	"os"
 	"syscall"
 
-	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/Senetas/crypto-cli/crypto"
@@ -34,7 +32,7 @@ import (
 var (
 	passphrase string
 	ctstr      string
-	cfgFile    string
+	//cfgFile    string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -79,29 +77,29 @@ func init() {
 }
 
 // initConfig reads in config file and ENV variables if set.
-func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find home directory.
-		home, err := homedir.Dir()
-		if err != nil {
-			log.Fatal().Msgf("%+v", err)
-		}
+//func initConfig() {
+//if cfgFile != "" {
+//// Use config file from the flag.
+//viper.SetConfigFile(cfgFile)
+//} else {
+//// Find home directory.
+//home, err := homedir.Dir()
+//if err != nil {
+//log.Fatal().Msgf("%+v", err)
+//}
 
-		// Search config in home directory with name ".crypto-cli" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigName(".crypto-cli")
-	}
+//// Search config in home directory with name ".crypto-cli" (without extension).
+//viper.AddConfigPath(home)
+//viper.SetConfigName(".crypto-cli")
+//}
 
-	viper.AutomaticEnv() // read in environment variables that match
+//viper.AutomaticEnv() // read in environment variables that match
 
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
-	}
-}
+//// If a config file is found, read it in.
+//if err := viper.ReadInConfig(); err == nil {
+//fmt.Println("Using config file:", viper.ConfigFileUsed())
+//}
+//}
 
 func checkFlags(f *pflag.Flag) {
 	switch f.Name {
@@ -115,7 +113,7 @@ func checkFlags(f *pflag.Flag) {
 
 func getPassSTDIN() string {
 	fmt.Print("Enter Passpharase: ")
-	passphrase, err := terminal.ReadPassword(int(syscall.Stdin))
+	passphrase, err := terminal.ReadPassword(syscall.Stdin)
 	if err != nil {
 		log.Fatal().Err(errors.Wrapf(err, "password typed: %s", passphrase)).Msg("")
 	}

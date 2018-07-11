@@ -153,23 +153,23 @@ func extractTarBall(tarFH io.Reader, manifest *types.ImageManifestJSON) (err err
 	tarfile := manifest.DirName + ".tar"
 
 	if err = os.MkdirAll(manifest.DirName, 0755); err != nil {
-		return err
+		return errors.Wrapf(err, "could not create: %s", manifest.DirName)
 	}
 
 	outFH, err := os.Create(tarfile)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "could not create: %s", tarfile)
 	}
 	defer func() {
 		err = utils.CheckedClose(outFH, err)
 	}()
 
 	if _, err = io.Copy(outFH, tarFH); err != nil {
-		return err
+		return errors.Wrapf(err, "could not extract to %s", tarfile)
 	}
 
 	if err = outFH.Sync(); err != nil {
-		return err
+		return errors.Wrapf(err, "could not sync file: %s", tarfile)
 	}
 
 	if err = tarinator.UnTarinate(manifest.DirName, tarfile); err != nil {
@@ -189,9 +189,10 @@ func findLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*t
 	}
 
 	// read the archive manifest
-	dat, err := ioutil.ReadFile(filepath.Join(path, "manifest.json"))
+	manifestfile := filepath.Join(path, "manifest.json")
+	dat, err := ioutil.ReadFile(manifestfile)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrapf(err, "could not open file: %s", manifestfile)
 	}
 
 	type configLayers struct {
@@ -201,7 +202,7 @@ func findLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*t
 
 	var images []*configLayers
 	if err := json.Unmarshal(dat, &images); err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrapf(err, "error unmarshalling: %s", dat)
 	}
 
 	if len(images) < 1 {
@@ -209,34 +210,39 @@ func findLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*t
 	}
 
 	configfile := filepath.Join(path, images[0].Config)
-	filename, digest, size, key, err := encryptLayer(configfile)
+	filename, d, size, key, err := encryptLayer(configfile)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	config := types.NewConfigJSON(filename, digest, size, key)
+	config := types.NewConfigJSON(filename, d, size, key)
 
 	layerJSON := make([]*types.LayerJSON, len(images[0].Layers))
 	for i, f := range images[0].Layers {
 		basename := filepath.Join(path, f)
-		sum, err := crypto.Sha256sum(basename)
+
+		fh, err := os.Open(basename)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, errors.Wrapf(err, "could not open file: %s", basename)
 		}
 
-		l := "sha256:" + sum
-		if layerSet[l] {
-			filename, digest, size, key, err := encryptLayer(basename)
+		d, err := digest.Canonical.FromReader(fh)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "could not calculate digest: %s", basename)
+		}
+
+		if layerSet[d.Encoded()] {
+			filename, d, size, key, err := encryptLayer(basename)
 			if err != nil {
 				return nil, nil, err
 			}
-			layerJSON[i] = types.NewLayerJSON(filename, digest, size, key)
+			layerJSON[i] = types.NewLayerJSON(filename, d, size, key)
 		} else {
-			filename, digest, size, _, err := compressLayer(basename)
+			filename, d, size, _, err := compressLayer(basename)
 			if err != nil {
 				return nil, nil, err
 			}
-			layerJSON[i] = types.NewPlainLayerJSON(filename, digest, size)
+			layerJSON[i] = types.NewPlainLayerJSON(filename, d, size)
 		}
 	}
 
@@ -253,7 +259,7 @@ func compressLayer(filename string) (compFile string, d *digest.Digest, size int
 
 	stat, err := os.Stat(compFile)
 	if err != nil {
-		return "", nil, 0, nil, err
+		return "", nil, 0, nil, errors.Wrapf(err, "could not stat file: %s", compFile)
 	}
 
 	return compFile, d, stat.Size(), key, nil
