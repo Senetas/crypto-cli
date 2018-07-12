@@ -16,11 +16,9 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"syscall"
 
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -60,9 +58,6 @@ func Execute() {
 }
 
 func init() {
-	// use UNIX time for logs
-	zerolog.TimeFieldFormat = ""
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	//cobra.OnInitialize(initConfig)
 

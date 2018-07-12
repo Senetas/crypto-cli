@@ -16,10 +16,19 @@ package main
 
 import (
 	_ "crypto/sha256"
+	"os"
 
 	"github.com/Senetas/crypto-cli/cmd"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
+	// use UNIX time for logs
+	zerolog.TimeFieldFormat = ""
+
+	// use a prettyier logger
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
 	cmd.Execute()
 }

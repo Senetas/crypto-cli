@@ -16,6 +16,7 @@ package types
 
 import (
 	"encoding/base64"
+	"fmt"
 
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -24,8 +25,8 @@ import (
 )
 
 var (
-	errDecrypt = errors.New("could not decrypt")
-	errEncrypt = errors.New("could not encrypt")
+	errDecrypt = fmt.Errorf("could not decrypt")
+	errEncrypt = fmt.Errorf("could not encrypt")
 )
 
 // ArchiveManifest represents the json manifest in an image archive
@@ -71,7 +72,7 @@ type DeCryptoData struct {
 func (c *CryptoJSON) Encrypt(pass, salt string, cryptotype crypto.EncAlgo) error {
 	ciphertextKey, err := crypto.Enckey(c.DecKey, pass, salt)
 	if err != nil {
-		return errEncrypt
+		return errors.WithStack(errEncrypt)
 	}
 
 	c.EncKey = base64.URLEncoding.EncodeToString(ciphertextKey)
@@ -88,12 +89,12 @@ func (c *CryptoJSON) Decrypt(pass, salt string, cryptotype crypto.EncAlgo) error
 
 	decoded, err := base64.URLEncoding.DecodeString(c.EncKey)
 	if err != nil {
-		return errDecrypt
+		return errors.WithStack(errDecrypt)
 	}
 
 	c.DecKey, err = crypto.Deckey(decoded, pass, salt)
 	if err != nil {
-		return errDecrypt
+		return errors.WithStack(errDecrypt)
 	}
 
 	return nil
