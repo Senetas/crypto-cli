@@ -99,8 +99,7 @@ func numLayers(hist []image.HistoryResponseItem) (n int, err error) {
 			return n, nil
 		}
 	}
-	log.Fatal().Msg("this image was not built with the correct LABEL")
-	return 0, nil
+	return 0, utils.NewError("this image was not built with the correct LABEL", false)
 }
 
 func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
@@ -114,21 +113,18 @@ func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
 
 	inspt, _, err := cli.ImageInspectWithRaw(ctx, repo+":"+tag)
 	if err != nil {
-		fmt.Printf("%s\n", err)
-		os.Exit(1)
+		return nil, nil, errors.WithStack(err)
 	}
 
 	img, err := cli.ImageSave(ctx, []string{inspt.ID})
 	if err != nil {
-		fmt.Printf("%s\n", err)
-		os.Exit(1)
+		return nil, nil, errors.WithStack(err)
 	}
 
 	// get the history
 	hist, err := cli.ImageHistory(ctx, repo+":"+tag)
 	if err != nil {
-		fmt.Printf("%s\n", err)
-		os.Exit(1)
+		return nil, nil, errors.WithStack(err)
 	}
 
 	// findLayers
