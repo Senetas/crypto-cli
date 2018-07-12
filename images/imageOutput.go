@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -173,7 +172,11 @@ func extractTarBall(tarFH io.Reader, manifest *types.ImageManifestJSON) (err err
 
 // find the layer files that correponds to the digests we want to encrypt
 // TODO: find a way to do this by interfacing with the daemon directly
-func findLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*types.LayerJSON, error) {
+func findLayers(repo, tag, path string, layers []string) (
+	config *types.LayerJSON,
+	layerJSON []*types.LayerJSON,
+	err error,
+) {
 	// assemble layers
 	layerSet := make(map[string]bool)
 	for _, x := range layers {
@@ -184,10 +187,13 @@ func findLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*t
 
 	// read the archive manifest
 	manifestfile := filepath.Join(path, "manifest.json")
-	dat, err := ioutil.ReadFile(manifestfile)
+	manifestFH, err := os.Open(manifestfile)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "could not open file: %s", manifestfile)
 	}
+	defer func() {
+		err = utils.CheckedClose(manifestFH, err)
+	}()
 
 	type configLayers struct {
 		Config string
@@ -195,8 +201,9 @@ func findLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*t
 	}
 
 	var images []*configLayers
-	if err := json.Unmarshal(dat, &images); err != nil {
-		return nil, nil, errors.Wrapf(err, "error unmarshalling: %s", dat)
+	dec := json.NewDecoder(manifestFH)
+	if err := dec.Decode(&images); err != nil {
+		return nil, nil, errors.Wrapf(err, "error unmarshalling: %s", manifestfile)
 	}
 
 	if len(images) < 1 {
@@ -209,9 +216,9 @@ func findLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*t
 		return nil, nil, err
 	}
 
-	config := types.NewConfigJSON(filename, d, size, key)
+	config = types.NewConfigJSON(filename, d, size, key)
 
-	layerJSON := make([]*types.LayerJSON, len(images[0].Layers))
+	layerJSON = make([]*types.LayerJSON, len(images[0].Layers))
 	for i, f := range images[0].Layers {
 		basename := filepath.Join(path, f)
 
