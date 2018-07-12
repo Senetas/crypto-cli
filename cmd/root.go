@@ -25,6 +25,7 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/Senetas/crypto-cli/crypto"
+	"github.com/Senetas/crypto-cli/utils"
 )
 
 var (
@@ -53,12 +54,15 @@ downloading them.`,
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
+		e, ok := errors.Cause(err).(utils.Error)
+		if ok && !e.HasStack {
+			log.Fatal().Msgf("%v", err)
+		}
 		log.Fatal().Msgf("%+v", err)
 	}
 }
 
 func init() {
-
 	//cobra.OnInitialize(initConfig)
 
 	// Here you will define your flags and configuration settings.
