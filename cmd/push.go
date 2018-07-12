@@ -52,7 +52,7 @@ func checkFlagsPush(f *pflag.Flag) {
 			if passphrase1 == passphrase2 {
 				passphrase = passphrase1
 			} else {
-				log.Fatal().Err(errors.New("passphrases do not match")).Msg("")
+				log.Fatal().Msg("Passphrases do not match.")
 			}
 		}
 	}
