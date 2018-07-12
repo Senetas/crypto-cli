@@ -65,7 +65,7 @@ func CreateManifest(
 		return nil, err
 	}
 
-	configData, layerData, err := findLayers(ref.Path(), ref.Tag(), manifest.DirName, layers)
+	configData, layerData, err := prepareLayers(ref.Path(), ref.Tag(), manifest.DirName, layers)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,9 @@ func numLayers(hist []image.HistoryResponseItem) (n int, err error) {
 			return n, nil
 		}
 	}
-	log.Fatal().Msg("this image was not built with the correct LABEL")
+	//log.Fatal().Msg("this image was not built with the correct LABEL")
+	fmt.Println("This image was not built with the correct LABEL")
+	os.Exit(1)
 	return 0, nil
 }
 
@@ -114,14 +116,92 @@ func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
 
 	inspt, _, err := cli.ImageInspectWithRaw(ctx, repo+":"+tag)
 	if err != nil {
+<<<<<<< HEAD
+		return nil, nil, utils.StripTrace(err)
+||||||| parent of a98e10c... prelim support for non oririginal images
+		return nil, nil, errors.Wrap(err, "")
+=======
 		fmt.Printf("%s\n", err)
 		os.Exit(1)
+>>>>>>> a98e10c... prelim support for non oririginal images
 	}
 
+<<<<<<< HEAD
+	// obtain the most recent two complete images
+	ids := []string{hist[0].ID}
+
+	// advance pointer to history entry for LABEL "com.senetas.crypto.enabled=true"
+	i := 0
+	for ; i < len(hist) && !strings.Contains(hist[i].CreatedBy, labelString); i++ {
+	}
+	if i >= len(hist)-1 {
+		return nil, nil, utils.NewError("no "+labelString+" in Dockerfile", false)
+	}
+	if hist[i+1].ID == "<missing>" {
+		return nil, nil, utils.NewError("image not built on this Machine", false)
+	}
+	ids = append(ids, hist[i+1].ID)
+
+	// map the layers of the two tags, since one tag was based on the other,
+	// the layers of the lower tag should be duplicates of the upper one
+	layerMap := make(map[string]int)
+	for _, x := range ids {
+		inspt, _, err := cli.ImageInspectWithRaw(ctx, x)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "inspecting layer %v", x)
+		}
+
+		for _, x := range inspt.RootFS.Layers {
+			layerMap[x]++
+		}
+	}
+
+	layers := []string{}
+	for k, v := range layerMap {
+		if v == 1 {
+			layers = append(layers, k)
+		}
+||||||| parent of a98e10c... prelim support for non oririginal images
+	// obtain the most recent two complete images
+	ids := []string{hist[0].ID}
+
+	// advance pointer to history entry for LABEL "com.senetas.crypto.enabled=true"
+	i := 0
+	for ; i < len(hist) && !strings.Contains(hist[i].CreatedBy, labelString); i++ {
+	}
+	if i >= len(hist)-1 {
+		return nil, nil, errors.New("no " + labelString + " in Dockerfile")
+	}
+	if hist[i+1].ID == "<missing>" {
+		return nil, nil, errors.New("image not built on this Machine")
+	}
+	ids = append(ids, hist[i+1].ID)
+
+	// map the layers of the two tags, since one tag was based on the other,
+	// the layers of the lower tag should be duplicates of the upper one
+	layerMap := make(map[string]int)
+	for _, x := range ids {
+		inspt, _, err := cli.ImageInspectWithRaw(ctx, x)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "inspecting layer %v", x)
+		}
+
+		for _, x := range inspt.RootFS.Layers {
+			layerMap[x]++
+		}
+	}
+
+	layers := []string{}
+	for k, v := range layerMap {
+		if v == 1 {
+			layers = append(layers, k)
+		}
+=======
 	img, err := cli.ImageSave(ctx, []string{inspt.ID})
 	if err != nil {
 		fmt.Printf("%s\n", err)
 		os.Exit(1)
+>>>>>>> a98e10c... prelim support for non oririginal images
 	}
 
 	// get the history
@@ -175,9 +255,9 @@ func extractTarBall(tarFH io.Reader, manifest *types.ImageManifestJSON) (err err
 	return nil
 }
 
-// find the layer files that correponds to the digests we want to encrypt
+// find the layer files that we want to encrypt
 // TODO: find a way to do this by interfacing with the daemon directly
-func findLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*types.LayerJSON, error) {
+func prepareLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*types.LayerJSON, error) {
 	// assemble layers
 	layerSet := make(map[string]bool)
 	for _, x := range layers {
