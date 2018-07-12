@@ -23,7 +23,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/Senetas/crypto-cli/crypto"
@@ -101,18 +100,8 @@ func init() {
 //}
 //}
 
-func checkFlags(f *pflag.Flag) {
-	switch f.Name {
-	case "pass":
-		if !f.Changed {
-			passphrase = getPassSTDIN()
-		}
-	default:
-	}
-}
-
-func getPassSTDIN() string {
-	fmt.Print("Enter Passpharase: ")
+func getPassSTDIN(prompt string) string {
+	fmt.Print(prompt)
 	passphrase, err := terminal.ReadPassword(syscall.Stdin)
 	if err != nil {
 		log.Fatal().Err(errors.Wrapf(err, "password typed: %s", passphrase)).Msg("")

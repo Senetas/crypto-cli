@@ -20,6 +20,7 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // pullCmd represents the pull command
@@ -30,7 +31,7 @@ var pullCmd = &cobra.Command{
 load that images into the local docker engine. It is then avaliable to be run under the same
 name as it was downloaded.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cmd.Flags().VisitAll(checkFlags)
+		cmd.Flags().VisitAll(checkFlagsPull)
 		cryptotype, err := validateCryptoType(ctstr)
 		if err != nil {
 			return err
@@ -38,6 +39,15 @@ name as it was downloaded.`,
 		return runPull(args[0], passphrase, cryptotype)
 	},
 	Args: cobra.ExactArgs(1),
+}
+
+func checkFlagsPull(f *pflag.Flag) {
+	switch f.Name {
+	case "pass":
+		if !f.Changed {
+			passphrase = getPassSTDIN("Enter passphrase: ")
+		}
+	}
 }
 
 func runPull(remote, passphrase string, cryptotype crypto.EncAlgo) error {
