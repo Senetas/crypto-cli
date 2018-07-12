@@ -17,7 +17,9 @@ package cmd
 import (
 	"github.com/docker/distribution/reference"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/images"
@@ -31,7 +33,7 @@ var pushCmd = &cobra.Command{
 to a remote repositories. It maybe used to distribute docker images
 confidentially. It does not sign images so cannot garuntee identities.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cmd.Flags().VisitAll(checkFlags)
+		cmd.Flags().VisitAll(checkFlagsPush)
 		cryptotype, err := validateCryptoType(ctstr)
 		if err != nil {
 			return err
@@ -39,6 +41,21 @@ confidentially. It does not sign images so cannot garuntee identities.`,
 		return runPush(args[0], passphrase, cryptotype)
 	},
 	Args: cobra.ExactArgs(1),
+}
+
+func checkFlagsPush(f *pflag.Flag) {
+	switch f.Name {
+	case "pass":
+		if !f.Changed {
+			passphrase1 := getPassSTDIN("Enter passphrase: ")
+			passphrase2 := getPassSTDIN("Re-enter passphrase: ")
+			if passphrase1 == passphrase2 {
+				passphrase = passphrase1
+			} else {
+				log.Fatal().Msg("Passphrases do not match.")
+			}
+		}
+	}
 }
 
 func runPush(remote, passphrase string, cryptotype crypto.EncAlgo) error {
