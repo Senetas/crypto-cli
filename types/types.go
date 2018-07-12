@@ -21,11 +21,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/Senetas/crypto-cli/crypto"
-)
-
-var (
-	errDecrypt = errors.New("could not decrypt")
-	errEncrypt = errors.New("could not encrypt")
+	"github.com/Senetas/crypto-cli/utils"
 )
 
 // ArchiveManifest represents the json manifest in an image archive
@@ -71,7 +67,7 @@ type DeCryptoData struct {
 func (c *CryptoJSON) Encrypt(pass, salt string, cryptotype crypto.EncAlgo) error {
 	ciphertextKey, err := crypto.Enckey(c.DecKey, pass, salt)
 	if err != nil {
-		return errEncrypt
+		return errors.WithStack(utils.ErrEncrypt)
 	}
 
 	c.EncKey = base64.URLEncoding.EncodeToString(ciphertextKey)
@@ -83,17 +79,17 @@ func (c *CryptoJSON) Encrypt(pass, salt string, cryptotype crypto.EncAlgo) error
 // Decrypt is the inverse function of Encrypt (up to error, types etc)
 func (c *CryptoJSON) Decrypt(pass, salt string, cryptotype crypto.EncAlgo) error {
 	if c.CryptoType != cryptotype {
-		return errors.New("encryption type does not match decryption type")
+		return utils.NewError("encryption type does not match decryption type", false)
 	}
 
 	decoded, err := base64.URLEncoding.DecodeString(c.EncKey)
 	if err != nil {
-		return errDecrypt
+		return errors.WithStack(utils.ErrDecrypt)
 	}
 
 	c.DecKey, err = crypto.Deckey(decoded, pass, salt)
 	if err != nil {
-		return errDecrypt
+		return errors.WithStack(utils.ErrDecrypt)
 	}
 
 	return nil

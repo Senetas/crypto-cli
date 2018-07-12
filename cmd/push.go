@@ -74,6 +74,18 @@ func runPush(remote, passphrase string, cryptotype crypto.EncAlgo) error {
 func init() {
 	rootCmd.AddCommand(pushCmd)
 
-	pushCmd.Flags().StringVarP(&passphrase, "pass", "p", "", "Specifies the passphrase to use if passphrase encryption is selected")
-	pushCmd.Flags().StringVarP(&ctstr, "type", "t", string(crypto.Pbkdf2Aes256Gcm), "Specifies the type of encryption to use.")
+	pushCmd.Flags().StringVarP(
+		&passphrase,
+		"pass",
+		"p",
+		"",
+		"Specifies the passphrase to use if passphrase encryption is selected",
+	)
+	pushCmd.Flags().StringVarP(
+		&ctstr,
+		"type",
+		"t",
+		string(crypto.Pbkdf2Aes256Gcm),
+		"Specifies the type of encryption to use.",
+	)
 }

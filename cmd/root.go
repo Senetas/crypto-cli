@@ -16,16 +16,15 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"syscall"
 
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/Senetas/crypto-cli/crypto"
+	"github.com/Senetas/crypto-cli/utils"
 )
 
 var (
@@ -54,15 +53,18 @@ downloading them.`,
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
+		// comment out until * to print all stack traces
+		e, ok := errors.Cause(err).(utils.Error)
+		if ok && !e.HasStack {
+			log.Fatal().Msgf("%v", err)
+		}
+		// *
+
 		log.Fatal().Msgf("%+v", err)
 	}
 }
 
 func init() {
-	// use UNIX time for logs
-	zerolog.TimeFieldFormat = ""
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-
 	//cobra.OnInitialize(initConfig)
 
 	// Here you will define your flags and configuration settings.

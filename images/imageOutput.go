@@ -39,7 +39,11 @@ import (
 
 // CreateManifest creates a manifest and encrypts all necessary parts of it
 // These are they ready to be uploaded to a regitry
-func CreateManifest(ref registry.NamedTaggedRepository, passphrase string, cryptotype crypto.EncAlgo) (manifest *types.ImageManifestJSON, err error) {
+func CreateManifest(
+	ref registry.NamedTaggedRepository,
+	passphrase string,
+	cryptotype crypto.EncAlgo,
+) (manifest *types.ImageManifestJSON, err error) {
 	layers, tarFH, err := getImgTarLayers(ref.Path(), ref.Tag())
 	if err != nil {
 		return nil, err
@@ -92,13 +96,13 @@ func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
 	// TODO: fix hardcoded version/ check if necessary
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "")
+		return nil, nil, utils.StripTrace(errors.Wrap(err, "could not create client for docker daemon"))
 	}
 
 	// get the history
 	hist, err := cli.ImageHistory(ctx, repo+":"+tag)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "")
+		return nil, nil, utils.StripTrace(err)
 	}
 
 	// obtain the most recent two complete images
@@ -109,10 +113,10 @@ func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
 	for ; i < len(hist) && !strings.Contains(hist[i].CreatedBy, labelString); i++ {
 	}
 	if i >= len(hist)-1 {
-		return nil, nil, errors.New("no " + labelString + " in Dockerfile")
+		return nil, nil, utils.NewError("no "+labelString+" in Dockerfile", false)
 	}
 	if hist[i+1].ID == "<missing>" {
-		return nil, nil, errors.New("image not built on this Machine")
+		return nil, nil, utils.NewError("image not built on this Machine", false)
 	}
 	ids = append(ids, hist[i+1].ID)
 

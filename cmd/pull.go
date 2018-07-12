@@ -57,7 +57,7 @@ func runPull(remote, passphrase string, cryptotype crypto.EncAlgo) error {
 	}
 
 	if err = images.PullImage(ref, passphrase, cryptotype); err != nil {
-		return errors.Wrapf(err, "ref = %v, cryptotype = %v", ref, cryptotype)
+		return err
 	}
 
 	return nil
@@ -66,6 +66,18 @@ func runPull(remote, passphrase string, cryptotype crypto.EncAlgo) error {
 func init() {
 	rootCmd.AddCommand(pullCmd)
 
-	pullCmd.Flags().StringVarP(&passphrase, "pass", "p", "", "Specifies the passphrase to use if passphrase encryption is selected")
-	pullCmd.Flags().StringVarP(&ctstr, "type", "t", string(crypto.Pbkdf2Aes256Gcm), "Specifies the type of encryption to use.")
+	pullCmd.Flags().StringVarP(
+		&passphrase,
+		"pass",
+		"p",
+		"",
+		"Specifies the passphrase to use if passphrase encryption is selected",
+	)
+	pullCmd.Flags().StringVarP(
+		&ctstr,
+		"type",
+		"t",
+		string(crypto.Pbkdf2Aes256Gcm),
+		"Specifies the type of encryption to use.",
+	)
 }
