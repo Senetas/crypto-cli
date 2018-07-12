@@ -155,10 +155,19 @@ func PullFromDigest(token string, ref reference.Named, d *digest.Digest, bldr *v
 
 func quitUnVerified(fn string, fh *os.File, err error) (string, error) {
 	if err2 := os.Remove(fn); err != nil {
-		return "", errors.Wrapf(utils.CombineErr([]error{err, err2}), "digest verification failed, and unverified was NOT delete. To clean manaually delete: %s", fn)
+		return "",
+			errors.Wrapf(
+				utils.Errors{err, err2},
+				"unverified data was NOT deleted. To clean manaually delete: %s",
+				fn,
+			)
 	}
 	if err2 := fh.Close(); err2 != nil {
-		return "", errors.Wrap(utils.CombineErr([]error{err, err2}), "digest verification failed, failed to close, but unverified data was deleted")
+		return "",
+			errors.Wrap(
+				utils.Errors{err, err2},
+				"digest verification failed, failed to close, but unverified data was deleted",
+			)
 	}
 	return "", errors.Wrapf(err, "digest verification failed, unverified data deleted")
 }

@@ -27,7 +27,7 @@ func main() {
 	// use UNIX time for logs
 	zerolog.TimeFieldFormat = ""
 
-	// use a prettyier logger
+	// use a prettier logger
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	cmd.Execute()

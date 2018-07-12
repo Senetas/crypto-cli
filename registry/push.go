@@ -95,7 +95,12 @@ func PushManifest(token string, ref reference.Named, manifest *types.ImageManife
 }
 
 // PushLayer pushes a layer to the registry, checking if it exists
-func PushLayer(token string, ref reference.Named, layerData *types.LayerJSON, endpoint *registry.APIEndpoint) (err error) {
+func PushLayer(
+	token string,
+	ref reference.Named,
+	layerData *types.LayerJSON,
+	endpoint *registry.APIEndpoint,
+) (err error) {
 	sep := SeperateRepository(ref)
 	dig := digestedReference{sep, *layerData.Digest}
 	bldr := v2.NewURLBuilder(endpoint.URL, false)

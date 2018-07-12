@@ -71,14 +71,14 @@ func EncFile(infile, outfile string, key []byte) (d *digest.Digest, size int64, 
 	digester := digest.Canonical.Digester()
 	mw := io.MultiWriter(digester.Hash(), outFH)
 	if size, err = sio.Encrypt(mw, inFH, cfg); err != nil {
-		if err2 := outFH.Close(); err2 != nil {
-			err = utils.CombineErr([]error{err, err2})
+		err2 := outFH.Close()
+		err3 := os.Remove(outfile)
+		// TODO: figure error reporting
+		if err3 != nil {
+			err3 = errors.Wrapf(err3, "warning, unauthenticated file could not be removed: %s", outfile)
 		}
-		if err2 := os.Remove(outfile); err2 != nil {
-			err2 = errors.Wrapf(err2, "warning, unauthenticated file could not be removed: %s", outfile)
-			err = utils.CombineErr([]error{err, err2})
-		}
-		return nil, 0, errors.New("could not encrypt")
+		return nil, 0, utils.Errors{err, err2, err3}
+		//return nil, 0, utils.ErrEncrypt
 	}
 
 	ds := digester.Digest()
@@ -113,14 +113,13 @@ func DecFile(infile, outfile string, datakey []byte) (err error) {
 	}
 
 	if _, err = sio.Decrypt(outFH, inFH, cfg); err != nil {
-		if err2 := outFH.Close(); err2 != nil {
-			err = utils.CombineErr([]error{err, err2})
+		err2 := outFH.Close()
+		err3 := os.Remove(outfile)
+		if err3 != nil {
+			err3 = errors.Wrapf(err3, "warning, unauthenticated file could not be removed: %s", outfile)
 		}
-		if err2 := os.Remove(outfile); err2 != nil {
-			err2 = errors.Wrapf(err2, "warning, unauthenticated file could not be removed: %s", outfile)
-			err = utils.CombineErr([]error{err, err2})
-		}
-		return errors.New("could not decrypt")
+		return utils.Errors{err, err2, err3}
+		//return utils.ErrDecrypt
 	}
 
 	return nil

@@ -33,9 +33,14 @@ import (
 	"github.com/Senetas/crypto-cli/utils"
 )
 
-// TarFromManifest takes a manifest and a target label for the images and create a tarball
-// that may be loaded with docker load. It downloads and decrypts the config and layers if necessary
-func TarFromManifest(manifest *types.ImageManifestJSON, ref registry.NamedTaggedRepository, passphrase string, cryptotype crypto.EncAlgo) (tarball string, err error) {
+// TarFromManifest takes a manifest and a target label for the images and create a tarball that may
+// be loaded with docker load. It downloads and decrypts the config and layers if necessary
+func TarFromManifest(
+	manifest *types.ImageManifestJSON,
+	ref registry.NamedTaggedRepository,
+	passphrase string,
+	cryptotype crypto.EncAlgo,
+) (tarball string, err error) {
 	salt := fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 
 	// decrypt config key
@@ -49,7 +54,11 @@ func TarFromManifest(manifest *types.ImageManifestJSON, ref registry.NamedTagged
 	}
 
 	// decrypt config file
-	if err = crypto.DecFile(manifest.Config.Filename, manifest.Config.Filename+".dec", manifest.Config.Crypto.DecKey); err != nil {
+	if err = crypto.DecFile(
+		manifest.Config.Filename,
+		manifest.Config.Filename+".dec",
+		manifest.Config.Crypto.DecKey,
+	); err != nil {
 		return "", err
 	}
 
@@ -64,8 +73,16 @@ func TarFromManifest(manifest *types.ImageManifestJSON, ref registry.NamedTagged
 		return "", errors.Wrapf(err, "dir name = %s", newDir)
 	}
 
-	if err = os.Rename(manifest.Config.Filename+".dec.dec", filepath.Join(newDir, d.Hex()+".json")); err != nil {
-		return "", errors.Wrapf(err, "could not rename %s to %s", manifest.Config.Filename+".dec.dec", filepath.Join(newDir, d.Hex()+".json"))
+	if err = os.Rename(
+		manifest.Config.Filename+".dec.dec",
+		filepath.Join(newDir, d.Hex()+".json"),
+	); err != nil {
+		return "", errors.Wrapf(
+			err,
+			"could not rename %s to %s",
+			manifest.Config.Filename+".dec.dec",
+			filepath.Join(newDir, d.Hex()+".json"),
+		)
 	}
 
 	am := &types.ArchiveManifest{
