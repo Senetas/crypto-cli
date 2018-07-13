@@ -38,18 +38,32 @@ func PullImage(
 	ref reference.Named,
 	endpoint *registry.APIEndpoint,
 	downloadDir string,
-) (*distribution.ImageManifest, error) {
+	decErr <-chan error,
+	manChan chan<- *distribution.ImageManifest,
+	errChan chan<- error,
+) {
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
+	log.Debug().Msg("Obtaining Manifest")
 	manifest, err := PullManifest(token, ref, bldr)
 	if err != nil {
-		return nil, err
+		errChan <- err
+		return
+	}
+
+	manChan <- manifest
+
+	// if there is a decrypt error, downloading will not start
+	if err = <-decErr; err != nil {
+		errChan <- err
+		return
 	}
 
 	log.Info().Msgf("Obtaining config: %s\n", manifest.Config.Digest)
 	manifest.Config.Filename, err = PullFromDigest(token, ref, manifest.Config.Digest, bldr, downloadDir)
 	if err != nil {
-		return nil, err
+		errChan <- err
+		return
 	}
 
 	log.Info().Msg("Obtaining layers:")
@@ -57,11 +71,12 @@ func PullImage(
 		log.Info().Msgf("Obtaining layer: %s", l.Digest)
 		l.Filename, err = PullFromDigest(token, ref, l.Digest, bldr, downloadDir)
 		if err != nil {
-			return nil, err
+			errChan <- err
+			return
 		}
 	}
 
-	return manifest, nil
+	errChan <- nil
 }
 
 // PullManifest pulls a manifest from the registry and parses it
