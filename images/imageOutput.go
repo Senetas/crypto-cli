@@ -34,7 +34,6 @@ import (
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/registry"
-	"github.com/Senetas/crypto-cli/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
@@ -169,9 +168,12 @@ func extractTarBall(tarFH io.Reader, manifest *distribution.ImageManifest) (err 
 
 // find the layer files that correponds to the digests we want to encrypt
 // TODO: find a way to do this by interfacing with the daemon directly
-func findLayers(repo, tag, path string, layers []string) (
-	config *types.LayerJSON,
-	layerJSON []*types.LayerJSON,
+func findLayers(
+	repo, tag, path string,
+	layers []string,
+) (
+	config *distribution.Layer,
+	layer []*distribution.Layer,
 	err error,
 ) {
 	// assemble layers
@@ -211,9 +213,9 @@ func findLayers(repo, tag, path string, layers []string) (
 		return nil, nil, err
 	}
 
-	config := distribution.NewConfig(filename, d, size, key)
+	config = distribution.NewConfig(filename, d, size, key)
 
-	layerJSON := make([]*distribution.Layer, len(images[0].Layers))
+	layer = make([]*distribution.Layer, len(images[0].Layers))
 	for i, f := range images[0].Layers {
 		basename := filepath.Join(path, f)
 
@@ -235,17 +237,17 @@ func findLayers(repo, tag, path string, layers []string) (
 			if err != nil {
 				return nil, nil, err
 			}
-			layerJSON[i] = distribution.NewLayer(filename, d, size, key)
+			layer[i] = distribution.NewLayer(filename, d, size, key)
 		} else {
 			filename, d, size, _, err := compressLayer(basename)
 			if err != nil {
 				return nil, nil, err
 			}
-			layerJSON[i] = distribution.NewPlainLayer(filename, d, size)
+			layer[i] = distribution.NewPlainLayer(filename, d, size)
 		}
 	}
 
-	return config, layerJSON, nil
+	return config, layer, nil
 }
 
 func compressLayer(filename string) (compFile string, d *digest.Digest, size int64, key []byte, err error) {
