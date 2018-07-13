@@ -28,12 +28,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	"github.com/Senetas/crypto-cli/types"
+	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
 // PullImage pulls an image from a remote repository
-func PullImage(token string, ref reference.Named, endpoint *registry.APIEndpoint, downloadDir string) (*types.ImageManifestJSON, error) {
+func PullImage(token string, ref reference.Named, endpoint *registry.APIEndpoint, downloadDir string) (*distribution.ImageManifest, error) {
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
 	manifest, err := PullManifest(token, ref, bldr)
@@ -64,7 +64,7 @@ func PullManifest(
 	token string,
 	ref reference.Named,
 	bldr *v2.URLBuilder,
-) (manifest *types.ImageManifestJSON, err error) {
+) (manifest *distribution.ImageManifest, err error) {
 	urlStr, err := bldr.BuildManifestURL(ref)
 	if err != nil {
 		return nil, errors.Wrapf(err, "ref = %v", ref)
@@ -91,7 +91,7 @@ func PullManifest(
 	}
 
 	body := json.NewDecoder(resp.Body)
-	manifest = &types.ImageManifestJSON{}
+	manifest = &distribution.ImageManifest{}
 	if err = body.Decode(manifest); err != nil {
 		return nil, errors.Wrapf(err, "body = %#v", body)
 	}

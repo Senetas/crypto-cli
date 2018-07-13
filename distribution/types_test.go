@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types_test
+package distribution_test
 
 import (
 	"reflect"
 	"testing"
 
 	"github.com/Senetas/crypto-cli/crypto"
-	"github.com/Senetas/crypto-cli/types"
+	"github.com/Senetas/crypto-cli/distribution"
 )
 
 func TestCrypto(t *testing.T) {
 	plaintext := []byte("196884 = 196883 + 1")
-	c := &types.CryptoJSON{
+	c := &distribution.Crypto{
 		CryptoType: crypto.Pbkdf2Aes256Gcm,
 		DecKey:     plaintext,
 	}

@@ -28,7 +28,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	"github.com/Senetas/crypto-cli/types"
+	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
@@ -36,7 +36,7 @@ import (
 func PushImage(
 	token string,
 	ref NamedTaggedRepository,
-	manifest *types.ImageManifestJSON,
+	manifest *distribution.ImageManifest,
 	endpoint *registry.APIEndpoint,
 ) error {
 	trimed := trimNamed(ref)
@@ -64,7 +64,7 @@ func PushImage(
 func PushManifest(
 	token string,
 	ref reference.Named,
-	manifest *types.ImageManifestJSON,
+	manifest *distribution.ImageManifest,
 	endpoint *registry.APIEndpoint,
 ) (string, error) {
 	manifestJSON, err := json.MarshalIndent(manifest, "", "\t")
@@ -108,7 +108,7 @@ func PushManifest(
 func PushLayer(
 	token string,
 	ref reference.Named,
-	layerData *types.LayerJSON,
+	layerData *distribution.Layer,
 	endpoint *registry.APIEndpoint,
 ) (err error) {
 	sep := seperateRepository(ref)

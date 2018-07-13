@@ -28,15 +28,15 @@ import (
 	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/crypto"
+	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/registry"
-	"github.com/Senetas/crypto-cli/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
 // Manifest2Tar takes a manifest and a target label for the images and create a tarball that may
 // be loaded with docker load. It downloads and decrypts the config and layers if necessary
 func Manifest2Tar(
-	manifest *types.ImageManifestJSON,
+	manifest *distribution.ImageManifest,
 	ref registry.NamedTaggedRepository,
 	passphrase string,
 	cryptotype crypto.EncAlgo,
@@ -85,7 +85,7 @@ func Manifest2Tar(
 		)
 	}
 
-	am := &types.ArchiveManifest{
+	am := &distribution.ArchiveManifest{
 		Config:   d.Hex() + ".json",
 		RepoTags: []string{ref.Path() + ":" + ref.Tag()},
 		Layers:   make([]string, len(manifest.Layers))}
@@ -125,7 +125,7 @@ func Manifest2Tar(
 		am.Layers[i] = d.Hex() + ".tar"
 	}
 
-	amJSON, err := json.Marshal([]*types.ArchiveManifest{am})
+	amJSON, err := json.Marshal([]*distribution.ArchiveManifest{am})
 	if err != nil {
 		return "", errors.Wrapf(err, "archive manifest = %v", am)
 	}
