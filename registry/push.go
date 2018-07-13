@@ -15,8 +15,8 @@
 package registry
 
 import (
-	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -67,18 +67,25 @@ func PushManifest(
 	manifest *distribution.ImageManifest,
 	endpoint *registry.APIEndpoint,
 ) (string, error) {
-	manifestJSON, err := json.MarshalIndent(manifest, "", "\t")
-	if err != nil {
-		return "", errors.Wrap(err, "while marshaling JSON")
-	}
-
 	builder := v2.NewURLBuilder(endpoint.URL, false)
 	urlStr, err := builder.BuildManifestURL(ref)
 	if err != nil {
 		return "", errors.Wrapf(err, "ref = %v", ref)
 	}
 
-	req, err := http.NewRequest("PUT", urlStr, bytes.NewReader(manifestJSON))
+	// a pipe allows using the struct directly as the http body
+	// w/o copying to a buffer
+	pr, pw := io.Pipe()
+	errChan := make(chan error, 1)
+	defer close(errChan)
+	go func() {
+		defer func() { errChan <- pw.Close() }()
+		enc := json.NewEncoder(pw)
+		enc.SetIndent("", "\t")
+		errChan <- enc.Encode(manifest)
+	}()
+
+	req, err := http.NewRequest("PUT", urlStr, pr)
 	if err != nil {
 		return "", errors.Wrapf(err, "url = %v", urlStr)
 	}
@@ -92,13 +99,15 @@ func PushManifest(
 	if err != nil {
 		return "", err
 	}
+	defer func() { err = utils.CheckedClose(resp.Body, err) }()
+
+	// close the channel after request is done
+	if err = utils.ConcatErrChan(errChan, 2); err != nil {
+		return "", errors.WithStack(err)
+	}
 
 	if resp.StatusCode != http.StatusCreated {
 		return "", errors.New("manifest upload failed with status: " + resp.Status)
-	}
-
-	if err = resp.Body.Close(); err != nil {
-		return "", errors.Wrapf(err, "error closing resp = %v", resp)
 	}
 
 	return resp.Header.Get("Docker-Content-Digest"), nil
