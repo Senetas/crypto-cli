@@ -75,3 +75,22 @@ func (es Errors) Error() string {
 
 	return msg.String()
 }
+
+// ConcatErrChan concatenates all the errors in the channel into in a single error
+func ConcatErrChan(errChan <-chan error, expected int) error {
+	var errs Errors
+	for i := 0; i < expected; i++ {
+		if err := <-errChan; err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	switch len(errs) {
+	case 0:
+		return nil
+	case 1:
+		return errs[0]
+	}
+
+	return errs
+}

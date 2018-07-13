@@ -33,7 +33,12 @@ import (
 )
 
 // PullImage pulls an image from a remote repository
-func PullImage(token string, ref reference.Named, endpoint *registry.APIEndpoint, downloadDir string) (*distribution.ImageManifest, error) {
+func PullImage(
+	token string,
+	ref reference.Named,
+	endpoint *registry.APIEndpoint,
+	downloadDir string,
+) (*distribution.ImageManifest, error) {
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
 	manifest, err := PullManifest(token, ref, bldr)
