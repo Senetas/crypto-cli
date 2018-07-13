@@ -17,6 +17,12 @@ package images
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/docker/distribution/reference"
+	dockerregistry "github.com/docker/docker/registry"
+	"github.com/pkg/errors"
+
+	"github.com/Senetas/crypto-cli/registry"
 )
 
 const (
@@ -27,3 +33,33 @@ const (
 )
 
 var tempRoot = filepath.Join(os.TempDir(), "com.senetas.crypto")
+
+func authProcedure(ref reference.Named) (
+	string,
+	*registry.NamedTaggedRepository,
+	*dockerregistry.APIEndpoint,
+	error,
+) {
+	nTRep, err := registry.ResolveNamed(ref)
+	if err != nil {
+		return "", nil, nil, err
+	}
+
+	repoInfo, err := dockerregistry.ParseRepositoryInfo(ref)
+	if err != nil {
+		return "", nil, nil, errors.Wrapf(err, "could not parse ref = %v", ref)
+	}
+
+	endpoint, err := registry.GetEndpoint(ref, *repoInfo)
+	if err != nil {
+		return "", nil, nil,
+			errors.Wrapf(err, "could not get endpoint ref = %v, repoInfo = %v", ref, *repoInfo)
+	}
+
+	token, err := registry.Authenticate(nTRep, *repoInfo, endpoint)
+	if err != nil {
+		return "", nil, nil, err
+	}
+
+	return token, &nTRep, &endpoint, nil
+}

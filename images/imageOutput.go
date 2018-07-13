@@ -32,8 +32,8 @@ import (
 	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/crypto"
+	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/registry"
-	"github.com/Senetas/crypto-cli/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
@@ -43,17 +43,15 @@ func CreateManifest(
 	ref registry.NamedTaggedRepository,
 	passphrase string,
 	cryptotype crypto.EncAlgo,
-) (manifest *types.ImageManifestJSON, err error) {
+) (manifest *distribution.ImageManifest, err error) {
 	layers, tarFH, err := getImgTarLayers(ref.Path(), ref.Tag())
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		err = utils.CheckedClose(tarFH, err)
-	}()
+	defer func() { err = utils.CheckedClose(tarFH, err) }()
 
 	// output image
-	manifest = &types.ImageManifestJSON{
+	manifest = &distribution.ImageManifest{
 		SchemaVersion: 2,
 		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
 		DirName:       filepath.Join(tempRoot, uuid.New().String()),
@@ -154,7 +152,7 @@ func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
 	return layers, img, nil
 }
 
-func extractTarBall(tarFH io.Reader, manifest *types.ImageManifestJSON) (err error) {
+func extractTarBall(tarFH io.Reader, manifest *distribution.ImageManifest) (err error) {
 	tarfile := manifest.DirName + ".tar"
 
 	if err = os.MkdirAll(manifest.DirName, 0755); err != nil {
@@ -165,9 +163,7 @@ func extractTarBall(tarFH io.Reader, manifest *types.ImageManifestJSON) (err err
 	if err != nil {
 		return errors.Wrapf(err, "could not create: %s", tarfile)
 	}
-	defer func() {
-		err = utils.CheckedClose(outFH, err)
-	}()
+	defer func() { err = utils.CheckedClose(outFH, err) }()
 
 	if _, err = io.Copy(outFH, tarFH); err != nil {
 		return errors.Wrapf(err, "could not extract to %s", tarfile)
@@ -186,7 +182,7 @@ func extractTarBall(tarFH io.Reader, manifest *types.ImageManifestJSON) (err err
 
 // find the layer files that correponds to the digests we want to encrypt
 // TODO: find a way to do this by interfacing with the daemon directly
-func findLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*types.LayerJSON, error) {
+func findLayers(repo, tag, path string, layers []string) (*distribution.Layer, []*distribution.Layer, error) {
 	// assemble layers
 	layerSet := make(map[string]bool)
 	for _, x := range layers {
@@ -222,9 +218,9 @@ func findLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*t
 		return nil, nil, err
 	}
 
-	config := types.NewConfigJSON(filename, d, size, key)
+	config := distribution.NewConfig(filename, d, size, key)
 
-	layerJSON := make([]*types.LayerJSON, len(images[0].Layers))
+	layerJSON := make([]*distribution.Layer, len(images[0].Layers))
 	for i, f := range images[0].Layers {
 		basename := filepath.Join(path, f)
 
@@ -246,13 +242,13 @@ func findLayers(repo, tag, path string, layers []string) (*types.LayerJSON, []*t
 			if err != nil {
 				return nil, nil, err
 			}
-			layerJSON[i] = types.NewLayerJSON(filename, d, size, key)
+			layerJSON[i] = distribution.NewLayer(filename, d, size, key)
 		} else {
 			filename, d, size, _, err := compressLayer(basename)
 			if err != nil {
 				return nil, nil, err
 			}
-			layerJSON[i] = types.NewPlainLayerJSON(filename, d, size)
+			layerJSON[i] = distribution.NewPlainLayer(filename, d, size)
 		}
 	}
 

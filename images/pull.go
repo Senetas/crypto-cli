@@ -19,7 +19,6 @@ import (
 	"path/filepath"
 
 	"github.com/docker/distribution/reference"
-	dockerregistry "github.com/docker/docker/registry"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
@@ -29,22 +28,7 @@ import (
 
 // PullImage pulls an image from the registry
 func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo) (err error) {
-	nTRep, err := registry.ResolveNamed(ref)
-	if err != nil {
-		return err
-	}
-
-	repoInfo, err := dockerregistry.ParseRepositoryInfo(ref)
-	if err != nil {
-		return errors.Wrapf(err, "could not parse ref = %v", ref)
-	}
-
-	endpoint, err := registry.GetEndPoint(ref, *repoInfo)
-	if err != nil {
-		return errors.Wrapf(err, "could not get endpoint ref = %v, repoInfo = %v", ref, *repoInfo)
-	}
-
-	token, err := registry.Authenticate(nTRep, *repoInfo, endpoint)
+	token, nTRep, endpoint, err := authProcedure(ref)
 	if err != nil {
 		return err
 	}
@@ -54,12 +38,12 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 		return errors.Wrapf(err, "dir = %s", dir)
 	}
 
-	manifest, err := registry.PullImage(token, nTRep, &endpoint, dir)
+	manifest, err := registry.PullImage(token, *nTRep, endpoint, dir)
 	if err != nil {
 		return err
 	}
 
-	tarball, err := TarFromManifest(manifest, nTRep, passphrase, cryptotype)
+	tarball, err := Manifest2Tar(manifest, *nTRep, passphrase, cryptotype)
 	if err != nil {
 		return err
 	}

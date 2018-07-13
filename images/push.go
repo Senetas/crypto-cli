@@ -18,7 +18,6 @@ import (
 	"os"
 
 	"github.com/docker/distribution/reference"
-	dockerregistry "github.com/docker/docker/registry"
 	"github.com/pkg/errors"
 
 	"github.com/Senetas/crypto-cli/crypto"
@@ -27,33 +26,18 @@ import (
 
 // PushImage encrypts then pushes an image
 func PushImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo) (err error) {
-	nTRep, err := registry.ResolveNamed(ref)
+	token, nTRep, endpoint, err := authProcedure(ref)
 	if err != nil {
 		return err
 	}
 
-	repoInfo, err := dockerregistry.ParseRepositoryInfo(ref)
-	if err != nil {
-		return errors.Wrapf(err, "could not parse ref = %v", ref)
-	}
-
-	endpoint, err := registry.GetEndPoint(ref, *repoInfo)
-	if err != nil {
-		return errors.Wrapf(err, "could not parse ref = %v", ref)
-	}
-
-	token, err := registry.Authenticate(nTRep, *repoInfo, endpoint)
-	if err != nil {
-		return err
-	}
-
-	manifest, err := CreateManifest(nTRep, passphrase, cryptotype)
+	manifest, err := CreateManifest(*nTRep, passphrase, cryptotype)
 	if err != nil {
 		return err
 	}
 
 	// Upload to registry
-	if err = registry.PushImage(token, nTRep, manifest, &endpoint); err != nil {
+	if err = registry.PushImage(token, *nTRep, manifest, endpoint); err != nil {
 		return err
 	}
 
