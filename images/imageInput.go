@@ -25,6 +25,7 @@ import (
 
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/crypto"
@@ -32,6 +33,46 @@ import (
 	"github.com/Senetas/crypto-cli/registry"
 	"github.com/Senetas/crypto-cli/utils"
 )
+
+func decryptManifest(
+	manIn <-chan *distribution.ImageManifest,
+	ref registry.NamedTaggedRepository,
+	passphrase string,
+	cryptotype crypto.EncAlgo,
+	manOut chan<- *distribution.ImageManifest,
+	errChan chan<- error,
+) {
+	log.Debug().Msg("entering decryptManifest")
+	manifest := <-manIn
+	log.Debug().Msg("obtained manifest")
+
+	salt := fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
+
+	log.Debug().Msg("decrypting Config Key")
+	// decrypt config key
+	if err := manifest.Config.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
+		log.Debug().Msg("error decrypting Config Key")
+		errChan <- err
+		return
+	}
+	log.Debug().Msg("finished decrypting Config Key")
+
+	// decrypt keys and files for layers
+	for i, l := range manifest.Layers {
+		if l.Crypto != nil {
+			salt := fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
+			log.Debug().Msg("decrypting Layer Key")
+			if err := l.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
+				errChan <- err
+				return
+			}
+		}
+	}
+	log.Debug().Msg("sending nil error")
+	errChan <- nil
+	log.Debug().Msg("sending decrypted manifest")
+	manOut <- manifest
+}
 
 // Manifest2Tar takes a manifest and a target label for the images and create a tarball that may
 // be loaded with docker load. It downloads and decrypts the config and layers if necessary
@@ -41,12 +82,6 @@ func Manifest2Tar(
 	passphrase string,
 	cryptotype crypto.EncAlgo,
 ) (tarball string, err error) {
-	salt := fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
-
-	// decrypt config key
-	if err = manifest.Config.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
-		return "", err
-	}
 
 	dir := filepath.Dir(manifest.Config.Filename)
 	if err = os.MkdirAll(dir, 0755); err != nil {
@@ -90,18 +125,11 @@ func Manifest2Tar(
 		RepoTags: []string{ref.Path() + ":" + ref.Tag()},
 		Layers:   make([]string, len(manifest.Layers))}
 
-	// decrypt keys and files for layers
+	// decrypt files for layers
 	for i, l := range manifest.Layers {
-		if l.Crypto != nil {
-			salt := fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
-			if err = l.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
-				return "", err
-			}
-		}
-
-		layerfilename := l.Filename
 
 		// decrypt layer file
+		layerfilename := l.Filename
 		if l.Crypto != nil {
 			layerfilename = l.Filename + ".dec"
 			if err = crypto.DecFile(l.Filename, layerfilename, l.Crypto.DecKey); err != nil {
