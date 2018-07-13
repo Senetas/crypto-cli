@@ -93,7 +93,3 @@ $RECYCLE.BIN/
 
 ### go run ###
 crypto-cli
-
-
-### git ###
-*.orig

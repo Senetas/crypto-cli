@@ -19,11 +19,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
 	digest "github.com/opencontainers/go-digest"
@@ -88,17 +88,6 @@ func CreateManifest(
 	return manifest, nil
 }
 
-func numLayers(hist []image.HistoryResponseItem) (n int, err error) {
-	for _, h := range hist {
-		if h.Size != 0 || !strings.Contains(h.CreatedBy, "#(nop)") {
-			n++
-		} else if strings.Contains(h.CreatedBy, labelString) {
-			return n, nil
-		}
-	}
-	return 0, utils.NewError("this image was not built with the correct LABEL", false)
-}
-
 func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
 	ctx := context.Background()
 
@@ -108,32 +97,57 @@ func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
 		return nil, nil, utils.StripTrace(errors.Wrap(err, "could not create client for docker daemon"))
 	}
 
+	// get the history
+	hist, err := cli.ImageHistory(ctx, repo+":"+tag)
+	if err != nil {
+		return nil, nil, utils.StripTrace(err)
+	}
+
+	// obtain the most recent two complete images
+	ids := []string{hist[0].ID}
+
+	// advance pointer to history entry for LABEL "com.senetas.crypto.enabled=true"
+	i := 0
+	for ; i < len(hist) && !strings.Contains(hist[i].CreatedBy, labelString); i++ {
+	}
+	if i >= len(hist)-1 {
+		return nil, nil, utils.NewError("no "+labelString+" in Dockerfile", false)
+	}
+	if hist[i+1].ID == "<missing>" {
+		return nil, nil, utils.NewError("image not built on this Machine", false)
+	}
+	ids = append(ids, hist[i+1].ID)
+
+	// map the layers of the two tags, since one tag was based on the other,
+	// the layers of the lower tag should be duplicates of the upper one
+	layerMap := make(map[string]int)
+	for _, x := range ids {
+		inspt, _, err := cli.ImageInspectWithRaw(ctx, x)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "inspecting layer %v", x)
+		}
+
+		for _, x := range inspt.RootFS.Layers {
+			layerMap[x]++
+		}
+	}
+
+	layers := []string{}
+	for k, v := range layerMap {
+		if v == 1 {
+			layers = append(layers, k)
+		}
+	}
+
 	inspt, _, err := cli.ImageInspectWithRaw(ctx, repo+":"+tag)
 	if err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, nil, errors.Wrap(err, "")
 	}
 
 	img, err := cli.ImageSave(ctx, []string{inspt.ID})
 	if err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, nil, errors.Wrap(err, "")
 	}
-
-	// get the history
-	hist, err := cli.ImageHistory(ctx, repo+":"+tag)
-	if err != nil {
-		return nil, nil, errors.WithStack(err)
-	}
-
-	// findLayers
-	n, err := numLayers(hist)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	m := len(inspt.RootFS.Layers)
-	layers := inspt.RootFS.Layers[m-n:]
-
-	log.Info().Msgf("The following layers are to be encrypted: %v", layers)
 
 	return layers, img, nil
 }
@@ -186,11 +200,10 @@ func findLayers(
 
 	// read the archive manifest
 	manifestfile := filepath.Join(path, "manifest.json")
-	manifestFH, err := os.Open(manifestfile)
+	dat, err := ioutil.ReadFile(manifestfile)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "could not open file: %s", manifestfile)
 	}
-	defer func() { err = utils.CheckedClose(manifestFH, err) }()
 
 	type configLayers struct {
 		Config string
@@ -198,9 +211,8 @@ func findLayers(
 	}
 
 	var images []*configLayers
-	dec := json.NewDecoder(manifestFH)
-	if err := dec.Decode(&images); err != nil {
-		return nil, nil, errors.Wrapf(err, "error unmarshalling: %s", manifestfile)
+	if err := json.Unmarshal(dat, &images); err != nil {
+		return nil, nil, errors.Wrapf(err, "error unmarshalling: %s", dat)
 	}
 
 	if len(images) < 1 {
