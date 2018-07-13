@@ -47,10 +47,10 @@ func GetEndPoint(ref reference.Named, repoInfo registry.RepositoryInfo) (registr
 func TrimNamed(ref reference.NamedTagged) NamedRepository {
 	switch r := ref.(type) {
 	case NamedTaggedRepository:
-		return repository{r.Domain(), r.Path()}
+		return repository{domain: r.Domain(), path: r.Path()}
 	default:
 		domain, path := reference.SplitHostname(ref)
-		return repository{domain, path}
+		return repository{domain: domain, path: path}
 	}
 }
 

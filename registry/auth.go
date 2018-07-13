@@ -31,7 +31,11 @@ import (
 )
 
 // Authenticate against the given server, returning the bearer token
-func Authenticate(ref NamedRepository, repoInfo registry.RepositoryInfo, endpoint registry.APIEndpoint) (string, error) {
+func Authenticate(
+	ref NamedRepository,
+	repoInfo registry.RepositoryInfo,
+	endpoint registry.APIEndpoint,
+) (string, error) {
 	confFile, err := config.Load("")
 	if err != nil {
 		return "", err

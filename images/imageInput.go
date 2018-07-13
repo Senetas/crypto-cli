@@ -33,9 +33,9 @@ import (
 	"github.com/Senetas/crypto-cli/utils"
 )
 
-// TarFromManifest takes a manifest and a target label for the images and create a tarball that may
+// Manifest2Tar takes a manifest and a target label for the images and create a tarball that may
 // be loaded with docker load. It downloads and decrypts the config and layers if necessary
-func TarFromManifest(
+func Manifest2Tar(
 	manifest *types.ImageManifestJSON,
 	ref registry.NamedTaggedRepository,
 	passphrase string,
