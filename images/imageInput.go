@@ -42,35 +42,28 @@ func decryptManifest(
 	manOut chan<- *distribution.ImageManifest,
 	errChan chan<- error,
 ) {
-	log.Debug().Msg("entering decryptManifest")
 	manifest := <-manIn
-	log.Debug().Msg("obtained manifest")
+	log.Info().Msg("begin decryption of keys")
 
-	salt := fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
-
-	log.Debug().Msg("decrypting Config Key")
 	// decrypt config key
+	salt := fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 	if err := manifest.Config.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
-		log.Debug().Msg("error decrypting Config Key")
 		errChan <- err
 		return
 	}
-	log.Debug().Msg("finished decrypting Config Key")
 
 	// decrypt keys and files for layers
 	for i, l := range manifest.Layers {
 		if l.Crypto != nil {
 			salt := fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
-			log.Debug().Msg("decrypting Layer Key")
 			if err := l.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
 				errChan <- err
 				return
 			}
 		}
 	}
-	log.Debug().Msg("sending nil error")
 	errChan <- nil
-	log.Debug().Msg("sending decrypted manifest")
+	log.Info().Msg("finished decryption of keys")
 	manOut <- manifest
 }
 

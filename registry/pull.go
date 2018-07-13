@@ -42,22 +42,19 @@ func PullImage(
 	manChan chan<- *distribution.ImageManifest,
 	errChan chan<- error,
 ) {
-	log.Debug().Msg("entering PullImage")
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
+	log.Debug().Msg("Obtaining Manifest")
 	manifest, err := PullManifest(token, ref, bldr)
 	if err != nil {
 		errChan <- err
 		return
 	}
 
-	log.Debug().Msg("downloaded manifest PullImage")
 	manChan <- manifest
-	log.Debug().Msg("manifest sent PullImage")
 
 	// if there is a decrypt error, downloading will not start
 	if err = <-decErr; err != nil {
-		log.Debug().Msg("decrypt error PullImage")
 		errChan <- err
 		return
 	}

@@ -39,6 +39,7 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 		return errors.Wrapf(err, "dir = %s", dir)
 	}
 
+	// TODO: make this more light weigth and SAFE!
 	manChan := make(chan *distribution.ImageManifest)
 	manChan2 := make(chan *distribution.ImageManifest)
 	errChan := make(chan error)
