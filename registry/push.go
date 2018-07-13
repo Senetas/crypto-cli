@@ -142,9 +142,7 @@ func PushLayer(
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err = utils.CheckedClose(resp.Body, err)
-	}()
+	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	if resp.StatusCode != http.StatusAccepted {
 		return errors.New("upload of layer " + layerData.Digest.String() + " was not accepted")
@@ -194,9 +192,7 @@ func PushLayer(
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err = utils.CheckedClose(resp.Body, err)
-	}()
+	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return errors.New("upload of layer " + layerData.Digest.String() + " failed")
@@ -222,9 +218,7 @@ func checkLayer(token string, ref reference.Canonical, bldr *v2.URLBuilder) (b b
 	if err != nil {
 		return false, errors.Wrapf(err, "%v", req)
 	}
-	defer func() {
-		err = utils.CheckedClose(resp.Body, err)
-	}()
+	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	if resp.StatusCode == http.StatusOK {
 		return true, nil

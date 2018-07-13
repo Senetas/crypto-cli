@@ -42,17 +42,13 @@ func EncFile(infile, outfile string, key []byte) (d *digest.Digest, size int64, 
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "could not open file %s", infile)
 	}
-	defer func() {
-		err = utils.CheckedClose(inFH, err)
-	}()
+	defer func() { err = utils.CheckedClose(inFH, err) }()
 
 	outFH, err := os.Create(outfile)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "could not create file %s", outfile)
 	}
-	defer func() {
-		err = utils.CheckedClose(outFH, err)
-	}()
+	defer func() { err = utils.CheckedClose(outFH, err) }()
 
 	cfg := sio.Config{
 		MinVersion:   sio.Version20,
@@ -86,17 +82,13 @@ func DecFile(infile, outfile string, datakey []byte) (err error) {
 	if err != nil {
 		return errors.Wrapf(err, "could not open file %s", infile)
 	}
-	defer func() {
-		err = utils.CheckedClose(inFH, err)
-	}()
+	defer func() { err = utils.CheckedClose(inFH, err) }()
 
 	outFH, err := os.Create(outfile)
 	if err != nil {
 		return errors.Wrapf(err, "could not create file %s", outfile)
 	}
-	defer func() {
-		err = utils.CheckedClose(outFH, err)
-	}()
+	defer func() { err = utils.CheckedClose(outFH, err) }()
 
 	cfg := sio.Config{
 		MinVersion:   sio.Version20,

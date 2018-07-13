@@ -48,9 +48,7 @@ func CreateManifest(
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		err = utils.CheckedClose(tarFH, err)
-	}()
+	defer func() { err = utils.CheckedClose(tarFH, err) }()
 
 	// output image
 	manifest = &distribution.ImageManifest{
@@ -165,9 +163,7 @@ func extractTarBall(tarFH io.Reader, manifest *distribution.ImageManifest) (err 
 	if err != nil {
 		return errors.Wrapf(err, "could not create: %s", tarfile)
 	}
-	defer func() {
-		err = utils.CheckedClose(outFH, err)
-	}()
+	defer func() { err = utils.CheckedClose(outFH, err) }()
 
 	if _, err = io.Copy(outFH, tarFH); err != nil {
 		return errors.Wrapf(err, "could not extract to %s", tarfile)

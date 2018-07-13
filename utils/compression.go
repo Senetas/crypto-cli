@@ -26,26 +26,20 @@ import (
 // Compress a file as gz, should already be tarred
 // assumes file uses the system seperator
 func Compress(file string) (err error) {
-	out, err := os.Create(file + ".gz")
-	if err != nil {
-		return errors.Wrapf(err, "could not create: %s.gz", file)
-	}
-	defer func() {
-		err = CheckedClose(out, err)
-	}()
-
-	w := gzip.NewWriter(out)
-	defer func() {
-		err = CheckedClose(w, err)
-	}()
-
 	in, err := os.Open(file)
 	if err != nil {
 		return errors.Wrapf(err, "could not open: %s", file)
 	}
-	defer func() {
-		err = CheckedClose(in, err)
-	}()
+	defer func() { err = CheckedClose(in, err) }()
+
+	out, err := os.Create(file + ".gz")
+	if err != nil {
+		return errors.Wrapf(err, "could not create: %s.gz", file)
+	}
+	defer func() { err = CheckedClose(out, err) }()
+
+	w := gzip.NewWriter(out)
+	defer func() { err = CheckedClose(w, err) }()
 
 	if _, err = io.Copy(w, in); err != nil {
 		return errors.Wrapf(err, "error compressing %s to %s.gz", file, file)
@@ -61,17 +55,13 @@ func CompressWithDigest(file string) (d *digest.Digest, err error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not open: %s", file)
 	}
-	defer func() {
-		err = CheckedClose(in, err)
-	}()
+	defer func() { err = CheckedClose(in, err) }()
 
 	out, err := os.Create(file + ".gz")
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not create: %s.gz", file)
 	}
-	defer func() {
-		err = CheckedClose(out, err)
-	}()
+	defer func() { err = CheckedClose(out, err) }()
 
 	digester := digest.Canonical.Digester()
 	mw := io.MultiWriter(digester.Hash(), out)
@@ -96,17 +86,13 @@ func Decompress(file string) (d *digest.Digest, err error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		err = CheckedClose(in, err)
-	}()
+	defer func() { err = CheckedClose(in, err) }()
 
 	out, err := os.Create(file + ".dec")
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		err = CheckedClose(out, err)
-	}()
+	defer func() { err = CheckedClose(out, err) }()
 
 	zr, err := gzip.NewReader(in)
 	if err != nil {
