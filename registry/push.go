@@ -33,8 +33,13 @@ import (
 )
 
 // PushImage pushes the config, layers and mainifest to the nominated registry, in that order
-func PushImage(token string, ref NamedTaggedRepository, manifest *types.ImageManifestJSON, endpoint *registry.APIEndpoint) error {
-	trimed := reference.TrimNamed(ref)
+func PushImage(
+	token string,
+	ref NamedTaggedRepository,
+	manifest *types.ImageManifestJSON,
+	endpoint *registry.APIEndpoint,
+) error {
+	trimed := trimNamed(ref)
 
 	if err := PushLayer(token, trimed, manifest.Config, endpoint); err != nil {
 		return err
@@ -56,7 +61,12 @@ func PushImage(token string, ref NamedTaggedRepository, manifest *types.ImageMan
 }
 
 // PushManifest puts a manifest on the registry
-func PushManifest(token string, ref reference.Named, manifest *types.ImageManifestJSON, endpoint *registry.APIEndpoint) (string, error) {
+func PushManifest(
+	token string,
+	ref reference.Named,
+	manifest *types.ImageManifestJSON,
+	endpoint *registry.APIEndpoint,
+) (string, error) {
 	manifestJSON, err := json.MarshalIndent(manifest, "", "\t")
 	if err != nil {
 		return "", errors.Wrap(err, "while marshaling JSON")
@@ -101,7 +111,7 @@ func PushLayer(
 	layerData *types.LayerJSON,
 	endpoint *registry.APIEndpoint,
 ) (err error) {
-	sep := SeperateRepository(ref)
+	sep := seperateRepository(ref)
 	dig := digestedReference{sep, *layerData.Digest}
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 

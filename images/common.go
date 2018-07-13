@@ -50,7 +50,7 @@ func authProcedure(ref reference.Named) (
 		return "", nil, nil, errors.Wrapf(err, "could not parse ref = %v", ref)
 	}
 
-	endpoint, err := registry.GetEndPoint(ref, *repoInfo)
+	endpoint, err := registry.GetEndpoint(ref, *repoInfo)
 	if err != nil {
 		return "", nil, nil,
 			errors.Wrapf(err, "could not get endpoint ref = %v, repoInfo = %v", ref, *repoInfo)

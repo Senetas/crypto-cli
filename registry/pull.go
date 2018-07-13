@@ -60,7 +60,11 @@ func PullImage(token string, ref reference.Named, endpoint *registry.APIEndpoint
 }
 
 // PullManifest pulls a manifest from the registry and parses it
-func PullManifest(token string, ref reference.Named, bldr *v2.URLBuilder) (manifest *types.ImageManifestJSON, err error) {
+func PullManifest(
+	token string,
+	ref reference.Named,
+	bldr *v2.URLBuilder,
+) (manifest *types.ImageManifestJSON, err error) {
 	urlStr, err := bldr.BuildManifestURL(ref)
 	if err != nil {
 		return nil, errors.Wrapf(err, "ref = %v", ref)
@@ -80,9 +84,7 @@ func PullManifest(token string, ref reference.Named, bldr *v2.URLBuilder) (manif
 	if err != nil {
 		return nil, errors.Wrapf(err, "req = %#v", req)
 	}
-	defer func() {
-		err = utils.CheckedClose(resp.Body, err)
-	}()
+	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.New("manifest download failed with status: " + resp.Status)
@@ -99,8 +101,14 @@ func PullManifest(token string, ref reference.Named, bldr *v2.URLBuilder) (manif
 
 // PullFromDigest downloads a blob (refereced by its digest) from the registry to a temporay file.
 // It verifies that the downloaded matches its digest, deleting if if it does not
-func PullFromDigest(token string, ref reference.Named, d *digest.Digest, bldr *v2.URLBuilder, dir string) (fn string, err error) {
-	sep := SeperateRepository(ref)
+func PullFromDigest(
+	token string,
+	ref reference.Named,
+	d *digest.Digest,
+	bldr *v2.URLBuilder,
+	dir string,
+) (fn string, err error) {
+	sep := seperateRepository(ref)
 	can := digestedReference{sep, *d}
 
 	urlStr, err := bldr.BuildBlobURL(can)
@@ -131,9 +139,7 @@ func PullFromDigest(token string, ref reference.Named, d *digest.Digest, bldr *v
 	if err != nil {
 		return "", errors.Wrapf(err, "filename = %s", fn)
 	}
-	defer func() {
-		err = utils.CheckedClose(fh, err)
-	}()
+	defer func() { err = utils.CheckedClose(fh, err) }()
 
 	vw := d.Verifier()
 	mw := io.MultiWriter(vw, fh)
@@ -162,6 +168,7 @@ func quitUnVerified(fn string, fh *os.File, err error) (string, error) {
 				fn,
 			)
 	}
+
 	if err2 := fh.Close(); err2 != nil {
 		return "",
 			errors.Wrap(
@@ -169,5 +176,6 @@ func quitUnVerified(fn string, fh *os.File, err error) (string, error) {
 				"digest verification failed, failed to close, but unverified data was deleted",
 			)
 	}
+
 	return "", errors.Wrapf(err, "digest verification failed, unverified data deleted")
 }

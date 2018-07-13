@@ -23,8 +23,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// GetEndPoint returns the endpoint associted with the reference
-func GetEndPoint(ref reference.Named, repoInfo registry.RepositoryInfo) (registry.APIEndpoint, error) {
+// GetEndpoint returns the endpoint associted with the reference
+func GetEndpoint(ref reference.Named, repoInfo registry.RepositoryInfo) (registry.APIEndpoint, error) {
 	options := registry.ServiceOptions{}
 	options.InsecureRegistries = append(options.InsecureRegistries, "0.0.0.0/0")
 	registryService, err := registry.NewService(options)
@@ -43,8 +43,8 @@ func GetEndPoint(ref reference.Named, repoInfo registry.RepositoryInfo) (registr
 	return endpoint, nil
 }
 
-// TrimNamed removes a tag from a Named
-func TrimNamed(ref reference.NamedTagged) NamedRepository {
+// trimNamed removes a tag from a Named
+func trimNamed(ref reference.NamedTagged) NamedRepository {
 	switch r := ref.(type) {
 	case NamedTaggedRepository:
 		return repository{domain: r.Domain(), path: r.Path()}
@@ -56,14 +56,14 @@ func TrimNamed(ref reference.NamedTagged) NamedRepository {
 
 // SeperateTaggedRepository converts a named into a named where the output of the Name()
 // function will not had the domain as a prefi
-func SeperateTaggedRepository(ref reference.NamedTagged) NamedTaggedRepository {
+func seperateTaggedRepository(ref reference.NamedTagged) NamedTaggedRepository {
 	domain, path := reference.SplitHostname(ref)
 	return taggedRepository{domain: domain, path: path, tag: ref.Tag()}
 }
 
 // SeperateRepository converts a named into a named where the output of the Name()
 // function will not had the domain as a prefi
-func SeperateRepository(ref reference.Named) NamedRepository {
+func seperateRepository(ref reference.Named) NamedRepository {
 	domain, path := reference.SplitHostname(ref)
 	return repository{domain: domain, path: path}
 }
@@ -73,9 +73,9 @@ func SeperateRepository(ref reference.Named) NamedRepository {
 func ResolveNamed(ref reference.Named) (NamedTaggedRepository, error) {
 	switch r := ref.(type) {
 	case reference.NamedTagged:
-		return SeperateTaggedRepository(r), nil
+		return seperateTaggedRepository(r), nil
 	case reference.Named:
-		sep := SeperateRepository(r)
+		sep := seperateRepository(r)
 		return taggedRepository{"latest", sep.Domain(), sep.Path()}, nil
 	default:
 		return nil, errors.New("invalid image name")
