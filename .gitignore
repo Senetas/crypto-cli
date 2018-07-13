@@ -96,4 +96,4 @@ crypto-cli
 
 
 ### git ###
-.orig
+*.orig

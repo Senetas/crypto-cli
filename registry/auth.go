@@ -31,10 +31,14 @@ import (
 )
 
 // Authenticate against the given server, returning the bearer token
-func Authenticate(ref NamedRepository, repoInfo registry.RepositoryInfo, endpoint registry.APIEndpoint) (string, error) {
+func Authenticate(
+	ref NamedRepository,
+	repoInfo registry.RepositoryInfo,
+	endpoint registry.APIEndpoint,
+) (string, error) {
 	confFile, err := config.Load("")
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	authConfig := registry.ResolveAuthConfig(confFile.AuthConfigs, repoInfo.Index)
@@ -43,7 +47,7 @@ func Authenticate(ref NamedRepository, repoInfo registry.RepositoryInfo, endpoin
 
 	urlStr, err := bldr.BuildBaseURL()
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "base = %s", endpoint.URL)
 	}
 
 	req, err := http.NewRequest("GET", urlStr, nil)
@@ -55,9 +59,7 @@ func Authenticate(ref NamedRepository, repoInfo registry.RepositoryInfo, endpoin
 	if err != nil {
 		return "", err
 	}
-	defer func() {
-		err = utils.CheckedClose(resp.Body, err)
-	}()
+	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	var auth string
 	if resp.StatusCode == http.StatusUnauthorized {
@@ -72,7 +74,10 @@ func Authenticate(ref NamedRepository, repoInfo registry.RepositoryInfo, endpoin
 	}
 
 	re := regexp.MustCompile("realm=\"(?P<realm>.*)\",service=\"(?P<service>.*)\"")
-	matches := re.FindAllStringSubmatch("Bearer realm=\"https://auth.docker.io/token\",service=\"registry.docker.io\"", -1)
+	matches := re.FindAllStringSubmatch(
+		"Bearer realm=\"https://auth.docker.io/token\",service=\"registry.docker.io\"",
+		-1,
+	)
 	realm := matches[0][1]
 	service := matches[0][2]
 
@@ -83,7 +88,7 @@ func Authenticate(ref NamedRepository, repoInfo registry.RepositoryInfo, endpoin
 
 	u, err := url.Parse(realm)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "could no parse: %s", realm)
 	}
 
 	q := url.Values{}
@@ -93,14 +98,14 @@ func Authenticate(ref NamedRepository, repoInfo registry.RepositoryInfo, endpoin
 
 	rawQ, err := url.QueryUnescape(q.Encode())
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "q = %v", q)
 	}
 
 	u.RawQuery = rawQ
 
 	req, err = http.NewRequest("GET", u.String(), nil)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "url = %s", u)
 	}
 
 	req.Header.Add("Authorization", "Basic "+authToken)
@@ -109,9 +114,7 @@ func Authenticate(ref NamedRepository, repoInfo registry.RepositoryInfo, endpoin
 	if err != nil {
 		return "", err
 	}
-	defer func() {
-		err = utils.CheckedClose(resp.Body, err)
-	}()
+	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", errors.New("authentication failed with status: " + resp.Status)
@@ -132,9 +135,7 @@ func localAuthToken() (tok string, err error) {
 	if err != nil {
 		return "", errors.Wrapf(err, "could not open file: %s", conffile)
 	}
-	defer func() {
-		err = utils.CheckedClose(confH, err)
-	}()
+	defer func() { err = utils.CheckedClose(confH, err) }()
 
 	var config map[string]interface{}
 	dec := json.NewDecoder(confH)

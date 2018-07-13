@@ -42,7 +42,7 @@ func TestEncDecImage(t *testing.T) {
 	}
 	t.Log(manifest)
 
-	if _, err = images.TarFromManifest(manifest, ref2, "hunter2", crypto.Pbkdf2Aes256Gcm); err != nil {
+	if _, err = images.Manifest2Tar(manifest, ref2, "hunter2", crypto.Pbkdf2Aes256Gcm); err != nil {
 		t.Fatalf("%v\ne = %s", err, manifest.Config.Crypto)
 	}
 

@@ -16,22 +16,15 @@ package crypto
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"io"
 	"os"
 
 	"github.com/minio/sio"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
-	"golang.org/x/crypto/pbkdf2"
 
 	"github.com/Senetas/crypto-cli/utils"
 )
-
-// PassSalt2Key deterministically returns a 32 byte encryption key given a passphrase and a salt
-func PassSalt2Key(pass string, salt []byte) []byte {
-	return pbkdf2.Key([]byte(pass), salt, 8192, 32, sha256.New)
-}
 
 //GenDataKey generates a random key for data encryption
 func GenDataKey() ([]byte, error) {
@@ -49,17 +42,13 @@ func EncFile(infile, outfile string, key []byte) (d *digest.Digest, size int64, 
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "could not open file %s", infile)
 	}
-	defer func() {
-		err = utils.CheckedClose(inFH, err)
-	}()
+	defer func() { err = utils.CheckedClose(inFH, err) }()
 
 	outFH, err := os.Create(outfile)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "could not create file %s", outfile)
 	}
-	defer func() {
-		err = utils.CheckedClose(outFH, err)
-	}()
+	defer func() { err = utils.CheckedClose(outFH, err) }()
 
 	cfg := sio.Config{
 		MinVersion:   sio.Version20,
@@ -93,17 +82,13 @@ func DecFile(infile, outfile string, datakey []byte) (err error) {
 	if err != nil {
 		return errors.Wrapf(err, "could not open file %s", infile)
 	}
-	defer func() {
-		err = utils.CheckedClose(inFH, err)
-	}()
+	defer func() { err = utils.CheckedClose(inFH, err) }()
 
 	outFH, err := os.Create(outfile)
 	if err != nil {
 		return errors.Wrapf(err, "could not create file %s", outfile)
 	}
-	defer func() {
-		err = utils.CheckedClose(outFH, err)
-	}()
+	defer func() { err = utils.CheckedClose(outFH, err) }()
 
 	cfg := sio.Config{
 		MinVersion:   sio.Version20,

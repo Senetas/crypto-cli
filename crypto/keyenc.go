@@ -18,8 +18,10 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 
 	"github.com/Senetas/crypto-cli/utils"
+	"golang.org/x/crypto/pbkdf2"
 )
 
 // EncAlgo represents the collection of algorithms used for encryption and authentication
@@ -37,10 +39,8 @@ const (
 func Deckey(ciphertext []byte, pass, salt string) ([]byte, error) {
 	nonce := ciphertext[:12]
 	ckey := ciphertext[12:]
-
 	bsalt := []byte(salt)
-
-	key := PassSalt2Key(pass, bsalt)
+	key := passSalt2Key(pass, bsalt)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -63,8 +63,7 @@ func Deckey(ciphertext []byte, pass, salt string) ([]byte, error) {
 // Enckey encrypts the ciphertext = key with the given passphrase and salt
 func Enckey(plaintext []byte, pass, salt string) ([]byte, error) {
 	bsalt := []byte(salt)
-
-	key := PassSalt2Key(pass, bsalt)
+	key := passSalt2Key(pass, bsalt)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -84,4 +83,9 @@ func Enckey(plaintext []byte, pass, salt string) ([]byte, error) {
 	ciphertext := aesgcm.Seal(nil, nonce, plaintext, bsalt)
 
 	return utils.Concat([][]byte{nonce, ciphertext}), nil
+}
+
+// passSalt2Key deterministically returns a 32 byte encryption key given a passphrase and a salt
+func passSalt2Key(pass string, salt []byte) []byte {
+	return pbkdf2.Key([]byte(pass), salt, 8192, 32, sha256.New)
 }

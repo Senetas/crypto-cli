@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package distribution
 
 import (
 	"encoding/base64"
@@ -32,39 +32,39 @@ type ArchiveManifest struct {
 	Layers   []string
 }
 
-// ImageManifestJSON represents a docker image manifest schema v2.2
-type ImageManifestJSON struct {
-	SchemaVersion int          `json:"schemaVersion"`
-	MediaType     string       `json:"mediaType"`
-	Config        *LayerJSON   `json:"config"`
-	Layers        []*LayerJSON `json:"layers"`
-	DirName       string       `json:"-"`
+// ImageManifest represents a docker image manifest schema v2.2
+type ImageManifest struct {
+	SchemaVersion int      `json:"schemaVersion"`
+	MediaType     string   `json:"mediaType"`
+	Config        *Layer   `json:"config"`
+	Layers        []*Layer `json:"layers"`
+	DirName       string   `json:"-"`
 }
 
-// LayerJSON is the go type for an element in the layer array
-type LayerJSON struct {
-	Crypto      *CryptoJSON    `json:"crypto,omitempty"`
+// Layer is the go type for an element in the layer array
+type Layer struct {
+	Crypto      *Crypto        `json:"crypto,omitempty"`
 	ContentType string         `json:"mediaType"`
 	Size        int64          `json:"size"`
 	Digest      *digest.Digest `json:"digest"`
 	Filename    string         `json:"-"`
 }
 
-// CryptoJSON is the go type backing a crypto object in a manifest
-type CryptoJSON struct {
+// Crypto is the go type backing a crypto object in a manifest
+type Crypto struct {
 	CryptoType crypto.EncAlgo `json:"cryptoType"`
 	EncKey     string         `json:"key"`
 	DecKey     []byte         `json:"-"`
 }
 
-// DeCryptoData stores the decrypted data keys after decrypting a crypto object
-type DeCryptoData struct {
+// DeCrypto stores the decrypted data keys after decrypting a crypto object
+type DeCrypto struct {
 	CryptoType crypto.EncAlgo
 	Key        []byte
 }
 
 // Encrypt creates a new CryptoJSON struct by encrypting a plaintext key with a passphrase and salt
-func (c *CryptoJSON) Encrypt(pass, salt string, cryptotype crypto.EncAlgo) error {
+func (c *Crypto) Encrypt(pass, salt string, cryptotype crypto.EncAlgo) error {
 	ciphertextKey, err := crypto.Enckey(c.DecKey, pass, salt)
 	if err != nil {
 		return errors.WithStack(utils.ErrEncrypt)
@@ -77,7 +77,7 @@ func (c *CryptoJSON) Encrypt(pass, salt string, cryptotype crypto.EncAlgo) error
 }
 
 // Decrypt is the inverse function of Encrypt (up to error, types etc)
-func (c *CryptoJSON) Decrypt(pass, salt string, cryptotype crypto.EncAlgo) error {
+func (c *Crypto) Decrypt(pass, salt string, cryptotype crypto.EncAlgo) error {
 	if c.CryptoType != cryptotype {
 		return utils.NewError("encryption type does not match decryption type", false)
 	}
@@ -95,40 +95,41 @@ func (c *CryptoJSON) Decrypt(pass, salt string, cryptotype crypto.EncAlgo) error
 	return nil
 }
 
-func newPlainLayerJSON(filename string, d *digest.Digest, size int64) *LayerJSON {
-	layer := &LayerJSON{
+func newPlainLayer(filename string, d *digest.Digest, size int64) *Layer {
+	layer := &Layer{
 		Size:     size,
 		Digest:   d,
-		Filename: filename}
+		Filename: filename,
+	}
 	return layer
 }
 
-func newLayerJSON(filename string, d *digest.Digest, size int64, plaintextKey []byte) *LayerJSON {
-	layer := newPlainLayerJSON(filename, d, size)
-	layer.Crypto = &CryptoJSON{
+func newLayer(filename string, d *digest.Digest, size int64, plaintextKey []byte) *Layer {
+	layer := newPlainLayer(filename, d, size)
+	layer.Crypto = &Crypto{
 		CryptoType: crypto.Pbkdf2Aes256Gcm,
 		DecKey:     plaintextKey,
 	}
 	return layer
 }
 
-// NewConfigJSON creates a new LayerJSON for a config layer
-func NewConfigJSON(filename string, d *digest.Digest, size int64, plaintextKey []byte) *LayerJSON {
-	layer := newLayerJSON(filename, d, size, plaintextKey)
+// NewConfig creates a new Layer for a config layer
+func NewConfig(filename string, d *digest.Digest, size int64, plaintextKey []byte) *Layer {
+	layer := newLayer(filename, d, size, plaintextKey)
 	layer.ContentType = "application/vnd.docker.container.image.v1+json"
 	return layer
 }
 
-// NewLayerJSON creates a new LayerJSON for a data layer
-func NewLayerJSON(filename string, d *digest.Digest, size int64, plaintextKey []byte) *LayerJSON {
-	layer := newLayerJSON(filename, d, size, plaintextKey)
+// NewLayer creates a new LayerJSON for a data layer
+func NewLayer(filename string, d *digest.Digest, size int64, plaintextKey []byte) *Layer {
+	layer := newLayer(filename, d, size, plaintextKey)
 	layer.ContentType = "application/vnd.docker.image.rootfs.diff.tar.gzip"
 	return layer
 }
 
-// NewPlainLayerJSON creates a new LayerJSON for an unencrypted data layer
-func NewPlainLayerJSON(filename string, d *digest.Digest, size int64) *LayerJSON {
-	layer := newPlainLayerJSON(filename, d, size)
+// NewPlainLayer creates a new LayerJSON for an unencrypted data layer
+func NewPlainLayer(filename string, d *digest.Digest, size int64) *Layer {
+	layer := newPlainLayer(filename, d, size)
 	layer.ContentType = "application/vnd.docker.image.rootfs.diff.tar.gzip"
 	return layer
 }

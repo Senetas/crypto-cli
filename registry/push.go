@@ -15,8 +15,8 @@
 package registry
 
 import (
-	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -28,13 +28,18 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	"github.com/Senetas/crypto-cli/types"
+	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
 // PushImage pushes the config, layers and mainifest to the nominated registry, in that order
-func PushImage(token string, ref NamedTaggedRepository, manifest *types.ImageManifestJSON, endpoint *registry.APIEndpoint) error {
-	trimed := reference.TrimNamed(ref)
+func PushImage(
+	token string,
+	ref NamedTaggedRepository,
+	manifest *distribution.ImageManifest,
+	endpoint *registry.APIEndpoint,
+) error {
+	trimed := trimNamed(ref)
 
 	if err := PushLayer(token, trimed, manifest.Config, endpoint); err != nil {
 		return err
@@ -56,19 +61,31 @@ func PushImage(token string, ref NamedTaggedRepository, manifest *types.ImageMan
 }
 
 // PushManifest puts a manifest on the registry
-func PushManifest(token string, ref reference.Named, manifest *types.ImageManifestJSON, endpoint *registry.APIEndpoint) (string, error) {
-	manifestJSON, err := json.MarshalIndent(manifest, "", "\t")
-	if err != nil {
-		return "", errors.Wrap(err, "while marshaling JSON")
-	}
-
+func PushManifest(
+	token string,
+	ref reference.Named,
+	manifest *distribution.ImageManifest,
+	endpoint *registry.APIEndpoint,
+) (string, error) {
 	builder := v2.NewURLBuilder(endpoint.URL, false)
 	urlStr, err := builder.BuildManifestURL(ref)
 	if err != nil {
 		return "", errors.Wrapf(err, "ref = %v", ref)
 	}
 
-	req, err := http.NewRequest("PUT", urlStr, bytes.NewReader(manifestJSON))
+	// a pipe allows using the struct directly as the http body
+	// w/o copying to a buffer
+	pr, pw := io.Pipe()
+	errChan := make(chan error, 1)
+	defer close(errChan)
+	go func() {
+		defer func() { errChan <- pw.Close() }()
+		enc := json.NewEncoder(pw)
+		enc.SetIndent("", "\t")
+		errChan <- enc.Encode(manifest)
+	}()
+
+	req, err := http.NewRequest("PUT", urlStr, pr)
 	if err != nil {
 		return "", errors.Wrapf(err, "url = %v", urlStr)
 	}
@@ -82,13 +99,15 @@ func PushManifest(token string, ref reference.Named, manifest *types.ImageManife
 	if err != nil {
 		return "", err
 	}
+	defer func() { err = utils.CheckedClose(resp.Body, err) }()
+
+	// close the channel after request is done
+	if err = utils.ConcatErrChan(errChan, 2); err != nil {
+		return "", errors.WithStack(err)
+	}
 
 	if resp.StatusCode != http.StatusCreated {
 		return "", errors.New("manifest upload failed with status: " + resp.Status)
-	}
-
-	if err = resp.Body.Close(); err != nil {
-		return "", errors.Wrapf(err, "error closing resp = %v", resp)
 	}
 
 	return resp.Header.Get("Docker-Content-Digest"), nil
@@ -98,10 +117,10 @@ func PushManifest(token string, ref reference.Named, manifest *types.ImageManife
 func PushLayer(
 	token string,
 	ref reference.Named,
-	layerData *types.LayerJSON,
+	layerData *distribution.Layer,
 	endpoint *registry.APIEndpoint,
 ) (err error) {
-	sep := SeperateRepository(ref)
+	sep := seperateRepository(ref)
 	dig := digestedReference{sep, *layerData.Digest}
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
@@ -132,9 +151,7 @@ func PushLayer(
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err = utils.CheckedClose(resp.Body, err)
-	}()
+	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	if resp.StatusCode != http.StatusAccepted {
 		return errors.New("upload of layer " + layerData.Digest.String() + " was not accepted")
@@ -184,9 +201,7 @@ func PushLayer(
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err = utils.CheckedClose(resp.Body, err)
-	}()
+	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return errors.New("upload of layer " + layerData.Digest.String() + " failed")
@@ -212,9 +227,7 @@ func checkLayer(token string, ref reference.Canonical, bldr *v2.URLBuilder) (b b
 	if err != nil {
 		return false, errors.Wrapf(err, "%v", req)
 	}
-	defer func() {
-		err = utils.CheckedClose(resp.Body, err)
-	}()
+	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	if resp.StatusCode == http.StatusOK {
 		return true, nil
