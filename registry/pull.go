@@ -40,7 +40,6 @@ func PullImage(
 	ref reference.Named,
 	endpoint *registry.APIEndpoint,
 	downloadDir string,
-	decErr <-chan error,
 	manChan chan<- *distribution.ImageManifest,
 	errChan chan<- error,
 ) {
@@ -61,8 +60,15 @@ func PullImage(
 		errChan <- ctx.Err()
 		return
 	default:
-		log.Info().Msgf("Downloading config: %s\n", manifest.Config.Digest)
-		manifest.Config.Filename, err = PullFromDigest(ctx, token, ref, manifest.Config.Digest, bldr, downloadDir)
+		log.Info().Msgf("Downloading config: %s", manifest.Config.Digest)
+		manifest.Config.Filename, err = PullFromDigest(
+			ctx,
+			token,
+			ref,
+			manifest.Config.Digest,
+			bldr,
+			downloadDir,
+		)
 		if err != nil {
 			errChan <- err
 			return
