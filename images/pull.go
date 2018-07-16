@@ -15,6 +15,7 @@
 package images
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/registry"
+	"github.com/Senetas/crypto-cli/utils"
 )
 
 // PullImage pulls an image from the registry
@@ -38,8 +40,11 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 	if err = os.MkdirAll(dir, 0755); err != nil {
 		return errors.Wrapf(err, "dir = %s", dir)
 	}
+	defer cleanup(dir, err)
 
-	// TODO: make this more light weigth and SAFE!
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// TODO: make this more light weight and SAFE!
 	manChan := make(chan *distribution.ImageManifest)
 	manChan2 := make(chan *distribution.ImageManifest)
 	errChan := make(chan error)
@@ -49,13 +54,31 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 	defer close(errChan)
 	defer close(errChan2)
 
-	go registry.PullImage(token, *nTRep, endpoint, dir, errChan2, manChan, errChan)
-	go decryptManifest(manChan, *nTRep, passphrase, cryptotype, manChan2, errChan2)
+	go registry.PullImage(ctx, token, *nTRep, endpoint, dir, manChan, errChan)
+	go DecryptManifest(cancel, manChan, *nTRep, passphrase, cryptotype, manChan2, errChan2)
 
-	if err = <-errChan; err != nil {
-		return err
+	errs := make(utils.Errors, 0)
+	var manifest *distribution.ImageManifest
+	for i := 0; i < 3; {
+		select {
+		case err2 := <-errChan:
+			if err2 != nil {
+				errs = append(errs, err2)
+			}
+			i++
+		case err2 := <-errChan2:
+			if err2 != nil {
+				errs = append(errs, err2)
+			}
+			i++
+		case manifest = <-manChan2:
+			i++
+		default:
+		}
 	}
-	manifest := <-manChan2
+	if len(errs) != 0 {
+		return errs
+	}
 
 	tarball, err := Manifest2Tar(manifest, *nTRep, passphrase, cryptotype)
 	if err != nil {
@@ -66,10 +89,20 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 		return err
 	}
 
-	// cleanup temporary files
-	if err = os.RemoveAll(dir); err != nil {
-		return errors.Wrapf(err, "could not clean up temp files in: %s", dir)
-	}
-
 	return nil
+}
+
+// cleanup temporary files
+func cleanup(dir string, err error) error {
+	if dir == "" {
+		return err
+	}
+	if err2 := os.RemoveAll(dir); err2 != nil {
+		err2 = errors.Wrapf(err, "could not clean up temp files in: %s", dir)
+		if err == nil {
+			return err2
+		}
+		return utils.Errors{err, err2}
+	}
+	return err
 }
