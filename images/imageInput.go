@@ -34,10 +34,7 @@ import (
 	"github.com/Senetas/crypto-cli/utils"
 )
 
-// DecryptManifest attempts to decrypt a manifest from the manIn channel,
-// sending to manOut. It will call cancel on error.
-func DecryptManifest(
-	cancel context.CancelFunc,
+func decryptManifest(
 	manIn <-chan *distribution.ImageManifest,
 	ref registry.NamedTaggedRepository,
 	passphrase string,
@@ -52,7 +49,6 @@ func DecryptManifest(
 	salt := fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 	if err := manifest.Config.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
 		errChan <- err
-		cancel()
 		return
 	}
 
@@ -62,7 +58,6 @@ func DecryptManifest(
 			salt := fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
 			if err := l.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
 				errChan <- err
-				cancel()
 				return
 			}
 		}
@@ -80,6 +75,7 @@ func Manifest2Tar(
 	passphrase string,
 	cryptotype crypto.EncAlgo,
 ) (tarball string, err error) {
+
 	dir := filepath.Dir(manifest.Config.Filename)
 	if err = os.MkdirAll(dir, 0755); err != nil {
 		return "", errors.Wrapf(err, "dir name = %s", dir)
@@ -124,6 +120,7 @@ func Manifest2Tar(
 
 	// decrypt files for layers
 	for i, l := range manifest.Layers {
+
 		// decrypt layer file
 		layerfilename := l.Filename
 		if l.Crypto != nil {
@@ -180,6 +177,8 @@ func Manifest2Tar(
 }
 
 func importImage(tarball string) error {
+	ctx := context.Background()
+
 	// TODO: fix hardcoded version/ check if necessary
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
 	if err != nil {
@@ -191,7 +190,7 @@ func importImage(tarball string) error {
 		return errors.Wrapf(err, "error opening file: %s", tarball)
 	}
 
-	resp, err := cli.ImageLoad(context.Background(), fh, false)
+	resp, err := cli.ImageLoad(ctx, fh, false)
 	if err != nil {
 		return errors.Wrapf(err, "error loading image tarball: %s", tarball)
 	}

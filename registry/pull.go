@@ -15,7 +15,6 @@
 package registry
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -35,7 +34,6 @@ import (
 
 // PullImage pulls an image from a remote repository
 func PullImage(
-	ctx context.Context,
 	token string,
 	ref reference.Named,
 	endpoint *registry.APIEndpoint,
@@ -46,7 +44,7 @@ func PullImage(
 ) {
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
-	log.Info().Msg("Obtaining Manifest")
+	log.Debug().Msg("Obtaining Manifest")
 	manifest, err := PullManifest(token, ref, bldr)
 	if err != nil {
 		errChan <- err
@@ -55,34 +53,26 @@ func PullImage(
 
 	manChan <- manifest
 
-	select {
-	case <-ctx.Done():
-		log.Error().Msg("config download cancelled")
-		errChan <- ctx.Err()
+	// if there is a decrypt error, downloading will not start
+	if err = <-decErr; err != nil {
+		errChan <- err
 		return
-	default:
-		log.Info().Msgf("Downloading config: %s\n", manifest.Config.Digest)
-		manifest.Config.Filename, err = PullFromDigest(ctx, token, ref, manifest.Config.Digest, bldr, downloadDir)
+	}
+
+	log.Info().Msgf("Obtaining config: %s\n", manifest.Config.Digest)
+	manifest.Config.Filename, err = PullFromDigest(token, ref, manifest.Config.Digest, bldr, downloadDir)
+	if err != nil {
+		errChan <- err
+		return
+	}
+
+	log.Info().Msg("Obtaining layers:")
+	for _, l := range manifest.Layers {
+		log.Info().Msgf("Obtaining layer: %s", l.Digest)
+		l.Filename, err = PullFromDigest(token, ref, l.Digest, bldr, downloadDir)
 		if err != nil {
 			errChan <- err
 			return
-		}
-	}
-
-	log.Info().Msg("Downloading layers:")
-	for _, l := range manifest.Layers {
-		select {
-		case <-ctx.Done():
-			log.Error().Msg("layer download cancelled")
-			errChan <- ctx.Err()
-			return
-		default:
-			log.Info().Msgf("Downloading layer: %s", l.Digest)
-			l.Filename, err = PullFromDigest(ctx, token, ref, l.Digest, bldr, downloadDir)
-			if err != nil {
-				errChan <- err
-				return
-			}
 		}
 	}
 
@@ -110,9 +100,9 @@ func PullManifest(
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := doRequest(http.DefaultClient, req, true, true)
+	resp, err := doRequest(&http.Client{}, req, true, true)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "req = %#v", req)
 	}
 	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
@@ -132,7 +122,6 @@ func PullManifest(
 // PullFromDigest downloads a blob (refereced by its digest) from the registry to a temporay file.
 // It verifies that the downloaded matches its digest, deleting if if it does not
 func PullFromDigest(
-	ctx context.Context,
 	token string,
 	ref reference.Named,
 	d *digest.Digest,
@@ -151,15 +140,14 @@ func PullFromDigest(
 	if err != nil {
 		return "", errors.Wrapf(err, "GET %s", urlStr)
 	}
-	req = req.WithContext(ctx)
 
 	req.Header.Set("Accept", "application/vnd.docker.image.rootfs.diff.tar.gzip")
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := doRequest(http.DefaultClient, req, true, true)
+	resp, err := doRequest(&http.Client{}, req, true, false)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "req = %#v", req)
 	}
 
 	if resp.StatusCode != http.StatusOK {
