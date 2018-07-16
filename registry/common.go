@@ -16,12 +16,14 @@ package registry
 
 import (
 	"net/http"
+	"net/http/httputil"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
-func doRequest(client *http.Client, req *http.Request, reqBody, respBody bool) (*http.Response, error) {
-	//dump, err := httputil.DumpRequestOut(req, reqBody)
+func doRequest(client *http.Client, req *http.Request, dumpReqBody, dumpRespBody bool) (*http.Response, error) {
+	//dump, err := httputil.DumpRequestOut(req, dumpReqBody)
 	//if err != nil {
 	//return nil, errors.Wrapf(err, "%#v", req)
 	//}
@@ -29,14 +31,70 @@ func doRequest(client *http.Client, req *http.Request, reqBody, respBody bool) (
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, errors.Wrapf(err, "%#v", req)
+		err = errors.Wrapf(err, "%#v", req)
 	}
 
-	//dump, err = httputil.DumpResponse(resp, respBody)
+	//dump, err = httputil.DumpResponse(resp, dumpRespBody)
 	//if err != nil {
 	//return nil, errors.Wrapf(err, "%#v", resp)
 	//}
 	//log.Debug().Msgf("\n%s", dump)
+
+	return resp, err
+}
+
+func doRequestCtx(client *http.Client, req *http.Request, dumpReqBody, dumpRespBody bool) (*http.Response, error) {
+	dump, err := httputil.DumpRequestOut(req, dumpReqBody)
+	if err != nil {
+		return nil, errors.Wrapf(err, "%#v", req)
+	}
+	log.Debug().Msgf("\n%s", dump)
+
+	errChan := make(chan error)
+	respChan := make(chan *http.Response)
+
+	defer close(errChan)
+	defer close(respChan)
+
+	go func() {
+		var err error
+		var resp *http.Response
+		select {
+		case <-req.Context().Done():
+			err = req.Context().Err()
+		default:
+			resp, err = client.Do(req)
+			select {
+			case <-req.Context().Done():
+				log.Error().Msg("cancelled")
+				err = req.Context().Err()
+			default:
+			}
+		}
+		if err != nil {
+			err = errors.Wrapf(err, "%#v", req)
+		}
+		errChan <- err
+		respChan <- resp
+	}()
+
+	select {
+	case err := <-errChan:
+		if err != nil {
+			return nil, err
+		}
+	case <-req.Context().Done():
+		log.Error().Msg("cancelled")
+		return nil, req.Context().Err()
+	}
+
+	resp := <-respChan
+
+	dump, err = httputil.DumpResponse(resp, dumpRespBody)
+	if err != nil {
+		return nil, errors.Wrapf(err, "%#v", resp)
+	}
+	log.Debug().Msgf("\n%s", dump)
 
 	return resp, nil
 }
