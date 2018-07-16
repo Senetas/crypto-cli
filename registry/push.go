@@ -95,7 +95,7 @@ func PushManifest(
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
 
-	resp, err := doRequest(&http.Client{}, req, true, true)
+	resp, err := doRequest(defaultClient, req, true, true)
 	if err != nil {
 		return "", err
 	}
@@ -147,7 +147,7 @@ func PushLayer(
 
 	req.Header.Add("Authorization", "Bearer "+token)
 
-	resp, err := doRequest(&http.Client{}, req, true, true)
+	resp, err := doRequest(defaultClient, req, true, true)
 	if err != nil {
 		return err
 	}
@@ -197,7 +197,7 @@ func PushLayer(
 	req.Header.Add("Content-Length", strconv.FormatInt(layerData.Size, 10))
 	req.Header.Add("Content-Type", "application/octect-stream")
 
-	resp, err = doRequest(&http.Client{}, req, false, true)
+	resp, err = doRequest(defaultClient, req, false, true)
 	if err != nil {
 		return err
 	}
@@ -223,7 +223,7 @@ func checkLayer(token string, ref reference.Canonical, bldr *v2.URLBuilder) (b b
 
 	req.Header.Add("Authorization", "Bearer "+token)
 
-	resp, err := doRequest(&http.Client{}, req, true, true)
+	resp, err := doRequest(defaultClient, req, true, true)
 	if err != nil {
 		return false, errors.Wrapf(err, "%v", req)
 	}

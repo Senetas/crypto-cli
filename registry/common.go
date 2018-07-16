@@ -15,11 +15,24 @@
 package registry
 
 import (
+	"net"
 	"net/http"
-	"net/http/httputil"
+	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
+)
+
+var (
+	defaultTransport = &http.Transport{
+		Dial: (&net.Dialer{
+			Timeout: 5 * time.Second,
+		}).Dial,
+		TLSHandshakeTimeout: 5 * time.Second,
+	}
+	defaultClient = &http.Client{
+		Timeout:   10 * time.Second,
+		Transport: defaultTransport,
+	}
 )
 
 func doRequest(client *http.Client, req *http.Request, dumpReqBody, dumpRespBody bool) (*http.Response, error) {
@@ -41,60 +54,4 @@ func doRequest(client *http.Client, req *http.Request, dumpReqBody, dumpRespBody
 	//log.Debug().Msgf("\n%s", dump)
 
 	return resp, err
-}
-
-func doRequestCtx(client *http.Client, req *http.Request, dumpReqBody, dumpRespBody bool) (*http.Response, error) {
-	dump, err := httputil.DumpRequestOut(req, dumpReqBody)
-	if err != nil {
-		return nil, errors.Wrapf(err, "%#v", req)
-	}
-	log.Debug().Msgf("\n%s", dump)
-
-	errChan := make(chan error)
-	respChan := make(chan *http.Response)
-
-	defer close(errChan)
-	defer close(respChan)
-
-	go func() {
-		var err error
-		var resp *http.Response
-		select {
-		case <-req.Context().Done():
-			err = req.Context().Err()
-		default:
-			resp, err = client.Do(req)
-			select {
-			case <-req.Context().Done():
-				log.Error().Msg("cancelled")
-				err = req.Context().Err()
-			default:
-			}
-		}
-		if err != nil {
-			err = errors.Wrapf(err, "%#v", req)
-		}
-		errChan <- err
-		respChan <- resp
-	}()
-
-	select {
-	case err := <-errChan:
-		if err != nil {
-			return nil, err
-		}
-	case <-req.Context().Done():
-		log.Error().Msg("cancelled")
-		return nil, req.Context().Err()
-	}
-
-	resp := <-respChan
-
-	dump, err = httputil.DumpResponse(resp, dumpRespBody)
-	if err != nil {
-		return nil, errors.Wrapf(err, "%#v", resp)
-	}
-	log.Debug().Msgf("\n%s", dump)
-
-	return resp, nil
 }

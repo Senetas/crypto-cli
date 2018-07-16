@@ -55,7 +55,7 @@ func Authenticate(
 		return "", err
 	}
 
-	resp, err := doRequest(&http.Client{}, req, true, false)
+	resp, err := doRequest(defaultClient, req, true, false)
 	if err != nil {
 		return "", err
 	}
@@ -110,7 +110,7 @@ func Authenticate(
 
 	req.Header.Add("Authorization", "Basic "+authToken)
 
-	resp, err = doRequest(&http.Client{}, req, true, false)
+	resp, err = doRequest(defaultClient, req, true, false)
 	if err != nil {
 		return "", err
 	}
