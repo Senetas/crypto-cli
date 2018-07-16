@@ -116,7 +116,7 @@ func PullManifest(
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := doRequest(http.DefaultClient, req, true, true)
+	resp, err := doRequest(defaultClient, req, true, true)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func PullFromDigest(
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := doRequest(http.DefaultClient, req, true, true)
+	resp, err := doRequest(defaultClient, req, true, true)
 	if err != nil {
 		return "", err
 	}
