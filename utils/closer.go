@@ -20,6 +20,9 @@ import (
 
 // CheckedClose may be called on defer to properly close a resouce and log any errors
 func CheckedClose(c io.Closer, err error) error {
+	if c == nil {
+		return err
+	}
 	if err2 := c.Close(); err2 != nil {
 		if err == nil {
 			return err2
