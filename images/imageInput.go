@@ -52,6 +52,7 @@ func DecryptManifest(
 	salt := fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 	if err := manifest.Config.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
 		errChan <- err
+		manOut <- nil
 		cancel()
 		return
 	}
@@ -62,14 +63,15 @@ func DecryptManifest(
 			salt := fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
 			if err := l.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
 				errChan <- err
+				manOut <- nil
 				cancel()
 				return
 			}
 		}
 	}
 	errChan <- nil
-	log.Info().Msg("finished decryption of keys")
 	manOut <- manifest
+	log.Info().Msg("finished decryption of keys")
 }
 
 // Manifest2Tar takes a manifest and a target label for the images and create a tarball that may
