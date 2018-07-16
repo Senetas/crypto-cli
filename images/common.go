@@ -56,6 +56,14 @@ func authProcedure(ref reference.Named) (
 			errors.Wrapf(err, "could not get endpoint ref = %v, repoInfo = %v", ref, *repoInfo)
 	}
 
+	tls, err := registry.UseTLS(nTRep, *repoInfo, endpoint)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	if !tls {
+		return "", &nTRep, &endpoint, nil
+	}
+
 	token, err := registry.Authenticate(nTRep, *repoInfo, endpoint)
 	if err != nil {
 		return "", nil, nil, err

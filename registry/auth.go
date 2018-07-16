@@ -30,6 +30,55 @@ import (
 	"github.com/Senetas/crypto-cli/utils"
 )
 
+// UseTLS determines whether the registry requires TLS
+func UseTLS(
+	ref NamedRepository,
+	repoInfo registry.RepositoryInfo,
+	endpoint registry.APIEndpoint,
+) (bool, error) {
+	endpoint.URL.Scheme = "http"
+	bldr := v2.NewURLBuilder(endpoint.URL, false)
+
+	urlStr, err := bldr.BuildBaseURL()
+	if err != nil {
+		return false, errors.Wrapf(err, "base = %s", endpoint.URL)
+	}
+
+	req, err := http.NewRequest("GET", urlStr, nil)
+	if err != nil {
+		return false, errors.Wrapf(err, "url = %s", urlStr)
+	}
+
+	httpClient := *defaultClient
+	httpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+
+	resp, err := doRequest(&httpClient, req, true, false)
+	if err != nil {
+		return false, err
+	}
+	defer func() { err = utils.CheckedClose(resp.Body, err) }()
+
+	switch resp.StatusCode {
+	case http.StatusMovedPermanently:
+		loc := resp.Header.Get("Location")
+		u, err := url.Parse(loc)
+		if err != nil {
+			return false, errors.WithStack(err)
+		}
+		if u.Scheme == "https" {
+			endpoint.URL.Scheme = "https"
+			return true, nil
+		}
+		return false, nil
+	case http.StatusOK:
+		return false, nil
+	default:
+		return false, errors.Errorf("status code %s from server", resp.Status)
+	}
+}
+
 // Authenticate against the given server, returning the bearer token
 func Authenticate(
 	ref NamedRepository,

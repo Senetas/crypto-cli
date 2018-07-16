@@ -55,7 +55,7 @@ func PushImage(
 	if err != nil {
 		return err
 	}
-	log.Info().Msgf("Successfully uploaded manifest with digest: %s\n", mdigest)
+	log.Info().Msgf("Successfully uploaded manifest with digest: %s", mdigest)
 
 	return nil
 }
@@ -92,8 +92,10 @@ func PushManifest(
 
 	req.Header.Set("Accept", "application/json, */*")
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
-	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err := doRequest(defaultClient, req, true, true)
 	if err != nil {
@@ -145,7 +147,9 @@ func PushLayer(
 		return errors.Wrapf(err, "could not make req = %v", req)
 	}
 
-	req.Header.Add("Authorization", "Bearer "+token)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err := doRequest(defaultClient, req, true, true)
 	if err != nil {
@@ -193,9 +197,11 @@ func PushLayer(
 		return errors.Wrapf(err, "could not make req = %v", req)
 	}
 
-	req.Header.Add("Authorization", "Bearer "+token)
 	req.Header.Add("Content-Length", strconv.FormatInt(layerData.Size, 10))
 	req.Header.Add("Content-Type", "application/octect-stream")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err = doRequest(defaultClient, req, false, true)
 	if err != nil {
@@ -221,7 +227,9 @@ func checkLayer(token string, ref reference.Canonical, bldr *v2.URLBuilder) (b b
 		return false, errors.Wrapf(err, "%v", layerURLStr)
 	}
 
-	req.Header.Add("Authorization", "Bearer "+token)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err := doRequest(defaultClient, req, true, true)
 	if err != nil {
