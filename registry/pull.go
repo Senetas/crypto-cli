@@ -83,7 +83,7 @@ func PullImage(
 			errChan <- ctx.Err()
 			return
 		default:
-			log.Info().Msgf("Downloading layer: %s", l.Digest)
+			log.Info().Msgf("Downloading: %s", l.Digest)
 			l.Filename, err = PullFromDigest(ctx, token, ref, l.Digest, bldr, downloadDir)
 			if err != nil {
 				errChan <- err
@@ -114,7 +114,9 @@ func PullManifest(
 	// TODO: Handle list manifests
 	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
-	req.Header.Set("Authorization", "Bearer "+token)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err := doRequest(defaultClient, req, true, true)
 	if err != nil {
@@ -161,9 +163,11 @@ func PullFromDigest(
 
 	req.Header.Set("Accept", "application/vnd.docker.image.rootfs.diff.tar.gzip")
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
-	req.Header.Set("Authorization", "Bearer "+token)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
-	resp, err := doRequest(defaultClient, req, true, true)
+	resp, err := doRequest(defaultClient, req, true, false)
 	if err != nil {
 		return "", err
 	}

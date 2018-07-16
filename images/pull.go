@@ -40,7 +40,7 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 	if err = os.MkdirAll(dir, 0755); err != nil {
 		return errors.Wrapf(err, "dir = %s", dir)
 	}
-	defer cleanup(dir, err)
+	defer func() { err = cleanup(dir, err) }()
 
 	ctx, cancel := context.WithCancel(context.Background())
 

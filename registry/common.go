@@ -40,7 +40,8 @@ func doRequest(client *http.Client, req *http.Request, dumpReqBody, dumpRespBody
 	//if err != nil {
 	//return nil, errors.Wrapf(err, "%#v", req)
 	//}
-	//log.Debug().Msgf("\n%s", dump)
+	//log.Debug().Msg(req.URL.String())
+	//log.Debug().Msgf("%s", dump)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -51,7 +52,23 @@ func doRequest(client *http.Client, req *http.Request, dumpReqBody, dumpRespBody
 	//if err != nil {
 	//return nil, errors.Wrapf(err, "%#v", resp)
 	//}
-	//log.Debug().Msgf("\n%s", dump)
+	//log.Debug().Msgf("%s", dump)
 
 	return resp, err
 }
+
+//func mkHTTPClient(repoInfo *registry.RepositoryInfo, endpoint *registry.APIEndpoint) (*http.Client, error) {
+//transport := &http.Transport{
+//Proxy: http.ProxyFromEnvironment,
+//Dial: (&net.Dialer{
+//Timeout:   30 * time.Second,
+//KeepAlive: 30 * time.Second,
+//DualStack: true,
+//}).Dial,
+//TLSHandshakeTimeout: 10 * time.Second,
+//TLSClientConfig:     endpoint.TLSConfig,
+//DisableKeepAlives:   true,
+//}
+
+//modifiers := registry.DockerHeaders(dockerversion.DockerUserAgent(nil), http.Header{})
+//}
