@@ -29,17 +29,18 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/distribution"
+	"github.com/Senetas/crypto-cli/registry/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
 // PushImage pushes the config, layers and mainifest to the nominated registry, in that order
 func PushImage(
 	token string,
-	ref NamedTaggedRepository,
+	ref types.NamedTaggedRepository,
 	manifest *distribution.ImageManifest,
 	endpoint *registry.APIEndpoint,
 ) error {
-	trimed := trimNamed(ref)
+	trimed := types.TrimNamed(ref)
 
 	if err := PushLayer(token, trimed, manifest.Config, endpoint); err != nil {
 		return err
@@ -122,8 +123,8 @@ func PushLayer(
 	layerData *distribution.Layer,
 	endpoint *registry.APIEndpoint,
 ) (err error) {
-	sep := seperateRepository(ref)
-	dig := digestedReference{sep, *layerData.Digest}
+	sep := types.SeperateRepository(ref)
+	dig := types.AppendDigest(sep, *layerData.Digest)
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
 	layerExists, err := checkLayer(token, dig, bldr)

@@ -22,7 +22,7 @@ import (
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/images"
-	"github.com/Senetas/crypto-cli/registry"
+	"github.com/Senetas/crypto-cli/registry/types"
 )
 
 func TestEncDecImage(t *testing.T) {
@@ -31,7 +31,7 @@ func TestEncDecImage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ref2, err := registry.ResolveNamed(ref)
+	ref2, err := types.CastToTagged(ref)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -24,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/Senetas/crypto-cli/registry"
+	"github.com/Senetas/crypto-cli/registry/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
@@ -72,7 +73,7 @@ func (c *Challenge) buildURL() *url.URL {
 
 // ChallengeHeader requests the challenge header from the auth server
 func ChallengeHeader(
-	ref registry.NamedRepository,
+	ref types.NamedRepository,
 	repoInfo dregistry.RepositoryInfo,
 	endpoint dregistry.APIEndpoint,
 	creds Credentials,

@@ -54,8 +54,8 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 	defer close(errChan)
 	defer close(errChan2)
 
-	go registry.PullImage(ctx, token.String(), *nTRep, endpoint, dir, manChan, errChan)
-	go DecryptManifest(cancel, manChan, *nTRep, passphrase, cryptotype, manChan2, errChan2)
+	go registry.PullImage(ctx, token.String(), nTRep, endpoint, dir, manChan, errChan)
+	go DecryptManifest(cancel, manChan, nTRep, passphrase, cryptotype, manChan2, errChan2)
 
 	errs := make(utils.Errors, 0)
 	var manifest *distribution.ImageManifest
@@ -80,7 +80,7 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 		return errs
 	}
 
-	tarball, err := Manifest2Tar(manifest, *nTRep, passphrase, cryptotype)
+	tarball, err := Manifest2Tar(manifest, nTRep, passphrase, cryptotype)
 	if err != nil {
 		return err
 	}

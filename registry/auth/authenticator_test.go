@@ -21,6 +21,7 @@ import (
 
 	"github.com/Senetas/crypto-cli/registry"
 	"github.com/Senetas/crypto-cli/registry/auth"
+	"github.com/Senetas/crypto-cli/registry/types"
 	"github.com/docker/distribution/reference"
 	dregistry "github.com/docker/docker/registry"
 	"github.com/rs/zerolog"
@@ -61,7 +62,7 @@ func TestChallenger(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	nTRep, err := registry.ResolveNamed(ref)
+	nTRep, err := types.CastToTagged(ref)
 	if err != nil {
 		t.Fatal(err)
 	}

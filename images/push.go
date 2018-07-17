@@ -31,13 +31,13 @@ func PushImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 		return err
 	}
 
-	manifest, err := CreateManifest(*nTRep, passphrase, cryptotype)
+	manifest, err := CreateManifest(nTRep, passphrase, cryptotype)
 	if err != nil {
 		return err
 	}
 
 	// Upload to registry
-	if err = registry.PushImage(token.String(), *nTRep, manifest, endpoint); err != nil {
+	if err = registry.PushImage(token.String(), nTRep, manifest, endpoint); err != nil {
 		return err
 	}
 
