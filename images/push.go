@@ -37,7 +37,7 @@ func PushImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 	}
 
 	// Upload to registry
-	if err = registry.PushImage(token, *nTRep, manifest, endpoint); err != nil {
+	if err = registry.PushImage(token.String(), *nTRep, manifest, endpoint); err != nil {
 		return err
 	}
 

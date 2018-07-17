@@ -118,7 +118,7 @@ func PullManifest(
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	resp, err := doRequest(defaultClient, req, true, true)
+	resp, err := DoRequest(DefaultClient, req, true, true)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +167,7 @@ func PullFromDigest(
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	resp, err := doRequest(defaultClient, req, true, false)
+	resp, err := DoRequest(DefaultClient, req, true, false)
 	if err != nil {
 		return "", err
 	}
