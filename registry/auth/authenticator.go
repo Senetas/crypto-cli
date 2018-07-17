@@ -16,11 +16,9 @@ package auth
 
 import (
 	"net/http"
-	"net/http/httputil"
 
 	"github.com/Senetas/crypto-cli/utils"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 )
 
 // Authenticator produces a Bearer token to authenticate with the HTTP API
@@ -41,28 +39,6 @@ func NewAuthenticator(client *http.Client, credentials Credentials) Authenticato
 	}
 }
 
-func doRequest(client *http.Client, req *http.Request, dumpReqBody, dumpRespBody bool) (*http.Response, error) {
-	dump, err := httputil.DumpRequestOut(req, dumpReqBody)
-	if err != nil {
-		return nil, errors.Wrapf(err, "%#v", req)
-	}
-	log.Debug().Msg(req.URL.String())
-	log.Debug().Msgf("%s", dump)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		err = errors.Wrapf(err, "%#v", req)
-	}
-
-	dump, err = httputil.DumpResponse(resp, dumpRespBody)
-	if err != nil {
-		return nil, errors.Wrapf(err, "%#v", resp)
-	}
-	log.Debug().Msgf("%s", dump)
-
-	return resp, err
-}
-
 func (a *authenticator) Authenticate(c *Challenge) (Token, error) {
 	reqURL := c.buildURL()
 	req, err := http.NewRequest("GET", reqURL.String(), nil)
@@ -76,7 +52,7 @@ func (a *authenticator) Authenticate(c *Challenge) (Token, error) {
 	}
 
 	//resp, err := a.httpClient.Do(req)
-	resp, err := doRequest(a.httpClient, req, true, true)
+	resp, err := a.httpClient.Do(req)
 	if err != nil {
 		return nil, errors.Wrapf(err, "req = %#v", req)
 	}
