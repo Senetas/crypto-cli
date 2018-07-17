@@ -97,7 +97,7 @@ func PushManifest(
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	resp, err := doRequest(defaultClient, req, true, true)
+	resp, err := DoRequest(DefaultClient, req, true, true)
 	if err != nil {
 		return "", err
 	}
@@ -151,7 +151,7 @@ func PushLayer(
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	resp, err := doRequest(defaultClient, req, true, true)
+	resp, err := DoRequest(DefaultClient, req, true, true)
 	if err != nil {
 		return err
 	}
@@ -203,7 +203,7 @@ func PushLayer(
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	resp, err = doRequest(defaultClient, req, false, true)
+	resp, err = DoRequest(DefaultClient, req, false, true)
 	if err != nil {
 		return err
 	}
@@ -231,7 +231,7 @@ func checkLayer(token string, ref reference.Canonical, bldr *v2.URLBuilder) (b b
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	resp, err := doRequest(defaultClient, req, true, true)
+	resp, err := DoRequest(DefaultClient, req, true, true)
 	if err != nil {
 		return false, errors.Wrapf(err, "%v", req)
 	}

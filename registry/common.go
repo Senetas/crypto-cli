@@ -23,19 +23,21 @@ import (
 )
 
 var (
+	// DefaultClient is a http client with timeouts set
+	DefaultClient = &http.Client{
+		Timeout:   10 * time.Second,
+		Transport: defaultTransport,
+	}
 	defaultTransport = &http.Transport{
 		Dial: (&net.Dialer{
 			Timeout: 5 * time.Second,
 		}).Dial,
 		TLSHandshakeTimeout: 5 * time.Second,
 	}
-	defaultClient = &http.Client{
-		Timeout:   10 * time.Second,
-		Transport: defaultTransport,
-	}
 )
 
-func doRequest(client *http.Client, req *http.Request, dumpReqBody, dumpRespBody bool) (*http.Response, error) {
+// DoRequest wraps http.Client.Do but dumps the request and response with optional bodies
+func DoRequest(client *http.Client, req *http.Request, dumpReqBody, dumpRespBody bool) (*http.Response, error) {
 	//dump, err := httputil.DumpRequestOut(req, dumpReqBody)
 	//if err != nil {
 	//return nil, errors.Wrapf(err, "%#v", req)
@@ -56,19 +58,3 @@ func doRequest(client *http.Client, req *http.Request, dumpReqBody, dumpRespBody
 
 	return resp, err
 }
-
-//func mkHTTPClient(repoInfo *registry.RepositoryInfo, endpoint *registry.APIEndpoint) (*http.Client, error) {
-//transport := &http.Transport{
-//Proxy: http.ProxyFromEnvironment,
-//Dial: (&net.Dialer{
-//Timeout:   30 * time.Second,
-//KeepAlive: 30 * time.Second,
-//DualStack: true,
-//}).Dial,
-//TLSHandshakeTimeout: 10 * time.Second,
-//TLSClientConfig:     endpoint.TLSConfig,
-//DisableKeepAlives:   true,
-//}
-
-//modifiers := registry.DockerHeaders(dockerversion.DockerUserAgent(nil), http.Header{})
-//}

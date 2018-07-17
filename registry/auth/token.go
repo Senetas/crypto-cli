@@ -14,6 +14,13 @@
 
 package auth
 
+import (
+	"encoding/json"
+	"io"
+
+	"github.com/pkg/errors"
+)
+
 // Token is the Bearer token to be used with API calls
 type Token interface {
 	String() string
@@ -21,21 +28,26 @@ type Token interface {
 }
 
 type token struct {
-	val   string
+	Token string `json:"token"`
 	fresh bool
 }
 
 func (t *token) String() string {
-	return t.val
+	return t.Token
 }
 
 func (t *token) Fresh() bool {
 	return t.fresh
 }
 
-func newToken(val string, fresh bool) Token {
-	return &token{
-		val:   val,
-		fresh: fresh,
+func decodeRespose(respBody io.Reader) (Token, error) {
+	t := &token{}
+	dec := json.NewDecoder(respBody)
+	if err := dec.Decode(&t); err != nil {
+		return nil, errors.Wrapf(err, "could not decode response from auth server")
 	}
+	if t.Token == "" {
+		return nil, errors.New("malformed response from auth server")
+	}
+	return t, nil
 }

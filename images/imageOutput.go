@@ -182,8 +182,6 @@ func findLayers(
 		layerSet[x] = true
 	}
 
-	log.Debug().Msgf("layerSet = %+v", layerSet)
-
 	// read the archive manifest
 	manifestfile := filepath.Join(path, "manifest.json")
 	manifestFH, err := os.Open(manifestfile)
@@ -229,10 +227,8 @@ func findLayers(
 			return nil, nil, errors.Wrapf(err, "could not calculate digest: %s", basename)
 		}
 
-		log.Debug().Msgf("diffID = %s", d.String())
-
 		if layerSet[d.String()] {
-			log.Debug().Msgf("encrypting %s", d)
+			log.Info().Msgf("encrypting %s", d)
 			filename, d, size, key, err := encryptLayer(basename)
 			if err != nil {
 				return nil, nil, err

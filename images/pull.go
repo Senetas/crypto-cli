@@ -54,7 +54,7 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 	defer close(errChan)
 	defer close(errChan2)
 
-	go registry.PullImage(ctx, token, *nTRep, endpoint, dir, manChan, errChan)
+	go registry.PullImage(ctx, token.String(), *nTRep, endpoint, dir, manChan, errChan)
 	go DecryptManifest(cancel, manChan, *nTRep, passphrase, cryptotype, manChan2, errChan2)
 
 	errs := make(utils.Errors, 0)
@@ -90,19 +90,4 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 	}
 
 	return nil
-}
-
-// cleanup temporary files
-func cleanup(dir string, err error) error {
-	if dir == "" {
-		return err
-	}
-	if err2 := os.RemoveAll(dir); err2 != nil {
-		err2 = errors.Wrapf(err, "could not clean up temp files in: %s", dir)
-		if err == nil {
-			return err2
-		}
-		return utils.Errors{err, err2}
-	}
-	return err
 }

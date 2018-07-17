@@ -17,6 +17,7 @@ package auth
 import (
 	"net/http"
 
+	"github.com/Senetas/crypto-cli/registry"
 	"github.com/Senetas/crypto-cli/utils"
 	"github.com/pkg/errors"
 )
@@ -46,13 +47,9 @@ func (a *authenticator) Authenticate(c *Challenge) (Token, error) {
 		return nil, errors.Wrapf(err, "url = %s", reqURL)
 	}
 
-	req, err = a.credentials.SetAuth(req)
-	if err != nil {
-		return nil, err
-	}
+	req = a.credentials.SetAuth(req)
 
-	//resp, err := a.httpClient.Do(req)
-	resp, err := a.httpClient.Do(req)
+	resp, err := registry.DoRequest(a.httpClient, req, true, true)
 	if err != nil {
 		return nil, errors.Wrapf(err, "req = %#v", req)
 	}
@@ -65,10 +62,5 @@ func (a *authenticator) Authenticate(c *Challenge) (Token, error) {
 		return nil, errors.Errorf("authentication failed with status: %s", resp.Status)
 	}
 
-	decodedResp, err := decodeRespose(resp.Body)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error decoding response: %#v", resp)
-	}
-
-	return newToken(decodedResp.Token, true), nil
+	return decodeRespose(resp.Body)
 }

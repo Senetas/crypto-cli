@@ -15,10 +15,16 @@
 package auth
 
 import (
+	"net/http"
 	"net/url"
 	"regexp"
 
+	"github.com/docker/distribution/registry/api/v2"
+	dregistry "github.com/docker/docker/registry"
 	"github.com/pkg/errors"
+
+	"github.com/Senetas/crypto-cli/registry"
+	"github.com/Senetas/crypto-cli/utils"
 )
 
 var challengeRE = regexp.MustCompile(`^\s*Bearer\s+realm="([^"]+)",service="([^"]+)"(,scope="([^"]+)")?\s*$`)
@@ -58,7 +64,47 @@ func (c *Challenge) buildURL() *url.URL {
 		authParams.Set("scope", c.scope)
 	}
 
+	//authURL.RawQuery, _ = url.QueryUnescape(authParams.Encode())
 	authURL.RawQuery = authParams.Encode()
 
 	return &authURL
+}
+
+// ChallengeHeader requests the challenge header from the auth server
+func ChallengeHeader(
+	ref registry.NamedRepository,
+	repoInfo dregistry.RepositoryInfo,
+	endpoint dregistry.APIEndpoint,
+	creds Credentials,
+) (string, error) {
+	bldr := v2.NewURLBuilder(endpoint.URL, false)
+
+	urlStr, err := bldr.BuildManifestURL(ref)
+	if err != nil {
+		return "", errors.Wrapf(err, "base = %s", endpoint.URL)
+	}
+
+	req, err := http.NewRequest("PUT", urlStr, nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := registry.DoRequest(registry.DefaultClient, req, true, true)
+	if err != nil {
+		return "", err
+	}
+	defer func() { err = utils.CheckedClose(resp.Body, err) }()
+
+	var auth string
+	if resp.StatusCode == http.StatusUnauthorized {
+		auth = resp.Header.Get("Www-Authenticate")
+		if auth == "" {
+			return "", errors.New("login error")
+		}
+	} else if resp.StatusCode == http.StatusOK {
+		return "", nil
+	} else {
+		return "", errors.New("login not supported")
+	}
+	return auth, nil
 }
