@@ -30,6 +30,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/distribution"
+	"github.com/Senetas/crypto-cli/registry/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
@@ -147,8 +148,8 @@ func PullFromDigest(
 	bldr *v2.URLBuilder,
 	dir string,
 ) (fn string, err error) {
-	sep := seperateRepository(ref)
-	can := digestedReference{sep, *d}
+	sep := types.SeperateRepository(ref)
+	can := types.AppendDigest(sep, *d)
 
 	urlStr, err := bldr.BuildBlobURL(can)
 	if err != nil {
@@ -173,7 +174,7 @@ func PullFromDigest(
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", errors.New("Failed to download blob " + d.String())
+		return "", errors.Errorf("Failed to download blob %s", d)
 	}
 
 	fn = filepath.Join(dir, d.Encoded())

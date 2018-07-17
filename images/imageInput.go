@@ -30,7 +30,7 @@ import (
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
-	"github.com/Senetas/crypto-cli/registry"
+	"github.com/Senetas/crypto-cli/registry/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
@@ -39,7 +39,7 @@ import (
 func DecryptManifest(
 	cancel context.CancelFunc,
 	manIn <-chan *distribution.ImageManifest,
-	ref registry.NamedTaggedRepository,
+	ref types.NamedTaggedRepository,
 	passphrase string,
 	cryptotype crypto.EncAlgo,
 	manOut chan<- *distribution.ImageManifest,
@@ -78,7 +78,7 @@ func DecryptManifest(
 // be loaded with docker load. It downloads and decrypts the config and layers if necessary
 func Manifest2Tar(
 	manifest *distribution.ImageManifest,
-	ref registry.NamedTaggedRepository,
+	ref types.NamedTaggedRepository,
 	passphrase string,
 	cryptotype crypto.EncAlgo,
 ) (tarball string, err error) {

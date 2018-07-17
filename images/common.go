@@ -27,6 +27,7 @@ import (
 
 	"github.com/Senetas/crypto-cli/registry"
 	"github.com/Senetas/crypto-cli/registry/auth"
+	"github.com/Senetas/crypto-cli/registry/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
@@ -41,7 +42,7 @@ var tempRoot = filepath.Join(os.TempDir(), "com.senetas.crypto")
 
 // useTLS determines whether the registry requires TLS
 func useTLS(
-	ref registry.NamedRepository,
+	ref types.NamedRepository,
 	repoInfo dregistry.RepositoryInfo,
 	endpoint dregistry.APIEndpoint,
 ) (bool, error) {
@@ -90,11 +91,11 @@ func useTLS(
 
 func authProcedure(ref reference.Named) (
 	auth.Token,
-	*registry.NamedTaggedRepository,
+	types.NamedTaggedRepository,
 	*dregistry.APIEndpoint,
 	error,
 ) {
-	nTRep, err := registry.ResolveNamed(ref)
+	nTRep, err := types.CastToTagged(ref)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -115,7 +116,7 @@ func authProcedure(ref reference.Named) (
 		return nil, nil, nil, err
 	}
 	if !tls {
-		return nil, &nTRep, &endpoint, nil
+		return nil, nTRep, &endpoint, nil
 	}
 
 	creds, err := auth.NewDefaultCreds(repoInfo)
@@ -135,7 +136,7 @@ func authProcedure(ref reference.Named) (
 		return nil, nil, nil, err
 	}
 
-	return token, &nTRep, &endpoint, nil
+	return token, nTRep, &endpoint, nil
 }
 
 // cleanup temporary files
