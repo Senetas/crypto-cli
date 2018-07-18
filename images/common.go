@@ -127,6 +127,10 @@ func authProcedure(ref reference.Named) (
 
 	authenticator := auth.NewAuthenticator(httpclient.DefaultClient, creds)
 	header, err := auth.ChallengeHeader(nTRep, *repoInfo, endpoint, creds)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	ch, err := auth.ParseChallengeHeader(header)
 	if err != nil {
 		return nil, nil, nil, err

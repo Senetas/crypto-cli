@@ -20,12 +20,15 @@ import (
 	"path/filepath"
 
 	"github.com/docker/distribution/reference"
+	"github.com/docker/distribution/registry/client/auth"
+	dregistry "github.com/docker/docker/registry"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/registry"
+	"github.com/Senetas/crypto-cli/registry/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
@@ -37,11 +40,35 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 	}
 
 	dir := filepath.Join(tempRoot, uuid.New().String())
-	if err = os.MkdirAll(dir, 0755); err != nil {
+	if err = os.MkdirAll(dir, 0700); err != nil {
 		return errors.Wrapf(err, "dir = %s", dir)
 	}
 	defer func() { err = cleanup(dir, err) }()
 
+	manifest, err := pullAndDecrypt(nTRep, token, endpoint, dir, passphrase, cryptotype)
+	if err != nil {
+		return err
+	}
+
+	tarball, err := Manifest2Tar(manifest, nTRep, passphrase, cryptotype)
+	if err != nil {
+		return err
+	}
+
+	if err = importImage(tarball); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func pullAndDecrypt(
+	nTRep types.NamedTaggedRepository,
+	token auth.Scope,
+	endpoint *dregistry.APIEndpoint,
+	dir, passphrase string,
+	cryptotype crypto.EncAlgo,
+) (*distribution.ImageManifest, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// TODO: make this more light weight and SAFE!
@@ -76,18 +103,10 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 		default:
 		}
 	}
+
 	if len(errs) != 0 {
-		return errs
+		return nil, errs
 	}
 
-	tarball, err := Manifest2Tar(manifest, nTRep, passphrase, cryptotype)
-	if err != nil {
-		return err
-	}
-
-	if err = importImage(tarball); err != nil {
-		return err
-	}
-
-	return nil
+	return manifest, nil
 }

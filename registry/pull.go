@@ -24,6 +24,7 @@ import (
 
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/v2"
+	dauth "github.com/docker/distribution/registry/client/auth"
 	"github.com/docker/docker/registry"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -39,7 +40,7 @@ import (
 // PullImage pulls an image from a remote repository
 func PullImage(
 	ctx context.Context,
-	token auth.Token,
+	token dauth.Scope,
 	ref reference.Named,
 	endpoint *registry.APIEndpoint,
 	downloadDir string,
@@ -100,7 +101,7 @@ func PullImage(
 
 // PullManifest pulls a manifest from the registry and parses it
 func PullManifest(
-	token auth.Token,
+	token dauth.Scope,
 	ref reference.Named,
 	bldr *v2.URLBuilder,
 ) (manifest *distribution.ImageManifest, err error) {
@@ -142,7 +143,7 @@ func PullManifest(
 // It verifies that the downloaded matches its digest, deleting if if it does not
 func PullFromDigest(
 	ctx context.Context,
-	token auth.Token,
+	token dauth.Scope,
 	ref reference.Named,
 	d *digest.Digest,
 	bldr *v2.URLBuilder,
@@ -200,7 +201,7 @@ func PullFromDigest(
 	return fn, nil
 }
 
-func quitUnVerified(fn string, fh *os.File, err error) (string, error) {
+func quitUnVerified(fn string, fh io.Closer, err error) (string, error) {
 	if err2 := os.Remove(fn); err != nil {
 		return "",
 			errors.Wrapf(

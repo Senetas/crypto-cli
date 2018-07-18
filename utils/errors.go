@@ -69,8 +69,12 @@ func (es Errors) Error() string {
 	}
 
 	for ; i < len(es); i++ {
-		msg.WriteString("\n")
-		msg.WriteString(es[i].Error())
+		if _, err := msg.WriteString("\n"); err != nil {
+			return "buffer became too large"
+		}
+		if _, err := msg.WriteString(es[i].Error()); err != nil {
+			return "buffer became too large"
+		}
 	}
 
 	return msg.String()
