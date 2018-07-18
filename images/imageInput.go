@@ -15,11 +15,9 @@
 package images
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -69,6 +67,7 @@ func DecryptManifest(
 			}
 		}
 	}
+
 	errChan <- nil
 	manOut <- manifest
 	log.Info().Msg("finished decryption of keys")
@@ -153,20 +152,15 @@ func Manifest2Tar(
 		archiveManifest.Layers[i] = d.Hex() + ".tar"
 	}
 
-	amJSON, err := json.Marshal([]*distribution.ArchiveManifest{archiveManifest})
-	if err != nil {
-		return "", errors.Wrapf(err, "archive manifest = %v", archiveManifest)
-	}
-
 	manifestfile := filepath.Join(newDir, "manifest.json")
-	amr := bytes.NewReader(amJSON)
 	amFH, err := os.Create(manifestfile)
 	if err != nil {
 		return "", errors.Wrapf(err, "filename = %s", manifestfile)
 	}
 
-	if _, err = io.Copy(amFH, amr); err != nil {
-		return "", errors.Wrap(err, "")
+	enc := json.NewEncoder(amFH)
+	if err = enc.Encode(&[]*distribution.ArchiveManifest{archiveManifest}); err != nil {
+		return "", errors.Wrapf(err, "%#v", archiveManifest)
 	}
 
 	path := filepath.Join(newDir, "*")
