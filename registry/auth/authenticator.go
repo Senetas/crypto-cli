@@ -17,7 +17,7 @@ package auth
 import (
 	"net/http"
 
-	"github.com/Senetas/crypto-cli/registry"
+	"github.com/Senetas/crypto-cli/registry/httpclient"
 	"github.com/Senetas/crypto-cli/utils"
 	"github.com/pkg/errors"
 )
@@ -49,7 +49,7 @@ func (a *authenticator) Authenticate(c *Challenge) (Token, error) {
 
 	req = a.credentials.SetAuth(req)
 
-	resp, err := registry.DoRequest(a.httpClient, req, true, true)
+	resp, err := httpclient.DoRequest(a.httpClient, req, true, true)
 	if err != nil {
 		return nil, errors.Wrapf(err, "req = %#v", req)
 	}

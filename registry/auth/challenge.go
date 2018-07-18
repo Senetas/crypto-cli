@@ -23,7 +23,7 @@ import (
 	dregistry "github.com/docker/docker/registry"
 	"github.com/pkg/errors"
 
-	"github.com/Senetas/crypto-cli/registry"
+	"github.com/Senetas/crypto-cli/registry/httpclient"
 	"github.com/Senetas/crypto-cli/registry/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
@@ -90,7 +90,7 @@ func ChallengeHeader(
 		return "", err
 	}
 
-	resp, err := registry.DoRequest(registry.DefaultClient, req, true, true)
+	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
 	if err != nil {
 		return "", err
 	}

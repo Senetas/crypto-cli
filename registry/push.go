@@ -29,13 +29,15 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/distribution"
+	"github.com/Senetas/crypto-cli/registry/auth"
+	"github.com/Senetas/crypto-cli/registry/httpclient"
 	"github.com/Senetas/crypto-cli/registry/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
 // PushImage pushes the config, layers and mainifest to the nominated registry, in that order
 func PushImage(
-	token string,
+	token auth.Token,
 	ref types.NamedTaggedRepository,
 	manifest *distribution.ImageManifest,
 	endpoint *registry.APIEndpoint,
@@ -63,7 +65,7 @@ func PushImage(
 
 // PushManifest puts a manifest on the registry
 func PushManifest(
-	token string,
+	token auth.Token,
 	ref reference.Named,
 	manifest *distribution.ImageManifest,
 	endpoint *registry.APIEndpoint,
@@ -94,11 +96,9 @@ func PushManifest(
 	req.Header.Set("Accept", "application/json, */*")
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	req.Header.Set("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
+	auth.AddToReqest(token, req)
 
-	resp, err := DoRequest(DefaultClient, req, true, true)
+	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
 	if err != nil {
 		return "", err
 	}
@@ -118,7 +118,7 @@ func PushManifest(
 
 // PushLayer pushes a layer to the registry, checking if it exists
 func PushLayer(
-	token string,
+	token auth.Token,
 	ref reference.Named,
 	layerData *distribution.Layer,
 	endpoint *registry.APIEndpoint,
@@ -148,11 +148,9 @@ func PushLayer(
 		return errors.Wrapf(err, "could not make req = %v", req)
 	}
 
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
+	auth.AddToReqest(token, req)
 
-	resp, err := DoRequest(DefaultClient, req, true, true)
+	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
 	if err != nil {
 		return err
 	}
@@ -200,11 +198,9 @@ func PushLayer(
 
 	req.Header.Add("Content-Length", strconv.FormatInt(layerData.Size, 10))
 	req.Header.Add("Content-Type", "application/octect-stream")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
+	auth.AddToReqest(token, req)
 
-	resp, err = DoRequest(DefaultClient, req, false, true)
+	resp, err = httpclient.DoRequest(httpclient.DefaultClient, req, false, true)
 	if err != nil {
 		return err
 	}
@@ -217,7 +213,7 @@ func PushLayer(
 	return nil
 }
 
-func checkLayer(token string, ref reference.Canonical, bldr *v2.URLBuilder) (b bool, err error) {
+func checkLayer(token auth.Token, ref reference.Canonical, bldr *v2.URLBuilder) (b bool, err error) {
 	layerURLStr, err := bldr.BuildBlobURL(ref)
 	if err != nil {
 		return false, errors.Wrapf(err, "%#v", ref)
@@ -228,11 +224,9 @@ func checkLayer(token string, ref reference.Canonical, bldr *v2.URLBuilder) (b b
 		return false, errors.Wrapf(err, "%v", layerURLStr)
 	}
 
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
+	auth.AddToReqest(token, req)
 
-	resp, err := DoRequest(DefaultClient, req, true, true)
+	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
 	if err != nil {
 		return false, errors.Wrapf(err, "%v", req)
 	}

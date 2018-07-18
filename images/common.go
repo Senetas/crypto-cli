@@ -27,6 +27,7 @@ import (
 
 	"github.com/Senetas/crypto-cli/registry"
 	"github.com/Senetas/crypto-cli/registry/auth"
+	"github.com/Senetas/crypto-cli/registry/httpclient"
 	"github.com/Senetas/crypto-cli/registry/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
@@ -59,12 +60,12 @@ func useTLS(
 		return false, errors.Wrapf(err, "url = %s", urlStr)
 	}
 
-	httpClient := *registry.DefaultClient
+	httpClient := *httpclient.DefaultClient
 	httpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		return http.ErrUseLastResponse
 	}
 
-	resp, err := registry.DoRequest(&httpClient, req, true, false)
+	resp, err := httpclient.DoRequest(&httpClient, req, true, false)
 	if err != nil {
 		return false, err
 	}
@@ -124,7 +125,7 @@ func authProcedure(ref reference.Named) (
 		return nil, nil, nil, err
 	}
 
-	authenticator := auth.NewAuthenticator(registry.DefaultClient, creds)
+	authenticator := auth.NewAuthenticator(httpclient.DefaultClient, creds)
 	header, err := auth.ChallengeHeader(nTRep, *repoInfo, endpoint, creds)
 	ch, err := auth.ParseChallengeHeader(header)
 	if err != nil {
