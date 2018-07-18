@@ -16,7 +16,9 @@ package auth
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
+	"net/http"
 
 	"github.com/pkg/errors"
 )
@@ -50,4 +52,11 @@ func decodeRespose(respBody io.Reader) (Token, error) {
 		return nil, errors.New("malformed response from auth server")
 	}
 	return t, nil
+}
+
+// AddToReqest adds a token as a Bearer Authorization of a request
+func AddToReqest(t Token, req *http.Request) {
+	if t != nil && t.String() != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", t))
+	}
 }

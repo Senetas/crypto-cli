@@ -54,7 +54,7 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 	defer close(errChan)
 	defer close(errChan2)
 
-	go registry.PullImage(ctx, token.String(), nTRep, endpoint, dir, manChan, errChan)
+	go registry.PullImage(ctx, token, nTRep, endpoint, dir, manChan, errChan)
 	go DecryptManifest(cancel, manChan, nTRep, passphrase, cryptotype, manChan2, errChan2)
 
 	errs := make(utils.Errors, 0)

@@ -30,6 +30,8 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/distribution"
+	"github.com/Senetas/crypto-cli/registry/auth"
+	"github.com/Senetas/crypto-cli/registry/httpclient"
 	"github.com/Senetas/crypto-cli/registry/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
@@ -37,7 +39,7 @@ import (
 // PullImage pulls an image from a remote repository
 func PullImage(
 	ctx context.Context,
-	token string,
+	token auth.Token,
 	ref reference.Named,
 	endpoint *registry.APIEndpoint,
 	downloadDir string,
@@ -98,7 +100,7 @@ func PullImage(
 
 // PullManifest pulls a manifest from the registry and parses it
 func PullManifest(
-	token string,
+	token auth.Token,
 	ref reference.Named,
 	bldr *v2.URLBuilder,
 ) (manifest *distribution.ImageManifest, err error) {
@@ -115,11 +117,9 @@ func PullManifest(
 	// TODO: Handle list manifests
 	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
+	auth.AddToReqest(token, req)
 
-	resp, err := DoRequest(DefaultClient, req, true, true)
+	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func PullManifest(
 // It verifies that the downloaded matches its digest, deleting if if it does not
 func PullFromDigest(
 	ctx context.Context,
-	token string,
+	token auth.Token,
 	ref reference.Named,
 	d *digest.Digest,
 	bldr *v2.URLBuilder,
@@ -164,11 +164,9 @@ func PullFromDigest(
 
 	req.Header.Set("Accept", "application/vnd.docker.image.rootfs.diff.tar.gzip")
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
+	auth.AddToReqest(token, req)
 
-	resp, err := DoRequest(DefaultClient, req, true, false)
+	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, false)
 	if err != nil {
 		return "", err
 	}

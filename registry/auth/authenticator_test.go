@@ -15,12 +15,12 @@
 package auth_test
 
 import (
-	"net/http"
 	"os"
 	"testing"
 
 	"github.com/Senetas/crypto-cli/registry"
 	"github.com/Senetas/crypto-cli/registry/auth"
+	"github.com/Senetas/crypto-cli/registry/httpclient"
 	"github.com/Senetas/crypto-cli/registry/types"
 	"github.com/docker/distribution/reference"
 	dregistry "github.com/docker/docker/registry"
@@ -44,7 +44,7 @@ func TestAuthenticator(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	a := auth.NewAuthenticator(http.DefaultClient, creds)
+	a := auth.NewAuthenticator(httpclient.DefaultClient, creds)
 	ch, err := auth.ParseChallengeHeader(`Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:narthanaepa1:pull,push"`)
 	if err != nil {
 		t.Fatal(err)
@@ -84,7 +84,7 @@ func TestChallenger(t *testing.T) {
 
 	header, err := auth.ChallengeHeader(nTRep, *repoInfo, endpoint, creds)
 
-	a := auth.NewAuthenticator(registry.DefaultClient, creds)
+	a := auth.NewAuthenticator(httpclient.DefaultClient, creds)
 	ch, err := auth.ParseChallengeHeader(header)
 	if err != nil {
 		t.Fatal(err)
