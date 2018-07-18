@@ -30,25 +30,7 @@ import (
 func TestFile(t *testing.T) {
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto")
 
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		t.Error(err)
-	}
-
-	fn := filepath.Join(dir, "plain")
-	fh, err := os.Create(fn)
-	if err != nil {
-		t.Error(err)
-	}
-
-	r := rand.Reader
-	_, err = io.CopyN(fh, r, 1024)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if err = fh.Close(); err != nil {
-		t.Log(err)
-	}
+	fn := mkTempFile(t, dir)
 
 	encpath := filepath.Join(dir, "enc")
 	decpath := filepath.Join(dir, "dec")
@@ -75,26 +57,54 @@ func TestFile(t *testing.T) {
 	}
 
 	if !equal {
-		fha, err := os.Open(fn)
-		if err != nil {
-			t.Error(err)
-		}
-		a, err := ioutil.ReadAll(fha)
-		if err != nil {
-			t.Error(err)
-		}
-		fhb, err := os.Open(decpath)
-		if err != nil {
-			t.Error(err)
-		}
-		b, err := ioutil.ReadAll(fhb)
-		if err != nil {
-			t.Error(err)
-		}
-		t.Errorf("decryption is not inverting encryption:\nPlaintext: %v\nDecrypted: %v", a, b)
+		handleError(t, fn, decpath)
 	}
 
 	if err = os.RemoveAll(dir); err != nil {
 		t.Logf(err.Error())
 	}
+
+}
+
+func mkTempFile(t *testing.T, dir string) string {
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Error(err)
+	}
+
+	fn := filepath.Join(dir, "plain")
+	fh, err := os.Create(fn)
+	if err != nil {
+		t.Error(err)
+	}
+
+	r := rand.Reader
+	_, err = io.CopyN(fh, r, 1024)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if err = fh.Close(); err != nil {
+		t.Log(err)
+	}
+	return fn
+}
+
+func handleError(t *testing.T, fn, decpath string) {
+	fha, err := os.Open(fn)
+	if err != nil {
+		t.Error(err)
+	}
+	a, err := ioutil.ReadAll(fha)
+	if err != nil {
+		t.Error(err)
+	}
+	fhb, err := os.Open(decpath)
+	if err != nil {
+		t.Error(err)
+	}
+	b, err := ioutil.ReadAll(fhb)
+	if err != nil {
+		t.Error(err)
+	}
+	t.Errorf("decryption is not inverting encryption:\nPlaintext: %v\nDecrypted: %v", a, b)
 }

@@ -83,6 +83,9 @@ func TestChallenger(t *testing.T) {
 	}
 
 	header, err := auth.ChallengeHeader(nTRep, *repoInfo, endpoint, creds)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	a := auth.NewAuthenticator(httpclient.DefaultClient, creds)
 	ch, err := auth.ParseChallengeHeader(header)

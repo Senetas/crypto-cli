@@ -71,11 +71,12 @@ func Enckey(plaintext []byte, pass, salt string) ([]byte, error) {
 	}
 
 	nonce := make([]byte, 12)
-	if _, err := rand.Read(nonce); err != nil {
+	if _, err = rand.Read(nonce); err != nil {
 		return nil, utils.ErrEncrypt
 	}
 
-	aesgcm, err := cipher.NewGCM(block)
+	var aesgcm cipher.AEAD
+	aesgcm, err = cipher.NewGCM(block)
 	if err != nil {
 		return nil, utils.ErrEncrypt
 	}

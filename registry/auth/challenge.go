@@ -19,12 +19,12 @@ import (
 	"net/url"
 	"regexp"
 
+	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/v2"
 	dregistry "github.com/docker/docker/registry"
 	"github.com/pkg/errors"
 
 	"github.com/Senetas/crypto-cli/registry/httpclient"
-	"github.com/Senetas/crypto-cli/registry/types"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
@@ -73,7 +73,7 @@ func (c *Challenge) buildURL() *url.URL {
 
 // ChallengeHeader requests the challenge header from the auth server
 func ChallengeHeader(
-	ref types.NamedRepository,
+	ref reference.Named,
 	repoInfo dregistry.RepositoryInfo,
 	endpoint dregistry.APIEndpoint,
 	creds Credentials,

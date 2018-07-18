@@ -21,7 +21,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/docker/distribution/registry/client/auth"
 	"github.com/docker/docker/client"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	tarinator "github.com/verybluebot/tarinator-go"
@@ -77,46 +79,23 @@ func DecryptManifest(
 // be loaded with docker load. It downloads and decrypts the config and layers if necessary
 func Manifest2Tar(
 	manifest *distribution.ImageManifest,
-	ref types.NamedTaggedRepository,
+	ref auth.Scope,
 	passphrase string,
 	cryptotype crypto.EncAlgo,
 ) (tarball string, err error) {
 	dir := filepath.Dir(manifest.Config.Filename)
-	if err = os.MkdirAll(dir, 0755); err != nil {
+	if err = os.MkdirAll(dir, 0700); err != nil {
 		return "", errors.Wrapf(err, "dir name = %s", dir)
 	}
 
-	// decrypt config file
-	if err = crypto.DecFile(
-		manifest.Config.Filename,
-		manifest.Config.Filename+".dec",
-		manifest.Config.Crypto.DecKey,
-	); err != nil {
-		return "", err
-	}
-
-	// decompress config file
-	d, err := utils.Decompress(manifest.Config.Filename + ".dec")
-	if err != nil {
-		return "", err
-	}
-
 	newDir := filepath.Join(dir, "new")
-	if err = os.MkdirAll(newDir, 0755); err != nil {
+	if err = os.MkdirAll(newDir, 0700); err != nil {
 		return "", errors.Wrapf(err, "dir name = %s", newDir)
 	}
 
-	conffile := d.Hex() + ".json"
-	if err = os.Rename(
-		manifest.Config.Filename+".dec.dec",
-		filepath.Join(newDir, conffile),
-	); err != nil {
-		return "", errors.Wrapf(
-			err,
-			"could not rename %s to %s",
-			manifest.Config.Filename+".dec.dec",
-			filepath.Join(newDir, conffile),
-		)
+	d, err := decodeConfig(manifest, newDir)
+	if err != nil {
+		return "", err
 	}
 
 	archiveManifest := &distribution.ArchiveManifest{
@@ -125,31 +104,8 @@ func Manifest2Tar(
 		Layers:   make([]string, len(manifest.Layers)),
 	}
 
-	// decrypt files for layers
-	for i, l := range manifest.Layers {
-		// decrypt layer file
-		layerfile := l.Filename
-		if l.Crypto != nil {
-			layerfile = l.Filename + ".dec"
-			if err = crypto.DecFile(l.Filename, layerfile, l.Crypto.DecKey); err != nil {
-				return "", err
-			}
-		}
-
-		// decompress layer file
-		d, err = utils.Decompress(layerfile)
-		if err != nil {
-			return "", err
-		}
-
-		layerfile = layerfile + ".dec"
-		layernewname := filepath.Join(newDir, d.Hex()+".tar")
-
-		if err = os.Rename(layerfile, layernewname); err != nil {
-			return "", errors.Wrapf(err, "could not rename %s to %s", layerfile, layernewname)
-		}
-
-		archiveManifest.Layers[i] = d.Hex() + ".tar"
+	if err = decodeLayers(manifest, newDir, archiveManifest); err != nil {
+		return "", err
 	}
 
 	manifestfile := filepath.Join(newDir, "manifest.json")
@@ -195,6 +151,73 @@ func importImage(tarball string) error {
 	}
 	if err = resp.Body.Close(); err != nil {
 		return errors.Wrapf(err, "error closing response body: %v", resp)
+	}
+
+	return nil
+}
+
+func decodeConfig(manifest *distribution.ImageManifest, newDir string) (*digest.Digest, error) {
+	// decrypt config file
+	if err := crypto.DecFile(
+		manifest.Config.Filename,
+		manifest.Config.Filename+".dec",
+		manifest.Config.Crypto.DecKey,
+	); err != nil {
+		return nil, err
+	}
+
+	// decompress config file
+	d, err := utils.Decompress(manifest.Config.Filename + ".dec")
+	if err != nil {
+		return nil, err
+	}
+
+	conffile := d.Hex() + ".json"
+	if err = os.Rename(
+		manifest.Config.Filename+".dec.dec",
+		filepath.Join(newDir, conffile),
+	); err != nil {
+		return nil, errors.Wrapf(
+			err,
+			"could not rename %s to %s",
+			manifest.Config.Filename+".dec.dec",
+			filepath.Join(newDir, conffile),
+		)
+	}
+
+	return d, nil
+}
+
+func decodeLayers(
+	manifest *distribution.ImageManifest,
+	newDir string,
+	archiveManifest *distribution.ArchiveManifest,
+) error {
+	// decrypt files for layers
+	for i, l := range manifest.Layers {
+		// decrypt layer file
+		layerfile := l.Filename
+		if l.Crypto != nil {
+			layerfile = l.Filename + ".dec"
+			if err := crypto.DecFile(l.Filename, layerfile, l.Crypto.DecKey); err != nil {
+				return err
+			}
+		}
+
+		// decompress layer file
+		d, err := utils.Decompress(layerfile)
+		if err != nil {
+			return err
+		}
+
+		layerfile = layerfile + ".dec"
+		layernewname := filepath.Join(newDir, d.Hex()+".tar")
+
+		if err = os.Rename(layerfile, layernewname); err != nil {
+			return errors.Wrapf(err, "could not rename %s to %s", layerfile, layernewname)
+		}
+
+		archiveManifest.Layers[i] = d.Hex() + ".tar"
 	}
 
 	return nil

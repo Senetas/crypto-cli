@@ -20,6 +20,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/docker/distribution/registry/client/auth"
 	"github.com/pkg/errors"
 )
 
@@ -55,7 +56,7 @@ func decodeRespose(respBody io.Reader) (Token, error) {
 }
 
 // AddToReqest adds a token as a Bearer Authorization of a request
-func AddToReqest(t Token, req *http.Request) {
+func AddToReqest(t auth.Scope, req *http.Request) {
 	if t != nil && t.String() != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", t))
 	}

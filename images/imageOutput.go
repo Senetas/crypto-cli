@@ -88,17 +88,6 @@ func CreateManifest(
 	return manifest, nil
 }
 
-func numLayers(hist []image.HistoryResponseItem) (n int, err error) {
-	for _, h := range hist {
-		if h.Size != 0 || !strings.Contains(h.CreatedBy, "#(nop)") {
-			n++
-		} else if strings.Contains(h.CreatedBy, labelString) {
-			return n, nil
-		}
-	}
-	return 0, utils.NewError("this image was not built with the correct LABEL", false)
-}
-
 func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
 	ctx := context.Background()
 
@@ -141,7 +130,7 @@ func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
 func extractTarBall(tarFH io.Reader, manifest *distribution.ImageManifest) (err error) {
 	tarfile := manifest.DirName + ".tar"
 
-	if err = os.MkdirAll(manifest.DirName, 0755); err != nil {
+	if err = os.MkdirAll(manifest.DirName, 0700); err != nil {
 		return errors.Wrapf(err, "could not create: %s", manifest.DirName)
 	}
 
@@ -164,6 +153,11 @@ func extractTarBall(tarFH io.Reader, manifest *distribution.ImageManifest) (err 
 	}
 
 	return nil
+}
+
+type configLayers struct {
+	Config string
+	Layers []string
 }
 
 // find the layer files that correponds to the digests we want to encrypt
@@ -190,22 +184,11 @@ func findLayers(
 	}
 	defer func() { err = utils.CheckedClose(manifestFH, err) }()
 
-	type configLayers struct {
-		Config string
-		Layers []string
+	images, configfile, err := mkConfig(path, manifestFH)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	var images []*configLayers
-	dec := json.NewDecoder(manifestFH)
-	if err = dec.Decode(&images); err != nil {
-		return nil, nil, errors.Wrapf(err, "error unmarshalling: %s", manifestfile)
-	}
-
-	if len(images) < 1 {
-		return nil, nil, errors.New("no image data was found")
-	}
-
-	configfile := filepath.Join(path, images[0].Config)
 	filename, d, size, key, err := encryptLayer(configfile)
 	if err != nil {
 		return nil, nil, err
@@ -217,14 +200,9 @@ func findLayers(
 	for i, f := range images[0].Layers {
 		basename := filepath.Join(path, f)
 
-		fh, err := os.Open(basename)
+		d, err = fileDigest(basename)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "could not open file: %s", basename)
-		}
-
-		d, err := digest.Canonical.FromReader(fh)
-		if err != nil {
-			return nil, nil, errors.Wrapf(err, "could not calculate digest: %s", basename)
+			return nil, nil, err
 		}
 
 		if layerSet[d.String()] {
@@ -235,7 +213,7 @@ func findLayers(
 			}
 			layer[i] = distribution.NewLayer(filename, d, size, key)
 		} else {
-			filename, d, size, _, err := compressLayer(basename)
+			filename, d, size, err := compressLayer(basename)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -246,27 +224,52 @@ func findLayers(
 	return config, layer, nil
 }
 
-func compressLayer(filename string) (compFile string, d *digest.Digest, size int64, key []byte, err error) {
+func fileDigest(filename string) (*digest.Digest, error) {
+	fh, err := os.Open(filename)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not open file: %s", filename)
+	}
+
+	d, err := digest.Canonical.FromReader(fh)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not calculate digest: %s", filename)
+	}
+
+	return &d, nil
+}
+
+func numLayers(hist []image.HistoryResponseItem) (n int, err error) {
+	for _, h := range hist {
+		if h.Size != 0 || !strings.Contains(h.CreatedBy, "#(nop)") {
+			n++
+		} else if strings.Contains(h.CreatedBy, labelString) {
+			return n, nil
+		}
+	}
+	return 0, utils.NewError("this image was not built with the correct LABEL", false)
+}
+
+func compressLayer(filename string) (compFile string, d *digest.Digest, size int64, err error) {
 	compFile = filename + ".gz"
 
 	d, err = utils.CompressWithDigest(filename)
 	if err != nil {
-		return "", nil, 0, nil, err
+		return "", nil, 0, err
 	}
 
 	stat, err := os.Stat(compFile)
 	if err != nil {
-		return "", nil, 0, nil, errors.Wrapf(err, "could not stat file: %s", compFile)
+		return "", nil, 0, errors.Wrapf(err, "could not stat file: %s", compFile)
 	}
 
-	return compFile, d, stat.Size(), key, nil
+	return compFile, d, stat.Size(), nil
 }
 
 func encryptLayer(filename string) (encname string, d *digest.Digest, size int64, key []byte, err error) {
 	compname := filename + ".gz"
 	encname = compname + ".aes"
 
-	if err := utils.Compress(filename); err != nil {
+	if err = utils.Compress(filename); err != nil {
 		return "", nil, 0, nil, err
 	}
 
@@ -281,4 +284,19 @@ func encryptLayer(filename string) (encname string, d *digest.Digest, size int64
 	}
 
 	return encname, d, size, key, nil
+}
+
+func mkConfig(path string, manifestFH io.Reader) ([]*configLayers, string, error) {
+	var images []*configLayers
+	dec := json.NewDecoder(manifestFH)
+	if err := dec.Decode(&images); err != nil {
+		return nil, "", errors.Wrapf(err, "error unmarshalling manifest")
+	}
+
+	if len(images) < 1 {
+		return nil, "", errors.New("no image data was found")
+	}
+
+	configfile := filepath.Join(path, images[0].Config)
+	return images, configfile, nil
 }

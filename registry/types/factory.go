@@ -8,7 +8,7 @@ import (
 )
 
 // TrimNamed removes a tag from a Named
-func TrimNamed(ref reference.NamedTagged) NamedRepository {
+func TrimNamed(ref reference.Named) NamedRepository {
 	switch r := ref.(type) {
 	case NamedTaggedRepository:
 		return &repository{domain: r.Domain(), path: r.Path()}
