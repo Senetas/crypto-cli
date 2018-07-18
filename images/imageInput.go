@@ -15,11 +15,9 @@
 package images
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -69,6 +67,7 @@ func DecryptManifest(
 			}
 		}
 	}
+
 	errChan <- nil
 	manOut <- manifest
 	log.Info().Msg("finished decryption of keys")
@@ -107,64 +106,61 @@ func Manifest2Tar(
 		return "", errors.Wrapf(err, "dir name = %s", newDir)
 	}
 
+	conffile := d.Hex() + ".json"
 	if err = os.Rename(
 		manifest.Config.Filename+".dec.dec",
-		filepath.Join(newDir, d.Hex()+".json"),
+		filepath.Join(newDir, conffile),
 	); err != nil {
 		return "", errors.Wrapf(
 			err,
 			"could not rename %s to %s",
 			manifest.Config.Filename+".dec.dec",
-			filepath.Join(newDir, d.Hex()+".json"),
+			filepath.Join(newDir, conffile),
 		)
 	}
 
-	am := &distribution.ArchiveManifest{
+	archiveManifest := &distribution.ArchiveManifest{
 		Config:   d.Hex() + ".json",
-		RepoTags: []string{ref.Path() + ":" + ref.Tag()},
-		Layers:   make([]string, len(manifest.Layers))}
+		RepoTags: []string{ref.String()},
+		Layers:   make([]string, len(manifest.Layers)),
+	}
 
 	// decrypt files for layers
 	for i, l := range manifest.Layers {
 		// decrypt layer file
-		layerfilename := l.Filename
+		layerfile := l.Filename
 		if l.Crypto != nil {
-			layerfilename = l.Filename + ".dec"
-			if err = crypto.DecFile(l.Filename, layerfilename, l.Crypto.DecKey); err != nil {
+			layerfile = l.Filename + ".dec"
+			if err = crypto.DecFile(l.Filename, layerfile, l.Crypto.DecKey); err != nil {
 				return "", err
 			}
 		}
 
 		// decompress layer file
-		d, err = utils.Decompress(layerfilename)
+		d, err = utils.Decompress(layerfile)
 		if err != nil {
 			return "", err
 		}
 
-		layerfilename = layerfilename + ".dec"
+		layerfile = layerfile + ".dec"
 		layernewname := filepath.Join(newDir, d.Hex()+".tar")
 
-		if err = os.Rename(layerfilename, layernewname); err != nil {
-			return "", errors.Wrapf(err, "could not rename %s to %s", layerfilename, layernewname)
+		if err = os.Rename(layerfile, layernewname); err != nil {
+			return "", errors.Wrapf(err, "could not rename %s to %s", layerfile, layernewname)
 		}
 
-		am.Layers[i] = d.Hex() + ".tar"
+		archiveManifest.Layers[i] = d.Hex() + ".tar"
 	}
 
-	amJSON, err := json.Marshal([]*distribution.ArchiveManifest{am})
+	manifestfile := filepath.Join(newDir, "manifest.json")
+	amFH, err := os.Create(manifestfile)
 	if err != nil {
-		return "", errors.Wrapf(err, "archive manifest = %v", am)
+		return "", errors.Wrapf(err, "filename = %s", manifestfile)
 	}
 
-	manifestfilename := filepath.Join(newDir, "manifest.json")
-	amr := bytes.NewReader(amJSON)
-	amFH, err := os.Create(manifestfilename)
-	if err != nil {
-		return "", errors.Wrapf(err, "filename = %s", manifestfilename)
-	}
-
-	if _, err = io.Copy(amFH, amr); err != nil {
-		return "", errors.Wrap(err, "")
+	enc := json.NewEncoder(amFH)
+	if err = enc.Encode(&[]*distribution.ArchiveManifest{archiveManifest}); err != nil {
+		return "", errors.Wrapf(err, "%#v", archiveManifest)
 	}
 
 	path := filepath.Join(newDir, "*")
