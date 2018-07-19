@@ -73,13 +73,6 @@ func Execute() {
 func init() {
 	//cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().BoolVar(
-		&opts.Compat,
-		"compat",
-		false,
-		`whether manifests should be compatible with the Docker image manifest schema v2.2
-or a slight modfication of it`,
-	)
 	rootCmd.PersistentFlags().StringVarP(
 		&opts.Passphrase,
 		"pass",
