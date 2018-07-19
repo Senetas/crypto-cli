@@ -33,7 +33,7 @@ import (
 	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/registry/auth"
 	"github.com/Senetas/crypto-cli/registry/httpclient"
-	"github.com/Senetas/crypto-cli/registry/types"
+	"github.com/Senetas/crypto-cli/registry/names"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
@@ -116,7 +116,7 @@ func PullManifest(
 	}
 
 	// TODO: Handle list manifests
-	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
+	req.Header.Set("Accept", distribution.MediaTypeManifest)
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	auth.AddToReqest(token, req)
 
@@ -149,8 +149,8 @@ func PullFromDigest(
 	bldr *v2.URLBuilder,
 	dir string,
 ) (fn string, err error) {
-	sep := types.SeperateRepository(ref)
-	can := types.AppendDigest(sep, *d)
+	sep := names.SeperateRepository(ref)
+	can := names.AppendDigest(sep, *d)
 
 	urlStr, err := bldr.BuildBlobURL(can)
 	if err != nil {
@@ -163,7 +163,7 @@ func PullFromDigest(
 	}
 	req = req.WithContext(ctx)
 
-	req.Header.Set("Accept", "application/vnd.docker.image.rootfs.diff.tar.gzip")
+	req.Header.Set("Accept", distribution.MediaTypeLayer)
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	auth.AddToReqest(token, req)
 

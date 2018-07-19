@@ -32,11 +32,7 @@ load that images into the local docker engine. It is then avaliable to be run un
 name as it was downloaded.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cmd.Flags().VisitAll(checkFlagsPull)
-		cryptotype, err := validateCryptoType(ctstr)
-		if err != nil {
-			return err
-		}
-		return runPull(args[0], passphrase, cryptotype)
+		return runPull(args[0], opts)
 	},
 	Args: cobra.ExactArgs(1),
 }
@@ -45,18 +41,18 @@ func checkFlagsPull(f *pflag.Flag) {
 	switch f.Name {
 	case "pass":
 		if !f.Changed {
-			passphrase = getPassSTDIN("Enter passphrase: ")
+			opts.Passphrase = getPassSTDIN("Enter passphrase: ")
 		}
 	}
 }
 
-func runPull(remote, passphrase string, cryptotype crypto.EncAlgo) error {
+func runPull(remote string, opts crypto.Opts) error {
 	ref, err := reference.ParseNormalizedNamed(remote)
 	if err != nil {
 		return errors.Wrapf(err, "remote = ", remote)
 	}
 
-	if err = images.PullImage(ref, passphrase, cryptotype); err != nil {
+	if err = images.PullImage(ref, opts); err != nil {
 		return err
 	}
 
@@ -65,19 +61,4 @@ func runPull(remote, passphrase string, cryptotype crypto.EncAlgo) error {
 
 func init() {
 	rootCmd.AddCommand(pullCmd)
-
-	pullCmd.Flags().StringVarP(
-		&passphrase,
-		"pass",
-		"p",
-		"",
-		"Specifies the passphrase to use if passphrase encryption is selected",
-	)
-	pullCmd.Flags().StringVarP(
-		&ctstr,
-		"type",
-		"t",
-		string(crypto.Pbkdf2Aes256Gcm),
-		"Specifies the type of encryption to use.",
-	)
 }

@@ -32,7 +32,7 @@ import (
 	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/registry/auth"
 	"github.com/Senetas/crypto-cli/registry/httpclient"
-	"github.com/Senetas/crypto-cli/registry/types"
+	"github.com/Senetas/crypto-cli/registry/names"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
@@ -43,7 +43,7 @@ func PushImage(
 	manifest *distribution.ImageManifest,
 	endpoint *registry.APIEndpoint,
 ) error {
-	trimed := types.TrimNamed(ref)
+	trimed := names.TrimNamed(ref)
 
 	if err := PushLayer(token, trimed, manifest.Config, endpoint); err != nil {
 		return err
@@ -96,7 +96,7 @@ func PushManifest(
 
 	req.Header.Set("Accept", "application/json, */*")
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
-	req.Header.Set("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
+	req.Header.Set("Content-Type", distribution.MediaTypeManifest)
 	auth.AddToReqest(token, req)
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
@@ -124,8 +124,8 @@ func PushLayer(
 	layerData *distribution.Layer,
 	endpoint *registry.APIEndpoint,
 ) (err error) {
-	sep := types.SeperateRepository(ref)
-	dig := types.AppendDigest(sep, *layerData.Digest)
+	sep := names.SeperateRepository(ref)
+	dig := names.AppendDigest(sep, *layerData.Digest)
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
 	layerExists, err := checkLayer(token, dig, bldr)

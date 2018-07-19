@@ -1,4 +1,4 @@
-package types
+package names
 
 import digest "github.com/opencontainers/go-digest"
 

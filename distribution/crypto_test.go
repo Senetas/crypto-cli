@@ -25,8 +25,8 @@ import (
 func TestCrypto(t *testing.T) {
 	plaintext := []byte("196884 = 196883 + 1")
 	c := &distribution.Crypto{
-		CryptoType: crypto.Pbkdf2Aes256Gcm,
-		DecKey:     plaintext,
+		Algos:  crypto.Pbkdf2Aes256Gcm,
+		DecKey: plaintext,
 	}
 
 	if err := c.Encrypt("hunter2", "saltysaltysaltysalty", crypto.Pbkdf2Aes256Gcm); err != nil {

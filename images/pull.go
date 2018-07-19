@@ -28,12 +28,12 @@ import (
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/registry"
-	"github.com/Senetas/crypto-cli/registry/types"
+	"github.com/Senetas/crypto-cli/registry/names"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
 // PullImage pulls an image from the registry
-func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo) (err error) {
+func PullImage(ref reference.Named, opts crypto.Opts) (err error) {
 	token, nTRep, endpoint, err := authProcedure(ref)
 	if err != nil {
 		return err
@@ -45,12 +45,12 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 	}
 	defer func() { err = cleanup(dir, err) }()
 
-	manifest, err := pullAndDecrypt(nTRep, token, endpoint, dir, passphrase, cryptotype)
+	manifest, err := pullAndDecrypt(nTRep, token, endpoint, dir, opts)
 	if err != nil {
 		return err
 	}
 
-	tarball, err := Manifest2Tar(manifest, nTRep, passphrase, cryptotype)
+	tarball, err := Manifest2Tar(manifest, nTRep, opts)
 	if err != nil {
 		return err
 	}
@@ -63,12 +63,15 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 }
 
 func pullAndDecrypt(
-	nTRep types.NamedTaggedRepository,
+	nTRep names.NamedTaggedRepository,
 	token auth.Scope,
 	endpoint *dregistry.APIEndpoint,
-	dir, passphrase string,
-	cryptotype crypto.EncAlgo,
-) (*distribution.ImageManifest, error) {
+	dir string,
+	opts crypto.Opts,
+) (
+	*distribution.ImageManifest,
+	error,
+) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// TODO: make this more light weight and SAFE!
@@ -82,7 +85,7 @@ func pullAndDecrypt(
 	defer close(errChan2)
 
 	go registry.PullImage(ctx, token, nTRep, endpoint, dir, manChan, errChan)
-	go DecryptManifest(cancel, manChan, nTRep, passphrase, cryptotype, manChan2, errChan2)
+	go DecryptManifest(cancel, manChan, nTRep, opts, manChan2, errChan2)
 
 	errs := make(utils.Errors, 0)
 	var manifest *distribution.ImageManifest
