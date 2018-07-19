@@ -15,17 +15,21 @@
 package images_test
 
 import (
+	"context"
 	"os"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/distribution/reference"
 
 	"github.com/Senetas/crypto-cli/crypto"
+	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/images"
 	"github.com/Senetas/crypto-cli/registry/names"
+	"github.com/Senetas/crypto-cli/utils"
 )
 
-func TestEncDecImage(t *testing.T) {
+func testEncDecImage(t *testing.T, opts crypto.Opts) {
 	ref, err := reference.ParseNormalizedNamed("narthanaepa1/my-alpine:test")
 	if err != nil {
 		t.Fatal(err)
@@ -36,17 +40,72 @@ func TestEncDecImage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manifest, err := images.CreateManifest(ref2, "hunter2", crypto.Pbkdf2Aes256Gcm)
+	manifest, err := images.CreateManifest(ref2, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log(manifest)
 
-	if _, err = images.Manifest2Tar(manifest, ref2, "hunter2", crypto.Pbkdf2Aes256Gcm); err != nil {
-		t.Fatalf("%v\ne = %s", err, manifest.Config.Crypto)
+	t.Log(spew.Sdump(manifest))
+
+	_, cancel := context.WithCancel(context.Background())
+
+	manChan := make(chan *distribution.ImageManifest)
+	manChan2 := make(chan *distribution.ImageManifest)
+	errChan2 := make(chan error)
+
+	defer close(manChan)
+	defer close(manChan2)
+	defer close(errChan2)
+
+	go images.DecryptManifest(cancel, manChan, ref2, opts, manChan2, errChan2)
+
+	manChan <- manifest
+
+	errs := make(utils.Errors, 0)
+	for i := 0; i < 2; {
+		select {
+		case err2 := <-errChan2:
+			if err2 != nil {
+				errs = append(errs, err2)
+			}
+			i++
+		case manifest = <-manChan2:
+			i++
+		default:
+		}
+	}
+
+	if len(errs) != 0 {
+		t.Fatal(errs)
+	}
+
+	t.Log(spew.Sdump(manifest))
+
+	if _, err = images.Manifest2Tar(manifest, ref2, opts); err != nil {
+		t.Fatal(err)
 	}
 
 	if err = os.RemoveAll(manifest.DirName); err != nil {
 		t.Log(err)
 	}
+}
+
+func TestEncDecImage(t *testing.T) {
+	opts := crypto.Opts{
+		Passphrase: "hunter2",
+		EncType:    crypto.Pbkdf2Aes256Gcm,
+		Compat:     false,
+	}
+	t.Logf("testing non-compat")
+	testEncDecImage(t, opts)
+}
+
+func TestCompatEncDecImage(t *testing.T) {
+	opts := crypto.Opts{
+		Passphrase: "hunter2",
+		EncType:    crypto.Pbkdf2Aes256Gcm,
+		Compat:     true,
+	}
+	t.Logf("testing compat")
+	testEncDecImage(t, opts)
 }

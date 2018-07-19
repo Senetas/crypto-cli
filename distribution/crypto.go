@@ -24,33 +24,27 @@ import (
 
 // Crypto is the go type backing a crypto object in a manifest
 type Crypto struct {
-	CryptoType crypto.EncAlgo `json:"cryptoType"`
-	EncKey     string         `json:"key"`
-	DecKey     []byte         `json:"-"`
-}
-
-// DeCrypto stores the decrypted data keys after decrypting a crypto object
-type DeCrypto struct {
-	CryptoType crypto.EncAlgo
-	Key        []byte
+	Algos  crypto.Algos `json:"cryptoType"`
+	EncKey string       `json:"key"`
+	DecKey []byte       `json:"-"`
 }
 
 // Encrypt creates a new CryptoJSON struct by encrypting a plaintext key with a passphrase and salt
-func (c *Crypto) Encrypt(pass, salt string, cryptotype crypto.EncAlgo) error {
+func (c *Crypto) Encrypt(pass, salt string, algos crypto.Algos) error {
 	ciphertextKey, err := crypto.Enckey(c.DecKey, pass, salt)
 	if err != nil {
 		return errors.WithStack(utils.ErrEncrypt)
 	}
 
 	c.EncKey = base64.URLEncoding.EncodeToString(ciphertextKey)
-	c.CryptoType = cryptotype
+	c.Algos = algos
 
 	return nil
 }
 
 // Decrypt is the inverse function of Encrypt (up to error, types etc)
-func (c *Crypto) Decrypt(pass, salt string, cryptotype crypto.EncAlgo) error {
-	if c.CryptoType != cryptotype {
+func (c *Crypto) Decrypt(pass, salt string, algos crypto.Algos) error {
+	if c.Algos != algos {
 		return utils.NewError("encryption type does not match decryption type", false)
 	}
 

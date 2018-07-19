@@ -28,8 +28,8 @@ import (
 )
 
 var (
-	passphrase string
-	ctstr      string
+	ctstr string
+	opts  crypto.Opts
 	//cfgFile    string
 )
 
@@ -52,6 +52,12 @@ downloading them.`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+	var err error
+	opts.EncType, err = crypto.ValidateAlgos(ctstr)
+	if err != nil {
+		log.Fatal().Msgf("%v", err)
+	}
+
 	if err := rootCmd.Execute(); err != nil {
 		// comment out until * to print all stack traces
 		e, ok := errors.Cause(err).(utils.Error)
@@ -67,14 +73,27 @@ func Execute() {
 func init() {
 	//cobra.OnInitialize(initConfig)
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-	//rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.crypto-cli.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	//rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.PersistentFlags().BoolVar(
+		&opts.Compat,
+		"compat",
+		false,
+		`whether manifests should be compatible with the Docker image manifest schema v2.2
+or a slight modfication of it`,
+	)
+	rootCmd.PersistentFlags().StringVarP(
+		&opts.Passphrase,
+		"pass",
+		"p",
+		"",
+		"Specifies the passphrase to use if passphrase encryption is selected",
+	)
+	rootCmd.PersistentFlags().StringVarP(
+		&ctstr,
+		"type",
+		"t",
+		string(crypto.Pbkdf2Aes256Gcm),
+		"Specifies the type of encryption to use.",
+	)
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -106,17 +125,8 @@ func getPassSTDIN(prompt string) string {
 	fmt.Print(prompt)
 	passphrase, err := terminal.ReadPassword(syscall.Stdin)
 	if err != nil {
-		log.Fatal().Err(errors.Wrapf(err, "password typed: %s", passphrase)).Msg("")
+		log.Fatal().Err(err).Msgf("password typed: %s", passphrase)
 	}
 	fmt.Println()
 	return string(passphrase)
-}
-
-func validateCryptoType(ctstr string) (crypto.EncAlgo, error) {
-	if ctstr == string(crypto.None) {
-		return crypto.None, nil
-	} else if ctstr == string(crypto.Pbkdf2Aes256Gcm) {
-		return crypto.Pbkdf2Aes256Gcm, nil
-	}
-	return crypto.EncAlgo(""), errors.New("invalid encryption type")
 }

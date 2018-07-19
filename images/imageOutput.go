@@ -41,19 +41,22 @@ import (
 // These are they ready to be uploaded to a regitry
 func CreateManifest(
 	ref names.NamedTaggedRepository,
-	passphrase string,
-	cryptotype crypto.EncAlgo,
-) (manifest *distribution.ImageManifest, err error) {
+	opts crypto.Opts,
+) (
+	manifest *distribution.ImageManifest,
+	err error,
+) {
 	layers, tarFH, err := getImgTarLayers(ref.Path(), ref.Tag())
 	if err != nil {
 		return nil, err
 	}
 	defer func() { err = utils.CheckedClose(tarFH, err) }()
+	log.Info().Msgf("The following layers are to be encrypted: %v", layers)
 
 	// output image
 	manifest = &distribution.ImageManifest{
 		SchemaVersion: 2,
-		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+		MediaType:     distribution.MediaTypeManifest,
 		DirName:       filepath.Join(tempRoot, uuid.New().String()),
 	}
 
@@ -70,16 +73,15 @@ func CreateManifest(
 	manifest.Config = configData
 	manifest.Layers = layerData
 
-	salt := fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
-
-	if err = manifest.Config.Crypto.Encrypt(passphrase, salt, cryptotype); err != nil {
+	opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
+	if err = manifest.Config.Encrypt(opts); err != nil {
 		return nil, err
 	}
 
 	for i, l := range manifest.Layers {
-		salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
+		opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
 		if l.Crypto != nil {
-			if err = l.Crypto.Encrypt(passphrase, salt, cryptotype); err != nil {
+			if err = l.Encrypt(opts); err != nil {
 				return nil, err
 			}
 		}
@@ -121,8 +123,6 @@ func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
 
 	m := len(inspt.RootFS.Layers)
 	layers := inspt.RootFS.Layers[m-n:]
-
-	log.Info().Msgf("The following layers are to be encrypted: %v", layers)
 
 	return layers, img, nil
 }

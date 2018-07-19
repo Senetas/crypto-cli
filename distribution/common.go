@@ -21,4 +21,7 @@ const (
 	// MediaTypeUncompressedLayer is the mediaType used for layers which
 	// are not compressed.
 	MediaTypeUncompressedLayer = "application/vnd.docker.image.rootfs.diff.tar"
+
+	// BaseCryptoURL is the base url to append query params to in compat mode
+	BaseCryptoURL = "https://crypto.senetas.com/"
 )

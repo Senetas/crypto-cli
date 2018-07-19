@@ -34,11 +34,7 @@ to a remote repositories. It maybe used to distribute docker images
 confidentially. It does not sign images so cannot garuntee identities.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cmd.Flags().VisitAll(checkFlagsPush)
-		cryptotype, err := validateCryptoType(ctstr)
-		if err != nil {
-			return err
-		}
-		return runPush(args[0], passphrase, cryptotype)
+		return runPush(args[0], opts)
 	},
 	Args: cobra.ExactArgs(1),
 }
@@ -50,7 +46,7 @@ func checkFlagsPush(f *pflag.Flag) {
 			passphrase1 := getPassSTDIN("Enter passphrase: ")
 			passphrase2 := getPassSTDIN("Re-enter passphrase: ")
 			if passphrase1 == passphrase2 {
-				passphrase = passphrase1
+				opts.Passphrase = passphrase1
 			} else {
 				log.Fatal().Msg("Passphrases do not match.")
 			}
@@ -58,14 +54,14 @@ func checkFlagsPush(f *pflag.Flag) {
 	}
 }
 
-func runPush(remote, passphrase string, cryptotype crypto.EncAlgo) error {
+func runPush(remote string, opts crypto.Opts) error {
 	ref, err := reference.ParseNormalizedNamed(remote)
 	if err != nil {
 		return errors.Wrapf(err, "remote = ", remote)
 	}
 
-	if err = images.PushImage(ref, passphrase, cryptotype); err != nil {
-		return errors.Wrapf(err, "ref = %v, cryptotype = %v", ref, cryptotype)
+	if err = images.PushImage(ref, opts); err != nil {
+		return errors.Wrapf(err, "ref = %v, cryptotype = %v", ref, opts.EncType)
 	}
 
 	return nil
@@ -73,19 +69,4 @@ func runPush(remote, passphrase string, cryptotype crypto.EncAlgo) error {
 
 func init() {
 	rootCmd.AddCommand(pushCmd)
-
-	pushCmd.Flags().StringVarP(
-		&passphrase,
-		"pass",
-		"p",
-		"",
-		"Specifies the passphrase to use if passphrase encryption is selected",
-	)
-	pushCmd.Flags().StringVarP(
-		&ctstr,
-		"type",
-		"t",
-		string(crypto.Pbkdf2Aes256Gcm),
-		"Specifies the type of encryption to use.",
-	)
 }

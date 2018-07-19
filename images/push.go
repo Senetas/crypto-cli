@@ -25,13 +25,13 @@ import (
 )
 
 // PushImage encrypts then pushes an image
-func PushImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo) (err error) {
+func PushImage(ref reference.Named, opts crypto.Opts) (err error) {
 	token, nTRep, endpoint, err := authProcedure(ref)
 	if err != nil {
 		return err
 	}
 
-	manifest, err := CreateManifest(nTRep, passphrase, cryptotype)
+	manifest, err := CreateManifest(nTRep, opts)
 	if err != nil {
 		return err
 	}

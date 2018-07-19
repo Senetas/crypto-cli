@@ -24,42 +24,6 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 )
 
-// EncAlgo represents the collection of algorithms used for encryption and authentication
-type EncAlgo string
-
-const (
-	// None represents an identity encryption function
-	None EncAlgo = "NONE"
-	// Pbkdf2Aes256Gcm represents aead with AES256-GCM with a key derived
-	// from a passphrase using PBKDF2
-	Pbkdf2Aes256Gcm EncAlgo = "PBKDF2-AES256-GCM"
-)
-
-// Deckey decrypts the ciphertext = key with the given passphrase and salt
-func Deckey(ciphertext []byte, pass, salt string) ([]byte, error) {
-	nonce := ciphertext[:12]
-	ckey := ciphertext[12:]
-	bsalt := []byte(salt)
-	key := passSalt2Key(pass, bsalt)
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, utils.ErrDecrypt
-	}
-
-	aesgcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, utils.ErrDecrypt
-	}
-
-	plaintext, err := aesgcm.Open(nil, nonce, ckey, bsalt)
-	if err != nil {
-		return nil, utils.ErrDecrypt
-	}
-
-	return plaintext, nil
-}
-
 // Enckey encrypts the ciphertext = key with the given passphrase and salt
 func Enckey(plaintext []byte, pass, salt string) ([]byte, error) {
 	bsalt := []byte(salt)
@@ -84,6 +48,31 @@ func Enckey(plaintext []byte, pass, salt string) ([]byte, error) {
 	ciphertext := aesgcm.Seal(nil, nonce, plaintext, bsalt)
 
 	return utils.Concat([][]byte{nonce, ciphertext}), nil
+}
+
+// Deckey decrypts the ciphertext = key with the given passphrase and salt
+func Deckey(ciphertext []byte, pass, salt string) ([]byte, error) {
+	nonce := ciphertext[:12]
+	ckey := ciphertext[12:]
+	bsalt := []byte(salt)
+	key := passSalt2Key(pass, bsalt)
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, utils.ErrDecrypt
+	}
+
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, utils.ErrDecrypt
+	}
+
+	plaintext, err := aesgcm.Open(nil, nonce, ckey, bsalt)
+	if err != nil {
+		return nil, utils.ErrDecrypt
+	}
+
+	return plaintext, nil
 }
 
 // passSalt2Key deterministically returns a 32 byte encryption key given a passphrase and a salt

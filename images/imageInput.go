@@ -40,8 +40,7 @@ func DecryptManifest(
 	cancel context.CancelFunc,
 	manIn <-chan *distribution.ImageManifest,
 	ref names.NamedTaggedRepository,
-	passphrase string,
-	cryptotype crypto.EncAlgo,
+	opts crypto.Opts,
 	manOut chan<- *distribution.ImageManifest,
 	errChan chan<- error,
 ) {
@@ -49,8 +48,8 @@ func DecryptManifest(
 	log.Info().Msg("begin decryption of keys")
 
 	// decrypt config key
-	salt := fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
-	if err := manifest.Config.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
+	opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
+	if err := manifest.Config.Decrypt(opts); err != nil {
 		errChan <- err
 		manOut <- nil
 		cancel()
@@ -59,14 +58,18 @@ func DecryptManifest(
 
 	// decrypt keys and files for layers
 	for i, l := range manifest.Layers {
-		if l.Crypto != nil {
-			salt := fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
-			if err := l.Crypto.Decrypt(passphrase, salt, cryptotype); err != nil {
+		switch {
+		case l.Crypto != nil:
+			fallthrough
+		case len(l.URLs) > 0:
+			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
+			if err := l.Decrypt(opts); err != nil {
 				errChan <- err
 				manOut <- nil
 				cancel()
 				return
 			}
+		default:
 		}
 	}
 
@@ -75,13 +78,12 @@ func DecryptManifest(
 	log.Info().Msg("finished decryption of keys")
 }
 
-// Manifest2Tar takes a manifest and a target label for the images and create a tarball that may
+// Manifest2Tar takes a manifest and a target label for the images and creates a tarball that may
 // be loaded with docker load. It downloads and decrypts the config and layers if necessary
 func Manifest2Tar(
 	manifest *distribution.ImageManifest,
 	ref auth.Scope,
-	passphrase string,
-	cryptotype crypto.EncAlgo,
+	opts crypto.Opts,
 ) (tarball string, err error) {
 	dir := filepath.Dir(manifest.Config.Filename)
 	if err = os.MkdirAll(dir, 0700); err != nil {
