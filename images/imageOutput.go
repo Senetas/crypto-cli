@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
@@ -38,7 +39,7 @@ import (
 )
 
 // CreateManifest creates a manifest and encrypts all necessary parts of it
-// These are they ready to be uploaded to a regitry
+// These are then ready to be uploaded to a regitry
 func CreateManifest(
 	ref names.NamedTaggedRepository,
 	opts crypto.Opts,
@@ -46,11 +47,30 @@ func CreateManifest(
 	manifest *distribution.ImageManifest,
 	err error,
 ) {
-	layers, tarFH, err := getImgTarLayers(ref.Path(), ref.Tag())
+	ctx := context.Background()
+
+	// TODO: fix hardcoded version/ check if necessary
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
+	if err != nil {
+		return nil, utils.StripTrace(errors.Wrap(err, "could not create client for docker daemon"))
+	}
+
+	inspt, _, err := cli.ImageInspectWithRaw(ctx, ref.String())
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	tarFH, err := cli.ImageSave(ctx, []string{inspt.ID})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	layers, err := layersToEncrypt(ctx, cli, inspt)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { err = utils.CheckedClose(tarFH, err) }()
+
 	log.Info().Msgf("The following layers are to be encrypted: %v", layers)
 
 	// output image
@@ -73,58 +93,53 @@ func CreateManifest(
 	manifest.Config = configData
 	manifest.Layers = layerData
 
-	opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
-	if err = manifest.Config.Encrypt(opts); err != nil {
+	if err = encryptKeys(ref, manifest, opts); err != nil {
 		return nil, err
-	}
-
-	for i, l := range manifest.Layers {
-		opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
-		if l.Crypto != nil {
-			if err = l.Encrypt(opts); err != nil {
-				return nil, err
-			}
-		}
 	}
 
 	return manifest, nil
 }
 
-func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
-	ctx := context.Background()
-
-	// TODO: fix hardcoded version/ check if necessary
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
-	if err != nil {
-		return nil, nil, utils.StripTrace(errors.Wrap(err, "could not create client for docker daemon"))
+func encryptKeys(
+	ref names.NamedTaggedRepository,
+	manifest *distribution.ImageManifest,
+	opts crypto.Opts,
+) error {
+	opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
+	if err := manifest.Config.Encrypt(opts); err != nil {
+		return err
 	}
 
-	inspt, _, err := cli.ImageInspectWithRaw(ctx, repo+":"+tag)
-	if err != nil {
-		return nil, nil, errors.WithStack(err)
+	for i, l := range manifest.Layers {
+		opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
+		if l.Crypto != nil {
+			if err := l.Encrypt(opts); err != nil {
+				return err
+			}
+		}
 	}
 
-	img, err := cli.ImageSave(ctx, []string{inspt.ID})
-	if err != nil {
-		return nil, nil, errors.WithStack(err)
-	}
+	return nil
+}
 
+func layersToEncrypt(ctx context.Context, cli *client.Client, inspt types.ImageInspect) ([]string, error) {
 	// get the history
-	hist, err := cli.ImageHistory(ctx, repo+":"+tag)
+	hist, err := cli.ImageHistory(ctx, inspt.ID)
 	if err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
-	// findLayers
+	// the number of layers to encrypt
 	n, err := numLayers(hist)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
+	// the total number of layers
 	m := len(inspt.RootFS.Layers)
-	layers := inspt.RootFS.Layers[m-n:]
 
-	return layers, img, nil
+	// the last n entries in this array are the diffIDs of the layers to encrypt
+	return inspt.RootFS.Layers[m-n:], nil
 }
 
 func extractTarBall(tarFH io.Reader, manifest *distribution.ImageManifest) (err error) {

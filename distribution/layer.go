@@ -81,7 +81,10 @@ func NewPlainLayer(filename string, d *digest.Digest, size int64) *Layer {
 
 // Encrypt encrypts the key for the layer
 func (l *Layer) Encrypt(opts crypto.Opts) error {
-	l.Crypto.Encrypt(opts.Passphrase, opts.Salt, opts.EncType)
+	if err := l.Crypto.Encrypt(opts.Passphrase, opts.Salt, opts.EncType); err != nil {
+		return err
+	}
+
 	if opts.Compat {
 		u, err := url.Parse(BaseCryptoURL)
 		if err != nil {
@@ -120,6 +123,10 @@ func (l *Layer) Decrypt(opts crypto.Opts) error {
 		}
 		l.URLs = nil
 	}
-	l.Crypto.Decrypt(opts.Passphrase, opts.Salt, opts.EncType)
+
+	if err := l.Crypto.Decrypt(opts.Passphrase, opts.Salt, opts.EncType); err != nil {
+		return err
+	}
+
 	return nil
 }

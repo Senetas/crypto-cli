@@ -29,7 +29,10 @@ import (
 	"github.com/Senetas/crypto-cli/utils"
 )
 
-func testEncDecImage(t *testing.T, opts crypto.Opts) {
+func prepareManifest(t *testing.T, opts crypto.Opts) (
+	*distribution.ImageManifest,
+	names.NamedTaggedRepository,
+) {
 	ref, err := reference.ParseNormalizedNamed("narthanaepa1/my-alpine:test")
 	if err != nil {
 		t.Fatal(err)
@@ -45,6 +48,12 @@ func testEncDecImage(t *testing.T, opts crypto.Opts) {
 		t.Fatal(err)
 	}
 
+	return manifest, ref2
+}
+
+func testEncDecImage(t *testing.T, opts crypto.Opts) {
+	manifest, ref := prepareManifest(t, opts)
+
 	t.Log(spew.Sdump(manifest))
 
 	_, cancel := context.WithCancel(context.Background())
@@ -57,7 +66,7 @@ func testEncDecImage(t *testing.T, opts crypto.Opts) {
 	defer close(manChan2)
 	defer close(errChan2)
 
-	go images.DecryptManifest(cancel, manChan, ref2, opts, manChan2, errChan2)
+	go images.DecryptManifest(cancel, manChan, ref, opts, manChan2, errChan2)
 
 	manChan <- manifest
 
@@ -81,11 +90,11 @@ func testEncDecImage(t *testing.T, opts crypto.Opts) {
 
 	t.Log(spew.Sdump(manifest))
 
-	if _, err = images.Manifest2Tar(manifest, ref2, opts); err != nil {
+	if _, err := images.Manifest2Tar(manifest, ref, opts); err != nil {
 		t.Fatal(err)
 	}
 
-	if err = os.RemoveAll(manifest.DirName); err != nil {
+	if err := os.RemoveAll(manifest.DirName); err != nil {
 		t.Log(err)
 	}
 }

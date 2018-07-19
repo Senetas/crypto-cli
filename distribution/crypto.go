@@ -29,7 +29,7 @@ type Crypto struct {
 	DecKey []byte       `json:"-"`
 }
 
-// Encrypt creates a new CryptoJSON struct by encrypting a plaintext key with a passphrase and salt
+// Encrypt encrypts a plaintext key with a passphrase and salt
 func (c *Crypto) Encrypt(pass, salt string, algos crypto.Algos) error {
 	ciphertextKey, err := crypto.Enckey(c.DecKey, pass, salt)
 	if err != nil {
