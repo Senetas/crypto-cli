@@ -25,7 +25,7 @@ import (
 var (
 	// DefaultClient is a http client with timeouts set
 	DefaultClient = &http.Client{
-		Timeout:   10 * time.Second,
+		Timeout:   100 * time.Second,
 		Transport: defaultTransport,
 	}
 	defaultTransport = &http.Transport{
