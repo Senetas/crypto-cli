@@ -33,14 +33,14 @@ import (
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
-	"github.com/Senetas/crypto-cli/registry/types"
+	"github.com/Senetas/crypto-cli/registry/names"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
 // CreateManifest creates a manifest and encrypts all necessary parts of it
 // These are they ready to be uploaded to a regitry
 func CreateManifest(
-	ref types.NamedTaggedRepository,
+	ref names.NamedTaggedRepository,
 	passphrase string,
 	cryptotype crypto.EncAlgo,
 ) (manifest *distribution.ImageManifest, err error) {

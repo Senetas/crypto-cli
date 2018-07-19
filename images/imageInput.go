@@ -30,7 +30,7 @@ import (
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
-	"github.com/Senetas/crypto-cli/registry/types"
+	"github.com/Senetas/crypto-cli/registry/names"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
@@ -39,7 +39,7 @@ import (
 func DecryptManifest(
 	cancel context.CancelFunc,
 	manIn <-chan *distribution.ImageManifest,
-	ref types.NamedTaggedRepository,
+	ref names.NamedTaggedRepository,
 	passphrase string,
 	cryptotype crypto.EncAlgo,
 	manOut chan<- *distribution.ImageManifest,

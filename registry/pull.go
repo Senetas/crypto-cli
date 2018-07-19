@@ -33,7 +33,7 @@ import (
 	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/registry/auth"
 	"github.com/Senetas/crypto-cli/registry/httpclient"
-	"github.com/Senetas/crypto-cli/registry/types"
+	"github.com/Senetas/crypto-cli/registry/names"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
@@ -149,8 +149,8 @@ func PullFromDigest(
 	bldr *v2.URLBuilder,
 	dir string,
 ) (fn string, err error) {
-	sep := types.SeperateRepository(ref)
-	can := types.AppendDigest(sep, *d)
+	sep := names.SeperateRepository(ref)
+	can := names.AppendDigest(sep, *d)
 
 	urlStr, err := bldr.BuildBlobURL(can)
 	if err != nil {

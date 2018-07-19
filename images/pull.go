@@ -28,7 +28,7 @@ import (
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/registry"
-	"github.com/Senetas/crypto-cli/registry/types"
+	"github.com/Senetas/crypto-cli/registry/names"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
@@ -63,7 +63,7 @@ func PullImage(ref reference.Named, passphrase string, cryptotype crypto.EncAlgo
 }
 
 func pullAndDecrypt(
-	nTRep types.NamedTaggedRepository,
+	nTRep names.NamedTaggedRepository,
 	token auth.Scope,
 	endpoint *dregistry.APIEndpoint,
 	dir, passphrase string,
