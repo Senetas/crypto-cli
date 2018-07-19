@@ -96,7 +96,7 @@ func PushManifest(
 
 	req.Header.Set("Accept", "application/json, */*")
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
-	req.Header.Set("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
+	req.Header.Set("Content-Type", distribution.MediaTypeManifest)
 	auth.AddToReqest(token, req)
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)

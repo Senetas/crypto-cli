@@ -116,7 +116,7 @@ func PullManifest(
 	}
 
 	// TODO: Handle list manifests
-	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
+	req.Header.Set("Accept", distribution.MediaTypeManifest)
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	auth.AddToReqest(token, req)
 
@@ -163,7 +163,7 @@ func PullFromDigest(
 	}
 	req = req.WithContext(ctx)
 
-	req.Header.Set("Accept", "application/vnd.docker.image.rootfs.diff.tar.gzip")
+	req.Header.Set("Accept", distribution.MediaTypeLayer)
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	auth.AddToReqest(token, req)
 
