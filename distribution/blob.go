@@ -16,6 +16,7 @@ package distribution
 
 import (
 	"io"
+	"os"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	digest "github.com/opencontainers/go-digest"
@@ -28,8 +29,8 @@ type Blob interface {
 	GetSize() int64
 	GetFilename() string
 	SetFilename(filename string)
-	//Reader() io.ReadCloser
-	//Writer() io.WriteCloser
+	ReadCloser() (io.ReadCloser, error)
+	WriteCloser() (io.WriteCloser, error)
 }
 
 // EncryptedBlob is a blob that may be decrypted
@@ -84,7 +85,6 @@ type NoncryptedBlob struct {
 	Size        int64          `json:"size"`
 	Digest      *digest.Digest `json:"digest"`
 	Filename    string         `json:"-"`
-	FileHandle  io.ReadWriter  `json:"-"`
 }
 
 func (b *NoncryptedBlob) GetDigest() *digest.Digest { return b.Digest }
@@ -97,30 +97,31 @@ func (b *NoncryptedBlob) SetFilename(filename string) { b.Filename = filename }
 
 func (b *NoncryptedBlob) GetFilename() string { return b.Filename }
 
+func (b *NoncryptedBlob) ReadCloser() (io.ReadCloser, error) { return os.Open(b.Filename) }
+
+func (b *NoncryptedBlob) WriteCloser() (io.WriteCloser, error) { return os.Open(b.Filename) }
+
 func newPlainBlob(
 	filename string,
-	filehandle io.ReadWriter,
 	d *digest.Digest,
 	size int64,
 ) *NoncryptedBlob {
 	return &NoncryptedBlob{
-		Size:       size,
-		Digest:     d,
-		Filename:   filename,
-		FileHandle: filehandle,
+		Size:     size,
+		Digest:   d,
+		Filename: filename,
 	}
 }
 
 func newDecryptedBlob(
 	filename string,
-	filehandle io.ReadWriter,
 	d *digest.Digest,
 	size int64,
 	contentType string,
 	dec *DeCrypto,
 ) *decryptedBlob {
 	return &decryptedBlob{
-		NoncryptedBlob: newPlainBlob(filename, filehandle, d, size),
+		NoncryptedBlob: newPlainBlob(filename, d, size),
 		DeCrypto:       dec,
 	}
 }
@@ -128,33 +129,30 @@ func newDecryptedBlob(
 // NewConfigBlob creates a new Layer for a config layer
 func NewConfigBlob(
 	filename string,
-	filehandle io.ReadWriter,
 	d *digest.Digest,
 	size int64,
 	dec *DeCrypto,
 ) Blob {
-	return newDecryptedBlob(filename, filehandle, d, size, MediaTypeImageConfig, dec)
+	return newDecryptedBlob(filename, d, size, MediaTypeImageConfig, dec)
 }
 
 // NewLayerBlob creates a new LayerJSON for a data layer
 func NewLayerBlob(
 	filename string,
-	filehandle io.ReadWriter,
 	d *digest.Digest,
 	size int64,
 	dec *DeCrypto,
 ) Blob {
-	return newDecryptedBlob(filename, filehandle, d, size, MediaTypeLayer, dec)
+	return newDecryptedBlob(filename, d, size, MediaTypeLayer, dec)
 }
 
 // NewPlainLayer creates a new LayerJSON for an unencrypted data layer
 func NewPlainLayer(
 	filename string,
-	filehandle io.ReadWriter,
 	d *digest.Digest,
 	size int64,
 ) Blob {
-	blob := newPlainBlob(filename, filehandle, d, size)
+	blob := newPlainBlob(filename, d, size)
 	blob.ContentType = MediaTypeLayer
 	return blob
 }

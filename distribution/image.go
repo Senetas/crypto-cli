@@ -14,6 +14,19 @@
 
 package distribution
 
+import (
+	"fmt"
+
+	"github.com/Senetas/crypto-cli/crypto"
+	"github.com/Senetas/crypto-cli/registry/names"
+)
+
+const (
+	saltBase   = "com.senetas.crypto/%s/%s"
+	configSalt = saltBase + "/config"
+	layerSalt  = saltBase + "/layer%d"
+)
+
 // ImageManifest represents a docker image manifest schema v2.2
 type ImageManifest struct {
 	SchemaVersion int    `json:"schemaVersion"`
@@ -21,4 +34,44 @@ type ImageManifest struct {
 	Config        Blob   `json:"config"`
 	Layers        []Blob `json:"layers"`
 	DirName       string `json:"-"`
+}
+
+func (m *ImageManifest) Encrypt(
+	ref names.NamedTaggedRepository,
+	opts crypto.Opts,
+) (
+	out *ImageManifest,
+	err error,
+) {
+	var configBlob Blob
+	switch blob := m.Config.(type) {
+	case DecryptedBlob:
+		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
+		configBlob, err = blob.EncryptBlob(opts, blob.GetFilename()+".aes")
+		if err != nil {
+			return nil, err
+		}
+	default:
+	}
+
+	layerBlobs := make([]Blob, len(m.Layers))
+	for i, l := range m.Layers {
+		switch blob := l.(type) {
+		case DecryptedBlob:
+			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
+			layerBlobs[i], err = blob.EncryptBlob(opts, blob.GetFilename()+".aes")
+			if err != nil {
+				return nil, err
+			}
+		default:
+		}
+	}
+
+	return &ImageManifest{
+		SchemaVersion: m.SchemaVersion,
+		MediaType:     m.MediaType,
+		DirName:       m.DirName,
+		Config:        configBlob,
+		Layers:        layerBlobs,
+	}, nil
 }

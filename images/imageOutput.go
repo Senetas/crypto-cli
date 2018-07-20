@@ -94,36 +94,6 @@ func CreateManifest(
 	return manifest, nil
 }
 
-//func encryptBlobs(
-//ref names.NamedTaggedRepository,
-//manifest *distribution.ImageManifest,
-//opts crypto.Opts,
-//) error {
-//switch blob := manifest.Config.(type) {
-//case distribution.DecryptedBlob:
-//opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
-//_, err := blob.EncryptBlob(opts, "")
-//if err != nil {
-//return err
-//}
-//default:
-//}
-
-//for i, l := range manifest.Layers {
-//switch blob := l.(type) {
-//case distribution.DecryptedBlob:
-//opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
-//_, err := blob.EncryptBlob(opts, "")
-//if err != nil {
-//return err
-//}
-//default:
-//}
-//}
-
-//return nil
-//}
-
 func layersToEncrypt(ctx context.Context, cli *client.Client, inspt types.ImageInspect) ([]string, error) {
 	// get the history
 	hist, err := cli.ImageHistory(ctx, inspt.ID)
@@ -208,7 +178,7 @@ func mkBolbs(
 		return nil, nil, err
 	}
 
-	configBlob = distribution.NewConfigBlob(filepath.Join(path, image.Config), nil, nil, 0, dec)
+	configBlob = distribution.NewConfigBlob(filepath.Join(path, image.Config), nil, 0, dec)
 
 	layerBlobs = make([]distribution.Blob, len(image.Layers))
 	for i, f := range image.Layers {
@@ -226,9 +196,9 @@ func mkBolbs(
 
 		if layerSet[d.String()] {
 			log.Info().Msgf("preparing %s", d)
-			layerBlobs[i] = distribution.NewLayerBlob(filepath.Join(path, f), nil, d, 0, dec)
+			layerBlobs[i] = distribution.NewLayerBlob(filepath.Join(path, f), d, 0, dec)
 		} else {
-			layerBlobs[i] = distribution.NewPlainLayer(filepath.Join(path, f), nil, d, 0)
+			layerBlobs[i] = distribution.NewPlainLayer(filepath.Join(path, f), d, 0)
 		}
 	}
 

@@ -15,13 +15,11 @@
 package images
 
 import (
-	"os"
-
+	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/distribution/reference"
-	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/crypto"
-	"github.com/Senetas/crypto-cli/registry"
 )
 
 // PushImage encrypts then pushes an image
@@ -31,24 +29,35 @@ func PushImage(ref reference.Named, opts crypto.Opts) (err error) {
 		return err
 	}
 
+	_ = token
+	_ = endpoint
+
 	manifest, err := CreateManifest(nTRep, opts)
 	if err != nil {
 		return err
 	}
 
-	// Upload to registry
-	if err = registry.PushImage(token, nTRep, manifest, endpoint); err != nil {
+	log.Info().Msgf("%s", spew.Sdump(manifest))
+
+	manifest2, err := manifest.Encrypt(nTRep, opts)
+	if err != nil {
 		return err
 	}
+	log.Info().Msgf("%s", spew.Sdump(manifest2))
 
-	// cleanup temporary files
-	if err = os.RemoveAll(manifest.DirName + ".tar"); err != nil {
-		return errors.Wrapf(err, "could not clean up temp file: %s", manifest.DirName+".tar")
-	}
+	//// Upload to registry
+	//if err = registry.PushImage(token, nTRep, manifest, endpoint); err != nil {
+	//return err
+	//}
 
-	if err = os.RemoveAll(manifest.DirName); err != nil {
-		return errors.Wrapf(err, "could not clean up temp files in: %s", manifest.DirName+".tar")
-	}
+	//// cleanup temporary files
+	//if err = os.RemoveAll(manifest.DirName + ".tar"); err != nil {
+	//return errors.Wrapf(err, "could not clean up temp file: %s", manifest.DirName+".tar")
+	//}
+
+	//if err = os.RemoveAll(manifest.DirName); err != nil {
+	//return errors.Wrapf(err, "could not clean up temp files in: %s", manifest.DirName+".tar")
+	//}
 
 	return nil
 }

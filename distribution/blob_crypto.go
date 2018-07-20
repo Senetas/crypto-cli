@@ -58,7 +58,13 @@ func (eb *encryptedBlobNew) DecryptBlob(opts crypto.Opts, outname string) (db De
 		return nil, err
 	}
 
-	dec, err := decFile(eb.FileHandle, dk.DecKey)
+	r, err := db.ReadCloser()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	defer func() { err = utils.CheckedClose(r, err) }()
+
+	dec, err := decFile(r, dk.DecKey)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +97,6 @@ func (eb *encryptedBlobNew) DecryptBlob(opts crypto.Opts, outname string) (db De
 	return &decryptedBlob{
 		NoncryptedBlob: &NoncryptedBlob{
 			Filename:    outname,
-			FileHandle:  nil,
 			Size:        n,
 			ContentType: eb.ContentType,
 			Digest:      &dgst,
@@ -129,7 +134,7 @@ func (e *encryptedBlobCompat) DecryptBlob(opts crypto.Opts, outname string) (Dec
 }
 
 // EncryptBlob encrypts the key for the layer
-func (db *decryptedBlob) EncryptBlob(opts crypto.Opts, outname string) (EncryptedBlob, error) {
+func (db *decryptedBlob) EncryptBlob(opts crypto.Opts, outname string) (eb EncryptedBlob, err error) {
 	if err := os.MkdirAll(filepath.Dir(outname), 0700); err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -150,7 +155,13 @@ func (db *decryptedBlob) EncryptBlob(opts crypto.Opts, outname string) (Encrypte
 
 	zw := gzip.NewWriter(ew)
 
-	n, err := io.Copy(zw, db.FileHandle)
+	r, err := db.ReadCloser()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	defer func() { err = utils.CheckedClose(r, err) }()
+
+	n, err := io.Copy(zw, r)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -164,7 +175,6 @@ func (db *decryptedBlob) EncryptBlob(opts crypto.Opts, outname string) (Encrypte
 
 	nb := &NoncryptedBlob{
 		Filename:    outname,
-		FileHandle:  nil,
 		Size:        n,
 		ContentType: db.ContentType,
 		Digest:      &dgst,
@@ -193,7 +203,7 @@ func (db *decryptedBlob) EncryptBlob(opts crypto.Opts, outname string) (Encrypte
 	}, nil
 }
 
-func (cb *NoncryptedBlob) Compress(outfile string) (CompressedBlob, error) {
+func (ub *NoncryptedBlob) Compress(outfile string) (cb CompressedBlob, err error) {
 	if err := os.MkdirAll(filepath.Dir(outfile), 0700); err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -204,7 +214,13 @@ func (cb *NoncryptedBlob) Compress(outfile string) (CompressedBlob, error) {
 	}
 	defer func() { err = utils.CheckedClose(out, err) }()
 
-	zr, err := gzip.NewReader(cb.FileHandle)
+	r, err := ub.ReadCloser()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	defer func() { err = utils.CheckedClose(r, err) }()
+
+	zr, err := gzip.NewReader(r)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -221,14 +237,13 @@ func (cb *NoncryptedBlob) Compress(outfile string) (CompressedBlob, error) {
 
 	return &NoncryptedBlob{
 		Filename:    outfile,
-		FileHandle:  nil,
 		Size:        size,
-		ContentType: cb.ContentType,
+		ContentType: ub.ContentType,
 		Digest:      &dgst,
 	}, nil
 }
 
-func (cb *NoncryptedBlob) Decompress(outfile string) (DecompressedBlob, error) {
+func (cb *NoncryptedBlob) Decompress(outfile string) (db DecompressedBlob, err error) {
 	if err := os.MkdirAll(filepath.Dir(outfile), 0700); err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -243,7 +258,13 @@ func (cb *NoncryptedBlob) Decompress(outfile string) (DecompressedBlob, error) {
 	mw := io.MultiWriter(digester.Hash(), out)
 	zw := gzip.NewWriter(mw)
 
-	size, err := io.Copy(zw, cb.FileHandle)
+	r, err := db.ReadCloser()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	defer func() { err = utils.CheckedClose(r, err) }()
+
+	size, err := io.Copy(zw, r)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -252,7 +273,6 @@ func (cb *NoncryptedBlob) Decompress(outfile string) (DecompressedBlob, error) {
 
 	return &NoncryptedBlob{
 		Filename:    outfile,
-		FileHandle:  nil,
 		Size:        size,
 		ContentType: cb.ContentType,
 		Digest:      &dgst,
