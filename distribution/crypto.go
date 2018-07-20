@@ -15,6 +15,7 @@
 package distribution
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 
 	"github.com/Senetas/crypto-cli/crypto"
@@ -22,41 +23,60 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Crypto is the go type backing a crypto object in a manifest
-type Crypto struct {
+// EnCrypto is a encrypted key with the algotithms used to encrypt it and the data
+type EnCrypto struct {
 	Algos  crypto.Algos `json:"cryptoType"`
 	EncKey string       `json:"key"`
+}
+
+// DeCrypto is a decrypted key with the algotithms used to encrypt it and the data
+type DeCrypto struct {
+	Algos  crypto.Algos `json:"cryptoType"`
 	DecKey []byte       `json:"-"`
 }
 
-// Encrypt encrypts a plaintext key with a passphrase and salt
-func (c *Crypto) Encrypt(pass, salt string, algos crypto.Algos) error {
-	ciphertextKey, err := crypto.Enckey(c.DecKey, pass, salt)
-	if err != nil {
-		return errors.WithStack(utils.ErrEncrypt)
+func NewDecrypto(opts crypto.Opts) (*DeCrypto, error) {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return nil, err
 	}
-
-	c.EncKey = base64.URLEncoding.EncodeToString(ciphertextKey)
-	c.Algos = algos
-
-	return nil
+	return &DeCrypto{
+		Algos:  opts.EncType,
+		DecKey: key,
+	}, nil
 }
 
-// Decrypt is the inverse function of Encrypt (up to error, types etc)
-func (c *Crypto) Decrypt(pass, salt string, algos crypto.Algos) error {
-	if c.Algos != algos {
-		return utils.NewError("encryption type does not match decryption type", false)
-	}
+// EncryptKey encrypts a plaintext key with a passphrase and salt
+func EncryptKey(d DeCrypto, opts crypto.Opts) (EnCrypto, error) {
+	e := EnCrypto{Algos: d.Algos}
 
-	decoded, err := base64.URLEncoding.DecodeString(c.EncKey)
+	ciphertextKey, err := crypto.Enckey(d.DecKey, opts.Passphrase, opts.Salt)
 	if err != nil {
-		return errors.WithStack(utils.ErrDecrypt)
+		return EnCrypto{}, errors.WithStack(utils.ErrEncrypt)
 	}
 
-	c.DecKey, err = crypto.Deckey(decoded, pass, salt)
+	e.EncKey = base64.URLEncoding.EncodeToString(ciphertextKey)
+
+	return e, nil
+}
+
+// DecryptKey is the inverse function of EncryptKey (up to error)
+func DecryptKey(e EnCrypto, opts crypto.Opts) (DeCrypto, error) {
+	if e.Algos != opts.EncType {
+		return DeCrypto{}, utils.NewError("encryption type does not match decryption type", false)
+	}
+
+	d := DeCrypto{Algos: e.Algos}
+
+	decoded, err := base64.URLEncoding.DecodeString(e.EncKey)
 	if err != nil {
-		return errors.WithStack(utils.ErrDecrypt)
+		return DeCrypto{}, errors.WithStack(utils.ErrDecrypt)
 	}
 
-	return nil
+	d.DecKey, err = crypto.Deckey(decoded, opts.Passphrase, opts.Salt)
+	if err != nil {
+		return DeCrypto{}, errors.WithStack(utils.ErrDecrypt)
+	}
+
+	return d, nil
 }

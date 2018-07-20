@@ -16,9 +16,9 @@ package distribution
 
 // ImageManifest represents a docker image manifest schema v2.2
 type ImageManifest struct {
-	SchemaVersion int      `json:"schemaVersion"`
-	MediaType     string   `json:"mediaType"`
-	Config        *Layer   `json:"config"`
-	Layers        []*Layer `json:"layers"`
-	DirName       string   `json:"-"`
+	SchemaVersion int    `json:"schemaVersion"`
+	MediaType     string `json:"mediaType"`
+	Config        Blob   `json:"config"`
+	Layers        []Blob `json:"layers"`
+	DirName       string `json:"-"`
 }

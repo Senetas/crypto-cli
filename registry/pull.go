@@ -64,19 +64,13 @@ func PullImage(
 		errChan <- ctx.Err()
 		return
 	default:
-		log.Info().Msgf("Downloading config: %s", manifest.Config.Digest)
-		manifest.Config.Filename, err = PullFromDigest(
-			ctx,
-			token,
-			ref,
-			manifest.Config.Digest,
-			bldr,
-			downloadDir,
-		)
+		log.Info().Msgf("Downloading config: %s", manifest.Config.GetDigest())
+		filename, err := PullFromDigest(ctx, token, ref, manifest.Config.GetDigest(), bldr, downloadDir)
 		if err != nil {
 			errChan <- err
 			return
 		}
+		manifest.Config.SetFilename(filename)
 	}
 
 	log.Info().Msg("Downloading layers:")
@@ -87,12 +81,13 @@ func PullImage(
 			errChan <- ctx.Err()
 			return
 		default:
-			log.Info().Msgf("Downloading: %s", l.Digest)
-			l.Filename, err = PullFromDigest(ctx, token, ref, l.Digest, bldr, downloadDir)
+			log.Info().Msgf("Downloading: %s", l.GetDigest())
+			filename, err := PullFromDigest(ctx, token, ref, l.GetDigest(), bldr, downloadDir)
 			if err != nil {
 				errChan <- err
 				return
 			}
+			l.SetFilename(filename)
 		}
 	}
 

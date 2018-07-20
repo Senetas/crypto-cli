@@ -23,7 +23,6 @@ import (
 
 	"github.com/docker/distribution/registry/client/auth"
 	"github.com/docker/docker/client"
-	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	tarinator "github.com/verybluebot/tarinator-go"
@@ -31,7 +30,6 @@ import (
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/registry/names"
-	"github.com/Senetas/crypto-cli/utils"
 )
 
 // DecryptManifest attempts to decrypt a manifest from the manIn channel,
@@ -45,36 +43,46 @@ func DecryptManifest(
 	errChan chan<- error,
 ) {
 	manifest := <-manIn
+	outmanifest := *manifest
 	log.Info().Msg("begin decryption of keys")
 
-	// decrypt config key
-	opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
-	if err := manifest.Config.Decrypt(opts); err != nil {
+	var err error
+	var db distribution.Blob
+	switch blob := manifest.Config.(type) {
+	case distribution.EncryptedBlob:
+		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
+		db, err = blob.DecryptBlob(opts, "")
+	default:
+		err = errors.New("manifest is not decryptable")
+	}
+	if err != nil {
 		errChan <- err
 		manOut <- nil
 		cancel()
 		return
 	}
 
+	outmanifest.Config = db
+
 	// decrypt keys and files for layers
+	outmanifest.Layers = make([]distribution.Blob, len(manifest.Layers))
 	for i, l := range manifest.Layers {
-		switch {
-		case l.Crypto != nil:
-			fallthrough
-		case len(l.URLs) > 0:
+		switch blob := l.(type) {
+		case distribution.EncryptedBlob:
 			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
-			if err := l.Decrypt(opts); err != nil {
+			db, err = blob.DecryptBlob(opts, "")
+			if err != nil {
 				errChan <- err
 				manOut <- nil
 				cancel()
 				return
 			}
+			outmanifest.Layers[i] = db
 		default:
 		}
 	}
-
 	errChan <- nil
-	manOut <- manifest
+	manOut <- &outmanifest
 	log.Info().Msg("finished decryption of keys")
 }
 
@@ -85,29 +93,21 @@ func Manifest2Tar(
 	ref auth.Scope,
 	opts crypto.Opts,
 ) (tarball string, err error) {
-	dir := filepath.Dir(manifest.Config.Filename)
-	if err = os.MkdirAll(dir, 0700); err != nil {
-		return "", errors.Wrapf(err, "dir name = %s", dir)
-	}
+	dir := manifest.DirName
 
 	newDir := filepath.Join(dir, "new")
 	if err = os.MkdirAll(newDir, 0700); err != nil {
 		return "", errors.Wrapf(err, "dir name = %s", newDir)
 	}
 
-	d, err := decodeConfig(manifest, newDir)
-	if err != nil {
-		return "", err
-	}
-
 	archiveManifest := &distribution.ArchiveManifest{
-		Config:   d.Hex() + ".json",
+		Config:   filepath.Base(manifest.Config.GetFilename()),
 		RepoTags: []string{ref.String()},
 		Layers:   make([]string, len(manifest.Layers)),
 	}
 
-	if err = decodeLayers(manifest, newDir, archiveManifest); err != nil {
-		return "", err
+	for i, l := range manifest.Layers {
+		archiveManifest.Layers[i] = filepath.Base(l.GetFilename())
 	}
 
 	manifestfile := filepath.Join(newDir, "manifest.json")
@@ -153,73 +153,6 @@ func importImage(tarball string) error {
 	}
 	if err = resp.Body.Close(); err != nil {
 		return errors.Wrapf(err, "error closing response body: %v", resp)
-	}
-
-	return nil
-}
-
-func decodeConfig(manifest *distribution.ImageManifest, newDir string) (*digest.Digest, error) {
-	// decrypt config file
-	if err := crypto.DecFile(
-		manifest.Config.Filename,
-		manifest.Config.Filename+".dec",
-		manifest.Config.Crypto.DecKey,
-	); err != nil {
-		return nil, err
-	}
-
-	// decompress config file
-	d, err := utils.Decompress(manifest.Config.Filename + ".dec")
-	if err != nil {
-		return nil, err
-	}
-
-	conffile := d.Hex() + ".json"
-	if err = os.Rename(
-		manifest.Config.Filename+".dec.dec",
-		filepath.Join(newDir, conffile),
-	); err != nil {
-		return nil, errors.Wrapf(
-			err,
-			"could not rename %s to %s",
-			manifest.Config.Filename+".dec.dec",
-			filepath.Join(newDir, conffile),
-		)
-	}
-
-	return d, nil
-}
-
-func decodeLayers(
-	manifest *distribution.ImageManifest,
-	newDir string,
-	archiveManifest *distribution.ArchiveManifest,
-) error {
-	// decrypt files for layers
-	for i, l := range manifest.Layers {
-		// decrypt layer file
-		layerfile := l.Filename
-		if l.Crypto != nil {
-			layerfile = l.Filename + ".dec"
-			if err := crypto.DecFile(l.Filename, layerfile, l.Crypto.DecKey); err != nil {
-				return err
-			}
-		}
-
-		// decompress layer file
-		d, err := utils.Decompress(layerfile)
-		if err != nil {
-			return err
-		}
-
-		layerfile = layerfile + ".dec"
-		layernewname := filepath.Join(newDir, d.Hex()+".tar")
-
-		if err = os.Rename(layerfile, layernewname); err != nil {
-			return errors.Wrapf(err, "could not rename %s to %s", layerfile, layernewname)
-		}
-
-		archiveManifest.Layers[i] = d.Hex() + ".tar"
 	}
 
 	return nil
