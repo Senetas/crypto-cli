@@ -24,11 +24,9 @@ import (
 )
 
 func main() {
-	// use UNIX time for logs
-	zerolog.TimeFieldFormat = ""
-
 	// use a prettier logger
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	//log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	log.Logger = zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).With().Logger()
 
 	cmd.Execute()
 }
