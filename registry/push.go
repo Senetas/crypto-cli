@@ -121,22 +121,22 @@ func PushManifest(
 func PushLayer(
 	token dauth.Scope,
 	ref reference.Named,
-	layerData *distribution.Layer,
+	layerData distribution.Blob,
 	endpoint *registry.APIEndpoint,
 ) (err error) {
 	sep := names.SeperateRepository(ref)
-	dig := names.AppendDigest(sep, *layerData.Digest)
+	dig := names.AppendDigest(sep, *layerData.GetDigest())
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
 	layerExists, err := checkLayer(token, dig, bldr)
 	if err != nil {
 		return err
 	} else if layerExists {
-		log.Info().Msgf("Blob %s exists.", layerData.Digest)
+		log.Info().Msgf("Blob %s exists.", layerData.GetDigest())
 		return nil
 	}
 
-	log.Info().Msgf("Blob %s is new, proceed to upload", layerData.Digest)
+	log.Info().Msgf("Blob %s is new, proceed to upload", layerData.GetDigest())
 
 	// query the server for which location to upload to
 	loc, err := getUploadLoc(token, dig, bldr, layerData)
@@ -145,7 +145,6 @@ func PushLayer(
 	}
 
 	// now actually upload the blob
-	log.Info().Msgf("Uploading to: %v", loc)
 	return uploadBlob(loc, token, dig, bldr, layerData)
 }
 
@@ -181,7 +180,7 @@ func getUploadLoc(
 	token dauth.Scope,
 	dig reference.Named,
 	bldr *v2.URLBuilder,
-	layerData *distribution.Layer,
+	layerData distribution.Blob,
 ) (loc string, err error) {
 	// get the location to upload the blob
 	uploadURLStr, err := bldr.BuildBlobUploadURL(dig, nil)
@@ -203,7 +202,7 @@ func getUploadLoc(
 	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	if resp.StatusCode != http.StatusAccepted {
-		return "", errors.New("upload of layer " + layerData.Digest.String() + " was not accepted")
+		return "", errors.New("upload of layer " + layerData.GetDigest().String() + " was not accepted")
 	}
 
 	loc = resp.Header.Get("Location")
@@ -219,7 +218,7 @@ func uploadBlob(
 	token dauth.Scope,
 	dig reference.Canonical,
 	bldr *v2.URLBuilder,
-	layerData *distribution.Layer,
+	blob distribution.Blob,
 ) error {
 	u, err := url.Parse(loc)
 	if err != nil {
@@ -230,28 +229,30 @@ func uploadBlob(
 	if err != nil {
 		return errors.Wrapf(err, "rawquery = %v", u.RawQuery)
 	}
-	q.Add("digest", layerData.Digest.String())
-	rawq, err := url.QueryUnescape(q.Encode())
+
+	q.Add("digest", blob.GetDigest().String())
+	u.RawQuery, err = url.QueryUnescape(q.Encode())
 	if err != nil {
-		return errors.Wrapf(err, "could not extract uescape url query: %s", q.Encode())
+		return errors.WithStack(err)
 	}
-	u.RawQuery = rawq
 
 	// open the layer file to get size and upload
-	layerFH, err := os.Open(layerData.Filename)
+	blobFH, err := os.Open(blob.GetFilename())
 	if err != nil {
-		return errors.Wrapf(err, "could not open: %s", layerData.Filename)
+		return errors.Wrapf(err, "could not open: %s", blob.GetFilename())
 	}
 	// file will be closed by the http client
 
-	req, err := http.NewRequest("PUT", u.String(), layerFH)
+	req, err := http.NewRequest("PUT", u.String(), blobFH)
 	if err != nil {
 		return errors.Wrapf(err, "could not make req = %v", req)
 	}
 
-	req.Header.Add("Content-Length", strconv.FormatInt(layerData.Size, 10))
+	req.Header.Add("Content-Length", strconv.FormatInt(blob.GetSize(), 10))
 	req.Header.Add("Content-Type", "application/octect-stream")
 	auth.AddToReqest(token, req)
+
+	log.Info().Msgf("Uploading to: %s", u)
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, false, true)
 	if err != nil {
@@ -260,7 +261,7 @@ func uploadBlob(
 	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	if resp.StatusCode != http.StatusCreated {
-		return errors.New("upload of layer " + layerData.Digest.String() + " failed")
+		return errors.Errorf("upload of blob %s failed", blob.GetFilename())
 	}
 	return nil
 }

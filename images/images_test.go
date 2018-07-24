@@ -15,21 +15,23 @@
 package images_test
 
 import (
-	"context"
 	"os"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/distribution/reference"
+	"github.com/udhos/equalfile"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/images"
 	"github.com/Senetas/crypto-cli/registry/names"
-	"github.com/Senetas/crypto-cli/utils"
 )
 
-func testEncDecImage(t *testing.T, opts crypto.Opts) {
+func createManifest(t *testing.T, opts crypto.Opts) (
+	*distribution.ImageManifest,
+	names.NamedTaggedRepository,
+) {
 	ref, err := reference.ParseNormalizedNamed("narthanaepa1/my-alpine:test")
 	if err != nil {
 		t.Fatal(err)
@@ -45,49 +47,51 @@ func testEncDecImage(t *testing.T, opts crypto.Opts) {
 		t.Fatal(err)
 	}
 
-	t.Log(spew.Sdump(manifest))
+	return manifest, ref2
+}
 
-	_, cancel := context.WithCancel(context.Background())
+// Todo, compare contents
+func testEncDecImage(t *testing.T, opts crypto.Opts) {
+	manifest, ref := createManifest(t, opts)
 
-	manChan := make(chan *distribution.ImageManifest)
-	manChan2 := make(chan *distribution.ImageManifest)
-	errChan2 := make(chan error)
-
-	defer close(manChan)
-	defer close(manChan2)
-	defer close(errChan2)
-
-	go images.DecryptManifest(cancel, manChan, ref2, opts, manChan2, errChan2)
-
-	manChan <- manifest
-
-	errs := make(utils.Errors, 0)
-	for i := 0; i < 2; {
-		select {
-		case err2 := <-errChan2:
-			if err2 != nil {
-				errs = append(errs, err2)
-			}
-			i++
-		case manifest = <-manChan2:
-			i++
-		default:
-		}
-	}
-
-	if len(errs) != 0 {
-		t.Fatal(errs)
-	}
-
-	t.Log(spew.Sdump(manifest))
-
-	if _, err = images.Manifest2Tar(manifest, ref2, opts); err != nil {
+	encManifest, err := manifest.Encrypt(ref, opts)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err = os.RemoveAll(manifest.DirName); err != nil {
-		t.Log(err)
+	t.Log(spew.Sdump(manifest))
+
+	decManifest, err := distribution.DecryptManifest(encManifest, ref, opts)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	t.Log(spew.Sdump(manifest))
+
+	if _, err = images.Manifest2Tar(manifest, ref, opts); err != nil {
+		t.Fatal(err)
+	}
+
+	cmp := equalfile.New(nil, equalfile.Options{})
+	equal, err := cmp.CompareFile(manifest.Config.GetFilename(), decManifest.Config.GetFilename())
+	if err != nil {
+		t.Error(err)
+	}
+	if !equal {
+		t.Error("files not equal")
+	}
+
+	for i, l := range manifest.Layers {
+		equal, err := cmp.CompareFile(l.GetFilename(), decManifest.Layers[i].GetFilename())
+		if err != nil {
+			t.Error(err)
+		}
+		if !equal {
+			t.Error("files not equal")
+		}
+	}
+
+	cleanUp(t, manifest)
 }
 
 func TestEncDecImage(t *testing.T) {
@@ -108,4 +112,14 @@ func TestCompatEncDecImage(t *testing.T) {
 	}
 	t.Logf("testing compat")
 	testEncDecImage(t, opts)
+}
+
+func cleanUp(t *testing.T, manifest *distribution.ImageManifest) {
+	if err := os.RemoveAll(manifest.DirName); err != nil {
+		t.Log(err)
+	}
+
+	if err := os.Remove(manifest.DirName + ".tar"); err != nil {
+		t.Log(err)
+	}
 }

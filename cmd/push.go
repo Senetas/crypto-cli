@@ -16,7 +16,6 @@ package cmd
 
 import (
 	"github.com/docker/distribution/reference"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -57,11 +56,11 @@ func checkFlagsPush(f *pflag.Flag) {
 func runPush(remote string, opts crypto.Opts) error {
 	ref, err := reference.ParseNormalizedNamed(remote)
 	if err != nil {
-		return errors.Wrapf(err, "remote = ", remote)
+		return err
 	}
 
 	if err = images.PushImage(ref, opts); err != nil {
-		return errors.Wrapf(err, "ref = %v, cryptotype = %v", ref, opts.EncType)
+		return err
 	}
 
 	return nil

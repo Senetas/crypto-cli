@@ -36,8 +36,12 @@ func PushImage(ref reference.Named, opts crypto.Opts) (err error) {
 		return err
 	}
 
-	// Upload to registry
-	if err = registry.PushImage(token, nTRep, manifest, endpoint); err != nil {
+	encManifest, err := manifest.Encrypt(nTRep, opts)
+	if err != nil {
+		return err
+	}
+
+	if err = registry.PushImage(token, nTRep, encManifest, endpoint); err != nil {
 		return err
 	}
 
@@ -47,7 +51,7 @@ func PushImage(ref reference.Named, opts crypto.Opts) (err error) {
 	}
 
 	if err = os.RemoveAll(manifest.DirName); err != nil {
-		return errors.Wrapf(err, "could not clean up temp files in: %s", manifest.DirName+".tar")
+		return errors.Wrapf(err, "could not clean up temp files in: %s", manifest.DirName)
 	}
 
 	return nil

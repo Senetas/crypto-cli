@@ -17,12 +17,12 @@ package images
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
@@ -37,8 +37,7 @@ import (
 	"github.com/Senetas/crypto-cli/utils"
 )
 
-// CreateManifest creates a manifest and encrypts all necessary parts of it
-// These are they ready to be uploaded to a regitry
+// CreateManifest creates an unencrypted manifest (with the data necessary for encryption)
 func CreateManifest(
 	ref names.NamedTaggedRepository,
 	opts crypto.Opts,
@@ -46,14 +45,33 @@ func CreateManifest(
 	manifest *distribution.ImageManifest,
 	err error,
 ) {
-	layers, tarFH, err := getImgTarLayers(ref.Path(), ref.Tag())
+	ctx := context.Background()
+
+	// TODO: fix hardcoded version if necessary
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
+	if err != nil {
+		return nil, utils.StripTrace(errors.Wrap(err, "could not create client for docker daemon"))
+	}
+
+	inspt, _, err := cli.ImageInspectWithRaw(ctx, ref.String())
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	tarFH, err := cli.ImageSave(ctx, []string{inspt.ID})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	layers, err := layersToEncrypt(ctx, cli, inspt)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { err = utils.CheckedClose(tarFH, err) }()
+
 	log.Info().Msgf("The following layers are to be encrypted: %v", layers)
 
-	// output image
+	// output manifest
 	manifest = &distribution.ImageManifest{
 		SchemaVersion: 2,
 		MediaType:     distribution.MediaTypeManifest,
@@ -65,66 +83,35 @@ func CreateManifest(
 		return nil, err
 	}
 
-	configData, layerData, err := findLayers(ref.Path(), ref.Tag(), manifest.DirName, layers)
+	configBlob, layerBlobs, err := mkBolbs(ref.Path(), ref.Tag(), manifest.DirName, layers, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	manifest.Config = configData
-	manifest.Layers = layerData
-
-	opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
-	if err = manifest.Config.Encrypt(opts); err != nil {
-		return nil, err
-	}
-
-	for i, l := range manifest.Layers {
-		opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
-		if l.Crypto != nil {
-			if err = l.Encrypt(opts); err != nil {
-				return nil, err
-			}
-		}
-	}
+	manifest.Config = configBlob
+	manifest.Layers = layerBlobs
 
 	return manifest, nil
 }
 
-func getImgTarLayers(repo, tag string) ([]string, io.ReadCloser, error) {
-	ctx := context.Background()
-
-	// TODO: fix hardcoded version/ check if necessary
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
-	if err != nil {
-		return nil, nil, utils.StripTrace(errors.Wrap(err, "could not create client for docker daemon"))
-	}
-
-	inspt, _, err := cli.ImageInspectWithRaw(ctx, repo+":"+tag)
-	if err != nil {
-		return nil, nil, errors.WithStack(err)
-	}
-
-	img, err := cli.ImageSave(ctx, []string{inspt.ID})
-	if err != nil {
-		return nil, nil, errors.WithStack(err)
-	}
-
+func layersToEncrypt(ctx context.Context, cli *client.Client, inspt types.ImageInspect) ([]string, error) {
 	// get the history
-	hist, err := cli.ImageHistory(ctx, repo+":"+tag)
+	hist, err := cli.ImageHistory(ctx, inspt.ID)
 	if err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
-	// findLayers
+	// the number of layers to encrypt
 	n, err := numLayers(hist)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
+	// the total number of layers
 	m := len(inspt.RootFS.Layers)
-	layers := inspt.RootFS.Layers[m-n:]
 
-	return layers, img, nil
+	// the last n entries in this array are the diffIDs of the layers to encrypt
+	return inspt.RootFS.Layers[m-n:], nil
 }
 
 func extractTarBall(tarFH io.Reader, manifest *distribution.ImageManifest) (err error) {
@@ -155,19 +142,15 @@ func extractTarBall(tarFH io.Reader, manifest *distribution.ImageManifest) (err 
 	return nil
 }
 
-type configLayers struct {
-	Config string
-	Layers []string
-}
-
 // find the layer files that correponds to the digests we want to encrypt
 // TODO: find a way to do this by interfacing with the daemon directly
-func findLayers(
+func mkBolbs(
 	repo, tag, path string,
 	layers []string,
+	opts crypto.Opts,
 ) (
-	config *distribution.Layer,
-	layer []*distribution.Layer,
+	configBlob distribution.Blob,
+	layerBlobs []distribution.Blob,
 	err error,
 ) {
 	// assemble layers
@@ -184,44 +167,42 @@ func findLayers(
 	}
 	defer func() { err = utils.CheckedClose(manifestFH, err) }()
 
-	images, configfile, err := mkConfig(path, manifestFH)
+	image, err := mkArchiveStruct(path, manifestFH)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	filename, d, size, key, err := encryptLayer(configfile)
+	// make the config
+	dec, err := distribution.NewDecrypto(opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	config = distribution.NewConfig(filename, d, size, key)
+	configBlob = distribution.NewConfigBlob(filepath.Join(path, image.Config), nil, 0, dec)
 
-	layer = make([]*distribution.Layer, len(images[0].Layers))
-	for i, f := range images[0].Layers {
+	layerBlobs = make([]distribution.Blob, len(image.Layers))
+	for i, f := range image.Layers {
 		basename := filepath.Join(path, f)
 
-		d, err = fileDigest(basename)
+		dec, err := distribution.NewDecrypto(opts)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		d, err := fileDigest(basename)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		if layerSet[d.String()] {
-			log.Info().Msgf("encrypting %s", d)
-			filename, d, size, key, err := encryptLayer(basename)
-			if err != nil {
-				return nil, nil, err
-			}
-			layer[i] = distribution.NewLayer(filename, d, size, key)
+			log.Info().Msgf("preparing %s", d)
+			layerBlobs[i] = distribution.NewLayerBlob(filepath.Join(path, f), d, 0, dec)
 		} else {
-			filename, d, size, err := compressLayer(basename)
-			if err != nil {
-				return nil, nil, err
-			}
-			layer[i] = distribution.NewPlainLayer(filename, d, size)
+			layerBlobs[i] = distribution.NewPlainLayer(filepath.Join(path, f), d, 0)
 		}
 	}
 
-	return config, layer, nil
+	return configBlob, layerBlobs, nil
 }
 
 func fileDigest(filename string) (*digest.Digest, error) {
@@ -229,6 +210,7 @@ func fileDigest(filename string) (*digest.Digest, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not open file: %s", filename)
 	}
+	defer func() { err = utils.CheckedClose(fh, err) }()
 
 	d, err := digest.Canonical.FromReader(fh)
 	if err != nil {
@@ -249,54 +231,21 @@ func numLayers(hist []image.HistoryResponseItem) (n int, err error) {
 	return 0, utils.NewError("this image was not built with the correct LABEL", false)
 }
 
-func compressLayer(filename string) (compFile string, d *digest.Digest, size int64, err error) {
-	compFile = filename + ".gz"
-
-	d, err = utils.CompressWithDigest(filename)
-	if err != nil {
-		return "", nil, 0, err
-	}
-
-	stat, err := os.Stat(compFile)
-	if err != nil {
-		return "", nil, 0, errors.Wrapf(err, "could not stat file: %s", compFile)
-	}
-
-	return compFile, d, stat.Size(), nil
+type archiveStruct struct {
+	Config string
+	Layers []string
 }
 
-func encryptLayer(filename string) (encname string, d *digest.Digest, size int64, key []byte, err error) {
-	compname := filename + ".gz"
-	encname = compname + ".aes"
-
-	if err = utils.Compress(filename); err != nil {
-		return "", nil, 0, nil, err
-	}
-
-	key, err = crypto.GenDataKey()
-	if err != nil {
-		return "", nil, 0, nil, err
-	}
-
-	d, size, err = crypto.EncFile(compname, encname, key)
-	if err != nil {
-		return "", nil, 0, nil, err
-	}
-
-	return encname, d, size, key, nil
-}
-
-func mkConfig(path string, manifestFH io.Reader) ([]*configLayers, string, error) {
-	var images []*configLayers
+func mkArchiveStruct(path string, manifestFH io.Reader) (*archiveStruct, error) {
+	var images []*archiveStruct
 	dec := json.NewDecoder(manifestFH)
 	if err := dec.Decode(&images); err != nil {
-		return nil, "", errors.Wrapf(err, "error unmarshalling manifest")
+		return nil, errors.Wrapf(err, "error unmarshalling manifest")
 	}
 
 	if len(images) < 1 {
-		return nil, "", errors.New("no image data was found")
+		return nil, errors.New("no image data was found")
 	}
 
-	configfile := filepath.Join(path, images[0].Config)
-	return images, configfile, nil
+	return images[0], nil
 }
