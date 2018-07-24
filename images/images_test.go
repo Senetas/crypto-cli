@@ -68,7 +68,7 @@ func testEncDecImage(t *testing.T, opts crypto.Opts) {
 
 	t.Log(spew.Sdump(manifest))
 
-	if _, err := images.Manifest2Tar(manifest, ref, opts); err != nil {
+	if _, err = images.Manifest2Tar(manifest, ref, opts); err != nil {
 		t.Fatal(err)
 	}
 
@@ -91,13 +91,7 @@ func testEncDecImage(t *testing.T, opts crypto.Opts) {
 		}
 	}
 
-	if err := os.RemoveAll(manifest.DirName); err != nil {
-		t.Log(err)
-	}
-
-	if err := os.Remove(manifest.DirName + ".tar"); err != nil {
-		t.Log(err)
-	}
+	cleanUp(t, manifest)
 }
 
 func TestEncDecImage(t *testing.T) {
@@ -118,4 +112,14 @@ func TestCompatEncDecImage(t *testing.T) {
 	}
 	t.Logf("testing compat")
 	testEncDecImage(t, opts)
+}
+
+func cleanUp(t *testing.T, manifest *distribution.ImageManifest) {
+	if err := os.RemoveAll(manifest.DirName); err != nil {
+		t.Log(err)
+	}
+
+	if err := os.Remove(manifest.DirName + ".tar"); err != nil {
+		t.Log(err)
+	}
 }

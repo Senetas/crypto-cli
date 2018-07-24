@@ -21,45 +21,48 @@ const (
 func (m *ImageManifest) UnmarshalJSON(data []byte) (err error) {
 
 	manifestMap := make(map[string]json.RawMessage)
-	if err := json.Unmarshal(data, &manifestMap); err != nil {
+	if err = json.Unmarshal(data, &manifestMap); err != nil {
 		return errors.WithStack(err)
 	}
 
 	for k, v := range manifestMap {
 		switch k {
 		case "mediaType":
-			if err := json.Unmarshal(v, &m.MediaType); err != nil {
-				return errors.WithStack(err)
-			}
+			err = json.Unmarshal(v, &m.MediaType)
 		case "schemaVersion":
-			if err := json.Unmarshal(v, &m.SchemaVersion); err != nil {
-				return errors.WithStack(err)
-			}
+			err = json.Unmarshal(v, &m.SchemaVersion)
 		case "config":
-			if m.Config, err = unmarshalBlob(v); err != nil {
-				return errors.WithStack(err)
-			}
+			m.Config, err = unmarshalBlob(v)
 		case "layers":
-			var layerJSONs []json.RawMessage
-			if err := json.Unmarshal(v, &layerJSONs); err != nil {
-				return errors.WithStack(err)
-			}
-
-			m.Layers = make([]Blob, len(layerJSONs))
-			for i, l := range layerJSONs {
-				if m.Layers[i], err = unmarshalBlob(l); err != nil {
-					return errors.WithStack(err)
-				}
-			}
+			m.Layers, err = unmarshalLayers(v)
 		default:
+		}
+		if err != nil {
+			return errors.WithStack(err)
 		}
 	}
 	return nil
 }
 
+func unmarshalLayers(v json.RawMessage) (_ []Blob, err error) {
+	var layerJSONs []json.RawMessage
+	err = json.Unmarshal(v, &layerJSONs)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	layers := make([]Blob, len(layerJSONs))
+	var err2 error
+	for i, l := range layerJSONs {
+		if layers[i], err2 = unmarshalBlob(l); err2 != nil {
+			return nil, errors.WithStack(err)
+		}
+	}
+	return layers, nil
+}
+
 func unmarshalBlob(m json.RawMessage) (_ Blob, err error) {
 	var (
-		bT        blobType
 		mediaType string
 		size      int64
 		d         digest.Digest
@@ -72,44 +75,9 @@ func unmarshalBlob(m json.RawMessage) (_ Blob, err error) {
 		return nil, errors.WithStack(err)
 	}
 
-	for k, v := range blobMap {
-		switch k {
-		case "mediatype":
-			if err = json.Unmarshal(v, &mediaType); err != nil {
-				return nil, errors.WithStack(err)
-			}
-		case "size":
-			if err = json.Unmarshal(v, &size); err != nil {
-				return nil, errors.WithStack(err)
-			}
-		case "digest":
-			var digestStr string
-			if err = json.Unmarshal(v, &digestStr); err != nil {
-				return nil, errors.WithStack(err)
-			}
-			if d, err = digest.Parse(digestStr); err != nil {
-				return nil, errors.WithStack(err)
-			}
-		case "crypto":
-			if err = json.Unmarshal(v, &enCrypto); err != nil {
-				return nil, errors.WithStack(err)
-			}
-			bT = current
-		case "urls":
-			if err = json.Unmarshal(v, &urls); err != nil {
-				return nil, errors.WithStack(err)
-			}
-			if bT == unknown {
-				bT = compat
-			} else {
-				return nil, errors.New("blob contains both new and compat crypto formats")
-			}
-		default:
-		}
-	}
-
-	if bT == unknown {
-		bT = plain
+	bT, err := loadFields(blobMap, &mediaType, &size, &d, &enCrypto, &urls)
+	if err != nil {
+		return nil, err
 	}
 
 	nb := &NoncryptedBlob{
@@ -118,11 +86,85 @@ func unmarshalBlob(m json.RawMessage) (_ Blob, err error) {
 		Digest:      &d,
 	}
 
+	return fillBlob(bT, nb, &enCrypto, urls)
+}
+
+func loadFields(
+	blobMap map[string]json.RawMessage,
+	mediaType *string,
+	size *int64,
+	d *digest.Digest,
+	enCrypto *EnCrypto,
+	urls *[]string,
+) (_ blobType, err error) {
+	bT := unknown
+
+	for k, v := range blobMap {
+		if err = parseKey(k, v, blobMap, &bT, mediaType, size, d, enCrypto, urls); err != nil {
+			return unknown, errors.WithStack(err)
+		}
+	}
+
+	if bT == unknown {
+		return plain, nil
+	}
+
+	return bT, nil
+}
+
+func parseKey(
+	k string,
+	v json.RawMessage,
+	blobMap map[string]json.RawMessage,
+	bT *blobType,
+	mediaType *string,
+	size *int64,
+	d *digest.Digest,
+	enCrypto *EnCrypto,
+	urls *[]string,
+) (err error) {
+
+	switch k {
+	case "mediaType":
+		return json.Unmarshal(v, mediaType)
+	case "size":
+		return json.Unmarshal(v, size)
+	case "digest":
+		return unmarshalDigest(v, d)
+	case "crypto":
+		*bT = current
+		return json.Unmarshal(v, enCrypto)
+	case "urls":
+		if *bT == unknown {
+			*bT = compat
+		} else {
+			return errors.New("blob contains both new and compat crypto formats")
+		}
+		return json.Unmarshal(v, urls)
+	default:
+		return nil
+	}
+}
+
+func unmarshalDigest(v json.RawMessage, d *digest.Digest) (err error) {
+	var digestStr string
+	err = json.Unmarshal(v, &digestStr)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	*d, err = digest.Parse(digestStr)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
+}
+
+func fillBlob(bT blobType, nb *NoncryptedBlob, enCrypto *EnCrypto, urls []string) (Blob, error) {
 	switch bT {
 	case current:
 		return &encryptedBlobNew{
 			NoncryptedBlob: nb,
-			EnCrypto:       &enCrypto,
+			EnCrypto:       enCrypto,
 		}, nil
 	case compat:
 		return &encryptedBlobCompat{
@@ -132,7 +174,6 @@ func unmarshalBlob(m json.RawMessage) (_ Blob, err error) {
 	case plain:
 		return nb, nil
 	default:
+		return nil, errors.New("could not determine type of crypto")
 	}
-
-	return nil, errors.New("could not determine type of crypto")
 }

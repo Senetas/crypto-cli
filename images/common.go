@@ -34,9 +34,6 @@ import (
 
 const (
 	labelString = "LABEL com.senetas.crypto.enabled=true"
-	saltBase    = "com.senetas.crypto/%s/%s"
-	configSalt  = saltBase + "/config"
-	layerSalt   = saltBase + "/layer%d"
 )
 
 var tempRoot = filepath.Join(os.TempDir(), "com.senetas.crypto")

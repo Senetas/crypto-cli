@@ -161,7 +161,7 @@ func createTempFile(t *testing.T, dir string) (int64, digest.Digest, string) {
 		t.Fatal(err)
 	}
 	defer func() {
-		if err := fh.Close(); err != nil {
+		if err = fh.Close(); err != nil {
 			t.Log(err)
 		}
 	}()
@@ -190,7 +190,7 @@ func mkTempFile(t *testing.T, dir string) (int64, digest.Digest, string) {
 		t.Error(err)
 	}
 	defer func() {
-		if err := fh.Close(); err != nil {
+		if err = fh.Close(); err != nil {
 			t.Log(err)
 		}
 	}()
