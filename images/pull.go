@@ -74,7 +74,7 @@ func pullAndDecrypt(
 ) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// TODO: make this more light weight and SAFE!
+	// TODO: make this more light weight
 	manChan := make(chan *distribution.ImageManifest)
 	manChan2 := make(chan *distribution.ImageManifest)
 	errChan := make(chan error)

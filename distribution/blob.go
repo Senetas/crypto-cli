@@ -66,13 +66,13 @@ type DecompressedBlob interface {
 // EncryptedBlob is the go type for an encrypted element in the layer array
 type encryptedBlobNew struct {
 	*NoncryptedBlob
-	*EnCrypto `json:"crypto,omitempty"`
+	*EnCrypto `json:"crypto"`
 }
 
 // EncryptedBlob is the go type for an encrypted element in the layer array
 type encryptedBlobCompat struct {
 	*NoncryptedBlob
-	URLs []string `json:"urls,omitempty"`
+	URLs []string `json:"urls"`
 }
 
 // DecryptedBlob is the go type for encryptable element in the layer array

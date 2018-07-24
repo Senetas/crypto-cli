@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -100,6 +101,7 @@ func PullManifest(
 	ref reference.Named,
 	bldr *v2.URLBuilder,
 ) (manifest *distribution.ImageManifest, err error) {
+	log.Debug().Caller().Msg("begin pull manifest")
 	urlStr, err := bldr.BuildManifestURL(ref)
 	if err != nil {
 		return nil, errors.Wrapf(err, "ref = %v", ref)
@@ -125,11 +127,21 @@ func PullManifest(
 		return nil, errors.New("manifest download failed with status: " + resp.Status)
 	}
 
-	body := json.NewDecoder(resp.Body)
-	manifest = &distribution.ImageManifest{}
-	if err = body.Decode(manifest); err != nil {
-		return nil, errors.Wrapf(err, "body = %#v", body)
+	//if err = json.NewDecoder(resp.Body).Decode(manifest); err != nil {
+	//return nil, errors.Wrapf(err, "body = %s", resp.Body)
+	//}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
+
+	manifest = &distribution.ImageManifest{}
+	if err = json.Unmarshal(body, manifest); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	log.Info().Msgf("%v", manifest)
 
 	return manifest, nil
 }
@@ -170,6 +182,8 @@ func PullFromDigest(
 	if resp.StatusCode != http.StatusOK {
 		return "", errors.Errorf("Failed to download blob %s", d)
 	}
+
+	log.Debug().Caller().Msgf("status = %s", resp.Status)
 
 	fn = filepath.Join(dir, d.Encoded())
 	fh, err := os.Create(fn)

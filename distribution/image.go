@@ -108,6 +108,7 @@ func DecryptManifest(
 	default:
 		err = errors.New("manifest is not decryptable")
 	}
+	log.Debug().Caller().Msgf("config = %v", config)
 	if err != nil {
 		errChan <- err
 		manOut <- nil
