@@ -15,7 +15,6 @@
 package images
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 
@@ -29,7 +28,6 @@ import (
 	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/registry"
 	"github.com/Senetas/crypto-cli/registry/names"
-	"github.com/Senetas/crypto-cli/utils"
 )
 
 // PullImage pulls an image from the registry
@@ -59,6 +57,10 @@ func PullImage(ref reference.Named, opts crypto.Opts) (err error) {
 		return err
 	}
 
+	if err = os.RemoveAll(dir); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -72,44 +74,9 @@ func pullAndDecrypt(
 	*distribution.ImageManifest,
 	error,
 ) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	// TODO: make this more light weight
-	manChan := make(chan *distribution.ImageManifest)
-	manChan2 := make(chan *distribution.ImageManifest)
-	errChan := make(chan error)
-	errChan2 := make(chan error)
-	defer close(manChan)
-	defer close(manChan2)
-	defer close(errChan)
-	defer close(errChan2)
-
-	go registry.PullImage(ctx, token, nTRep, endpoint, dir, manChan, errChan)
-	go distribution.DecryptManifest(cancel, manChan, nTRep, opts, manChan2, errChan2)
-
-	errs := make(utils.Errors, 0)
-	var manifest *distribution.ImageManifest
-	for i := 0; i < 3; {
-		select {
-		case err2 := <-errChan:
-			if err2 != nil {
-				errs = append(errs, err2)
-			}
-			i++
-		case err2 := <-errChan2:
-			if err2 != nil {
-				errs = append(errs, err2)
-			}
-			i++
-		case manifest = <-manChan2:
-			i++
-		default:
-		}
+	manifest, err := registry.PullImage(token, nTRep, endpoint, opts, dir)
+	if err != nil {
+		return nil, err
 	}
-
-	if len(errs) != 0 {
-		return nil, errs
-	}
-
-	return manifest, nil
+	return distribution.DecryptManifest(manifest, nTRep, opts)
 }

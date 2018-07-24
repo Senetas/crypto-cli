@@ -15,7 +15,6 @@
 package registry
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -31,6 +30,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/registry/auth"
 	"github.com/Senetas/crypto-cli/registry/httpclient"
@@ -40,59 +40,38 @@ import (
 
 // PullImage pulls an image from a remote repository
 func PullImage(
-	ctx context.Context,
 	token dauth.Scope,
 	ref reference.Named,
 	endpoint *registry.APIEndpoint,
+	opts crypto.Opts,
 	downloadDir string,
-	manChan chan<- *distribution.ImageManifest,
-	errChan chan<- error,
-) {
+) (*distribution.ImageManifest, error) {
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
 	log.Info().Msg("Obtaining Manifest")
-	manifest, err := PullManifest(token, ref, bldr)
+	manifest, err := PullManifest(token, ref, bldr, downloadDir)
 	if err != nil {
-		errChan <- err
-		return
+		return nil, err
 	}
 
-	manChan <- manifest
-
-	select {
-	case <-ctx.Done():
-		log.Error().Msg("config download cancelled")
-		errChan <- ctx.Err()
-		return
-	default:
-		log.Info().Msgf("Downloading config: %s", manifest.Config.GetDigest())
-		filename, err := PullFromDigest(ctx, token, ref, manifest.Config.GetDigest(), bldr, downloadDir)
-		if err != nil {
-			errChan <- err
-			return
-		}
-		manifest.Config.SetFilename(filename)
+	log.Info().Msgf("Downloading config: %s", manifest.Config.GetDigest())
+	filename, err := PullFromDigest(token, ref, manifest.Config.GetDigest(), bldr, downloadDir)
+	if err != nil {
+		return nil, err
 	}
+	manifest.Config.SetFilename(filename)
 
 	log.Info().Msg("Downloading layers:")
 	for _, l := range manifest.Layers {
-		select {
-		case <-ctx.Done():
-			log.Error().Msg("layer download cancelled")
-			errChan <- ctx.Err()
-			return
-		default:
-			log.Info().Msgf("Downloading: %s", l.GetDigest())
-			filename, err := PullFromDigest(ctx, token, ref, l.GetDigest(), bldr, downloadDir)
-			if err != nil {
-				errChan <- err
-				return
-			}
-			l.SetFilename(filename)
+		log.Info().Msgf("Downloading: %s", l.GetDigest())
+		filename, err := PullFromDigest(token, ref, l.GetDigest(), bldr, downloadDir)
+		if err != nil {
+			return nil, err
 		}
+		l.SetFilename(filename)
 	}
 
-	errChan <- nil
+	return manifest, nil
 }
 
 // PullManifest pulls a manifest from the registry and parses it
@@ -100,8 +79,8 @@ func PullManifest(
 	token dauth.Scope,
 	ref reference.Named,
 	bldr *v2.URLBuilder,
-) (manifest *distribution.ImageManifest, err error) {
-	log.Debug().Caller().Msg("begin pull manifest")
+	dir string,
+) (_ *distribution.ImageManifest, err error) {
 	urlStr, err := bldr.BuildManifestURL(ref)
 	if err != nil {
 		return nil, errors.Wrapf(err, "ref = %v", ref)
@@ -127,21 +106,17 @@ func PullManifest(
 		return nil, errors.New("manifest download failed with status: " + resp.Status)
 	}
 
-	//if err = json.NewDecoder(resp.Body).Decode(manifest); err != nil {
-	//return nil, errors.Wrapf(err, "body = %s", resp.Body)
-	//}
-
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	manifest = &distribution.ImageManifest{}
+	manifest := &distribution.ImageManifest{DirName: dir}
 	if err = json.Unmarshal(body, manifest); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	log.Info().Msgf("%v", manifest)
+	log.Info().Msgf("%s", body)
 
 	return manifest, nil
 }
@@ -149,7 +124,6 @@ func PullManifest(
 // PullFromDigest downloads a blob (refereced by its digest) from the registry to a temporay file.
 // It verifies that the downloaded matches its digest, deleting if if it does not
 func PullFromDigest(
-	ctx context.Context,
 	token dauth.Scope,
 	ref reference.Named,
 	d *digest.Digest,
@@ -168,7 +142,6 @@ func PullFromDigest(
 	if err != nil {
 		return "", errors.Wrapf(err, "GET %s", urlStr)
 	}
-	req = req.WithContext(ctx)
 
 	req.Header.Set("Accept", distribution.MediaTypeLayer)
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
@@ -182,8 +155,6 @@ func PullFromDigest(
 	if resp.StatusCode != http.StatusOK {
 		return "", errors.Errorf("Failed to download blob %s", d)
 	}
-
-	log.Debug().Caller().Msgf("status = %s", resp.Status)
 
 	fn = filepath.Join(dir, d.Encoded())
 	fh, err := os.Create(fn)

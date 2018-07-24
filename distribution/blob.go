@@ -38,8 +38,18 @@ type EncryptedBlob interface {
 	// DecryptBlob decrypts:
 	//     The Key encryption key contained in the "EnCrypto" struct
 	//     The data stream in the FileHandle io.Reader
-	// The data is also decompressed and written to a file which is referenced in the "Filename"
+	// The data is also decompressed and written to a file which is referenced
+	// in the "Filename"
 	DecryptBlob(opts crypto.Opts, outfile string) (DecryptedBlob, error)
+	DecryptKey(opts crypto.Opts) (KeyDecryptedBlob, error)
+}
+
+// KeyDecryptedBlob is a type for blobs that have had their key objects
+// decrypted but not their files
+type KeyDecryptedBlob interface {
+	Blob
+	DecryptFile(opts crypto.Opts, outfile string) (DecryptedBlob, error)
+	EncryptKey(opts crypto.Opts) (EncryptedBlob, error)
 }
 
 // DecryptedBlob is a blob that may be encrypted
@@ -73,6 +83,11 @@ type encryptedBlobNew struct {
 type encryptedBlobCompat struct {
 	*NoncryptedBlob
 	URLs []string `json:"urls"`
+}
+
+type keyDecryptedBlob struct {
+	*NoncryptedBlob
+	*DeCrypto `json:"-"`
 }
 
 // DecryptedBlob is the go type for encryptable element in the layer array

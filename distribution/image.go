@@ -15,7 +15,6 @@
 package distribution
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/Senetas/crypto-cli/crypto"
@@ -85,21 +84,38 @@ func (m *ImageManifest) Encrypt(
 	}, nil
 }
 
+// DecryptKeys attempts to decrypt all keys in a manifest
+func (m *ImageManifest) DecryptKeys(opts crypto.Opts) (err error) {
+	if db, ok := m.Config.(EncryptedBlob); ok {
+		m.Config, err = db.DecryptKey(opts)
+		if err != nil {
+			return err
+		}
+	} else {
+		return errors.New("mainfest blobs are of wrong type")
+	}
+
+	for i, l := range m.Layers {
+		if db, ok := l.(EncryptedBlob); ok {
+			m.Layers[i], err = db.DecryptKey(opts)
+			if err != nil {
+				return err
+			}
+		} else {
+			return errors.New("mainfest blobs are of wrong type")
+		}
+	}
+	return nil
+}
+
 // DecryptManifest attempts to decrypt a manifest from the manIn channel,
 // sending to manOut. It will call cancel on error.
 func DecryptManifest(
-	cancel context.CancelFunc,
-	manIn <-chan *ImageManifest,
+	manifest *ImageManifest,
 	ref names.NamedTaggedRepository,
 	opts crypto.Opts,
-	manOut chan<- *ImageManifest,
-	errChan chan<- error,
-) {
-	manifest := <-manIn
-
+) (_ *ImageManifest, err error) {
 	log.Info().Msg("begin decryption of keys")
-
-	var err error
 	var config Blob
 	switch blob := manifest.Config.(type) {
 	case EncryptedBlob:
@@ -108,12 +124,8 @@ func DecryptManifest(
 	default:
 		err = errors.New("manifest is not decryptable")
 	}
-	log.Debug().Caller().Msgf("config = %v", config)
 	if err != nil {
-		errChan <- err
-		manOut <- nil
-		cancel()
-		return
+		return nil, err
 	}
 
 	// decrypt keys and files for layers
@@ -128,20 +140,16 @@ func DecryptManifest(
 		default:
 		}
 		if err != nil {
-			errChan <- err
-			manOut <- nil
-			cancel()
-			return
+			return nil, err
 		}
 	}
 
-	errChan <- nil
-	manOut <- &ImageManifest{
+	log.Info().Msg("finished decryption of keys")
+	return &ImageManifest{
 		SchemaVersion: manifest.SchemaVersion,
 		MediaType:     manifest.MediaType,
 		Config:        config,
 		Layers:        layers,
 		DirName:       manifest.DirName,
-	}
-	log.Info().Msg("finished decryption of keys")
+	}, nil
 }
