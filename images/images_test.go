@@ -26,10 +26,9 @@ import (
 	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/images"
 	"github.com/Senetas/crypto-cli/registry/names"
-	"github.com/Senetas/crypto-cli/utils"
 )
 
-func prepareManifest(t *testing.T, opts crypto.Opts) (
+func encryptManifest(t *testing.T, opts crypto.Opts) (
 	*distribution.ImageManifest,
 	names.NamedTaggedRepository,
 ) {
@@ -48,11 +47,16 @@ func prepareManifest(t *testing.T, opts crypto.Opts) (
 		t.Fatal(err)
 	}
 
-	return manifest, ref2
+	encManifest, err := manifest.Encrypt(ref2, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return encManifest, ref2
 }
 
 func testEncDecImage(t *testing.T, opts crypto.Opts) {
-	manifest, ref := prepareManifest(t, opts)
+	manifest, ref := encryptManifest(t, opts)
 
 	t.Log(spew.Sdump(manifest))
 
@@ -66,26 +70,21 @@ func testEncDecImage(t *testing.T, opts crypto.Opts) {
 	defer close(manChan2)
 	defer close(errChan2)
 
-	go images.DecryptManifest(cancel, manChan, ref, opts, manChan2, errChan2)
+	go distribution.DecryptManifest(cancel, manChan, ref, opts, manChan2, errChan2)
 
 	manChan <- manifest
 
-	errs := make(utils.Errors, 0)
 	for i := 0; i < 2; {
 		select {
-		case err2 := <-errChan2:
-			if err2 != nil {
-				errs = append(errs, err2)
+		case err := <-errChan2:
+			if err != nil {
+				t.Fatal(err)
 			}
 			i++
 		case manifest = <-manChan2:
 			i++
 		default:
 		}
-	}
-
-	if len(errs) != 0 {
-		t.Fatal(errs)
 	}
 
 	t.Log(spew.Sdump(manifest))

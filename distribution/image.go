@@ -15,10 +15,13 @@
 package distribution
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/registry/names"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -36,6 +39,7 @@ type ImageManifest struct {
 	DirName       string `json:"-"`
 }
 
+// Encrypt an image, generating an image manifest suitable for upload to a repo
 func (m *ImageManifest) Encrypt(
 	ref names.NamedTaggedRepository,
 	opts crypto.Opts,
@@ -46,6 +50,7 @@ func (m *ImageManifest) Encrypt(
 	var configBlob Blob
 	switch blob := m.Config.(type) {
 	case DecryptedBlob:
+		log.Info().Msg("encrypting config")
 		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 		configBlob, err = blob.EncryptBlob(opts, blob.GetFilename()+".aes")
 		if err != nil {
@@ -58,12 +63,16 @@ func (m *ImageManifest) Encrypt(
 	for i, l := range m.Layers {
 		switch blob := l.(type) {
 		case DecryptedBlob:
+			log.Info().Msgf("encrypting layer %d", i)
 			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
 			layerBlobs[i], err = blob.EncryptBlob(opts, blob.GetFilename()+".aes")
-			if err != nil {
-				return nil, err
-			}
+		case *NoncryptedBlob:
+			log.Info().Msgf("compressing layer %d", i)
+			layerBlobs[i], err = blob.Compress(blob.GetFilename() + ".gz")
 		default:
+		}
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -74,4 +83,64 @@ func (m *ImageManifest) Encrypt(
 		Config:        configBlob,
 		Layers:        layerBlobs,
 	}, nil
+}
+
+// DecryptManifest attempts to decrypt a manifest from the manIn channel,
+// sending to manOut. It will call cancel on error.
+func DecryptManifest(
+	cancel context.CancelFunc,
+	manIn <-chan *ImageManifest,
+	ref names.NamedTaggedRepository,
+	opts crypto.Opts,
+	manOut chan<- *ImageManifest,
+	errChan chan<- error,
+) {
+	manifest := <-manIn
+
+	log.Info().Msg("begin decryption of keys")
+
+	var err error
+	var config Blob
+	switch blob := manifest.Config.(type) {
+	case EncryptedBlob:
+		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
+		config, err = blob.DecryptBlob(opts, blob.GetFilename()+".dec")
+	default:
+		err = errors.New("manifest is not decryptable")
+	}
+	if err != nil {
+		errChan <- err
+		manOut <- nil
+		cancel()
+		return
+	}
+
+	// decrypt keys and files for layers
+	layers := make([]Blob, len(manifest.Layers))
+	for i, l := range manifest.Layers {
+		switch blob := l.(type) {
+		case EncryptedBlob:
+			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
+			layers[i], err = blob.DecryptBlob(opts, blob.GetFilename()+".dec")
+		case CompressedBlob:
+			layers[i], err = blob.Decompress(blob.GetFilename() + ".dec")
+		default:
+		}
+		if err != nil {
+			errChan <- err
+			manOut <- nil
+			cancel()
+			return
+		}
+	}
+
+	errChan <- nil
+	manOut <- &ImageManifest{
+		SchemaVersion: manifest.SchemaVersion,
+		MediaType:     manifest.MediaType,
+		Config:        config,
+		Layers:        layers,
+		DirName:       manifest.DirName,
+	}
+	log.Info().Msg("finished decryption of keys")
 }

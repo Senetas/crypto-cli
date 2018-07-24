@@ -30,7 +30,6 @@ type Blob interface {
 	GetFilename() string
 	SetFilename(filename string)
 	ReadCloser() (io.ReadCloser, error)
-	WriteCloser() (io.WriteCloser, error)
 }
 
 // EncryptedBlob is a blob that may be decrypted
@@ -52,11 +51,13 @@ type DecryptedBlob interface {
 	EncryptBlob(opts crypto.Opts, outfile string) (EncryptedBlob, error)
 }
 
+// CompressedBlob is a blob that may be decompressed
 type CompressedBlob interface {
 	Blob
 	Decompress(outfile string) (DecompressedBlob, error)
 }
 
+// DecompressedBlob is a blob that may be compressed
 type DecompressedBlob interface {
 	Blob
 	Compress(outfile string) (CompressedBlob, error)
@@ -80,6 +81,9 @@ type decryptedBlob struct {
 	*DeCrypto `json:"-"`
 }
 
+// NoncryptedBlob is a vanilla blob with no encrpytion data
+// Despite appearnces, the ContentType type is not indicative of whether
+// the blob is compressed or not
 type NoncryptedBlob struct {
 	ContentType string         `json:"mediaType"`
 	Size        int64          `json:"size"`
@@ -87,29 +91,36 @@ type NoncryptedBlob struct {
 	Filename    string         `json:"-"`
 }
 
+// GetDigest returnts the digest
 func (b *NoncryptedBlob) GetDigest() *digest.Digest { return b.Digest }
 
+//GetContentType returns the content type
 func (b *NoncryptedBlob) GetContentType() string { return b.ContentType }
 
+// GetSize returns the size
 func (b *NoncryptedBlob) GetSize() int64 { return b.Size }
 
+// SetFilename set the filename of the file that the blob is stored in
 func (b *NoncryptedBlob) SetFilename(filename string) { b.Filename = filename }
 
+// GetFilename retunrs the filename of the file that the blob is stored in
 func (b *NoncryptedBlob) GetFilename() string { return b.Filename }
 
+// ReadCloser opens the file that back the blob and returns a handle to it
+// It is the user's responsibility to close the file handle
 func (b *NoncryptedBlob) ReadCloser() (io.ReadCloser, error) { return os.Open(b.Filename) }
-
-func (b *NoncryptedBlob) WriteCloser() (io.WriteCloser, error) { return os.Open(b.Filename) }
 
 func newPlainBlob(
 	filename string,
 	d *digest.Digest,
 	size int64,
+	contentType string,
 ) *NoncryptedBlob {
 	return &NoncryptedBlob{
-		Size:     size,
-		Digest:   d,
-		Filename: filename,
+		Size:        size,
+		Digest:      d,
+		ContentType: contentType,
+		Filename:    filename,
 	}
 }
 
@@ -121,7 +132,7 @@ func newDecryptedBlob(
 	dec *DeCrypto,
 ) *decryptedBlob {
 	return &decryptedBlob{
-		NoncryptedBlob: newPlainBlob(filename, d, size),
+		NoncryptedBlob: newPlainBlob(filename, d, size, contentType),
 		DeCrypto:       dec,
 	}
 }
@@ -132,7 +143,7 @@ func NewConfigBlob(
 	d *digest.Digest,
 	size int64,
 	dec *DeCrypto,
-) Blob {
+) DecryptedBlob {
 	return newDecryptedBlob(filename, d, size, MediaTypeImageConfig, dec)
 }
 
@@ -142,7 +153,7 @@ func NewLayerBlob(
 	d *digest.Digest,
 	size int64,
 	dec *DeCrypto,
-) Blob {
+) DecryptedBlob {
 	return newDecryptedBlob(filename, d, size, MediaTypeLayer, dec)
 }
 
@@ -151,8 +162,7 @@ func NewPlainLayer(
 	filename string,
 	d *digest.Digest,
 	size int64,
-) Blob {
-	blob := newPlainBlob(filename, d, size)
-	blob.ContentType = MediaTypeLayer
+) DecompressedBlob {
+	blob := newPlainBlob(filename, d, size, MediaTypeLayer)
 	return blob
 }

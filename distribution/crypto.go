@@ -35,6 +35,7 @@ type DeCrypto struct {
 	DecKey []byte       `json:"-"`
 }
 
+// NewDecrypto create a new DeCrypto struct that holds decrupted key data
 func NewDecrypto(opts crypto.Opts) (*DeCrypto, error) {
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {

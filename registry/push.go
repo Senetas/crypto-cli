@@ -145,7 +145,6 @@ func PushLayer(
 	}
 
 	// now actually upload the blob
-	log.Info().Msgf("Uploading to: %v", loc)
 	return uploadBlob(loc, token, dig, bldr, layerData)
 }
 
@@ -219,7 +218,7 @@ func uploadBlob(
 	token dauth.Scope,
 	dig reference.Canonical,
 	bldr *v2.URLBuilder,
-	layerData distribution.Blob,
+	blob distribution.Blob,
 ) error {
 	u, err := url.Parse(loc)
 	if err != nil {
@@ -230,28 +229,30 @@ func uploadBlob(
 	if err != nil {
 		return errors.Wrapf(err, "rawquery = %v", u.RawQuery)
 	}
-	q.Add("digest", layerData.GetDigest().String())
-	rawq, err := url.QueryUnescape(q.Encode())
+
+	q.Add("digest", blob.GetDigest().String())
+	u.RawQuery, err = url.QueryUnescape(q.Encode())
 	if err != nil {
-		return errors.Wrapf(err, "could not extract uescape url query: %s", q.Encode())
+		return errors.WithStack(err)
 	}
-	u.RawQuery = rawq
 
 	// open the layer file to get size and upload
-	layerFH, err := os.Open(layerData.GetFilename())
+	blobFH, err := os.Open(blob.GetFilename())
 	if err != nil {
-		return errors.Wrapf(err, "could not open: %s", layerData.GetFilename())
+		return errors.Wrapf(err, "could not open: %s", blob.GetFilename())
 	}
 	// file will be closed by the http client
 
-	req, err := http.NewRequest("PUT", u.String(), layerFH)
+	req, err := http.NewRequest("PUT", u.String(), blobFH)
 	if err != nil {
 		return errors.Wrapf(err, "could not make req = %v", req)
 	}
 
-	req.Header.Add("Content-Length", strconv.FormatInt(layerData.GetSize(), 10))
+	req.Header.Add("Content-Length", strconv.FormatInt(blob.GetSize(), 10))
 	req.Header.Add("Content-Type", "application/octect-stream")
 	auth.AddToReqest(token, req)
+
+	log.Info().Msgf("Uploading to: %s", u)
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, false, true)
 	if err != nil {
@@ -260,7 +261,7 @@ func uploadBlob(
 	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	if resp.StatusCode != http.StatusCreated {
-		return errors.New("upload of layer " + layerData.GetDigest().String() + " failed")
+		return errors.Errorf("upload of blob %s failed", blob.GetFilename())
 	}
 	return nil
 }

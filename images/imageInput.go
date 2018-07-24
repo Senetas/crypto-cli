@@ -17,74 +17,17 @@ package images
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/docker/distribution/registry/client/auth"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
-	"github.com/Senetas/crypto-cli/registry/names"
 )
-
-// DecryptManifest attempts to decrypt a manifest from the manIn channel,
-// sending to manOut. It will call cancel on error.
-func DecryptManifest(
-	cancel context.CancelFunc,
-	manIn <-chan *distribution.ImageManifest,
-	ref names.NamedTaggedRepository,
-	opts crypto.Opts,
-	manOut chan<- *distribution.ImageManifest,
-	errChan chan<- error,
-) {
-	manifest := <-manIn
-	outmanifest := *manifest
-	log.Info().Msg("begin decryption of keys")
-
-	var err error
-	var db distribution.Blob
-	switch blob := manifest.Config.(type) {
-	case distribution.EncryptedBlob:
-		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
-		db, err = blob.DecryptBlob(opts, "")
-	default:
-		err = errors.New("manifest is not decryptable")
-	}
-	if err != nil {
-		errChan <- err
-		manOut <- nil
-		cancel()
-		return
-	}
-
-	outmanifest.Config = db
-
-	// decrypt keys and files for layers
-	outmanifest.Layers = make([]distribution.Blob, len(manifest.Layers))
-	for i, l := range manifest.Layers {
-		switch blob := l.(type) {
-		case distribution.EncryptedBlob:
-			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
-			db, err = blob.DecryptBlob(opts, "")
-			if err != nil {
-				errChan <- err
-				manOut <- nil
-				cancel()
-				return
-			}
-			outmanifest.Layers[i] = db
-		default:
-		}
-	}
-	errChan <- nil
-	manOut <- &outmanifest
-	log.Info().Msg("finished decryption of keys")
-}
 
 // Manifest2Tar takes a manifest and a target label for the images and creates a tarball that may
 // be loaded with docker load. It downloads and decrypts the config and layers if necessary

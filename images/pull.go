@@ -85,7 +85,7 @@ func pullAndDecrypt(
 	defer close(errChan2)
 
 	go registry.PullImage(ctx, token, nTRep, endpoint, dir, manChan, errChan)
-	go DecryptManifest(cancel, manChan, nTRep, opts, manChan2, errChan2)
+	go distribution.DecryptManifest(cancel, manChan, nTRep, opts, manChan2, errChan2)
 
 	errs := make(utils.Errors, 0)
 	var manifest *distribution.ImageManifest
