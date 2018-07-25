@@ -23,6 +23,7 @@ import (
 	dregistry "github.com/docker/docker/registry"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
@@ -57,6 +58,8 @@ func PullImage(ref reference.Named, opts crypto.Opts) (err error) {
 		return err
 	}
 
+	log.Info().Msg("image pulled successfully")
+
 	if err = os.RemoveAll(dir); err != nil {
 		return err
 	}
@@ -78,5 +81,5 @@ func pullAndDecrypt(
 	if err != nil {
 		return nil, err
 	}
-	return distribution.DecryptManifest(manifest, nTRep, opts)
+	return distribution.DecryptManifest(manifest)
 }

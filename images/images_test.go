@@ -61,7 +61,11 @@ func testEncDecImage(t *testing.T, opts crypto.Opts) {
 
 	t.Log(spew.Sdump(manifest))
 
-	decManifest, err := distribution.DecryptManifest(encManifest, ref, opts)
+	if err = encManifest.DecryptKeys(opts, ref); err != nil {
+		t.Fatalf("%+v", err)
+	}
+
+	decManifest, err := distribution.DecryptManifest(encManifest)
 	if err != nil {
 		t.Fatal(err)
 	}

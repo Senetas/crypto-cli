@@ -85,23 +85,32 @@ func (m *ImageManifest) Encrypt(
 }
 
 // DecryptKeys attempts to decrypt all keys in a manifest
-func (m *ImageManifest) DecryptKeys(opts crypto.Opts) (err error) {
-	if db, ok := m.Config.(EncryptedBlob); ok {
-		m.Config, err = db.DecryptKey(opts)
+func (m *ImageManifest) DecryptKeys(
+	opts crypto.Opts,
+	ref names.NamedTaggedRepository,
+) (err error) {
+	switch blob := m.Config.(type) {
+	case EncryptedBlob:
+		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
+		m.Config, err = blob.DecryptKey(opts)
 		if err != nil {
 			return err
 		}
-	} else {
+	case *NoncryptedBlob:
+	default:
 		return errors.New("mainfest blobs are of wrong type")
 	}
 
 	for i, l := range m.Layers {
-		if db, ok := l.(EncryptedBlob); ok {
-			m.Layers[i], err = db.DecryptKey(opts)
+		switch blob := l.(type) {
+		case EncryptedBlob:
+			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
+			m.Layers[i], err = blob.DecryptKey(opts)
 			if err != nil {
 				return err
 			}
-		} else {
+		case *NoncryptedBlob:
+		default:
 			return errors.New("mainfest blobs are of wrong type")
 		}
 	}
@@ -112,17 +121,16 @@ func (m *ImageManifest) DecryptKeys(opts crypto.Opts) (err error) {
 // sending to manOut. It will call cancel on error.
 func DecryptManifest(
 	manifest *ImageManifest,
-	ref names.NamedTaggedRepository,
-	opts crypto.Opts,
 ) (_ *ImageManifest, err error) {
 	log.Info().Msg("begin decryption of keys")
 	var config Blob
 	switch blob := manifest.Config.(type) {
-	case EncryptedBlob:
-		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
-		config, err = blob.DecryptBlob(opts, blob.GetFilename()+".dec")
+	case KeyDecryptedBlob:
+		config, err = blob.DecryptFile(blob.GetFilename() + ".dec")
+	case *NoncryptedBlob:
+		config = blob
 	default:
-		err = errors.New("manifest is not decryptable")
+		err = errors.Errorf("manifest is not decryptable: %#v", blob)
 	}
 	if err != nil {
 		return nil, err
@@ -132,9 +140,8 @@ func DecryptManifest(
 	layers := make([]Blob, len(manifest.Layers))
 	for i, l := range manifest.Layers {
 		switch blob := l.(type) {
-		case EncryptedBlob:
-			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
-			layers[i], err = blob.DecryptBlob(opts, blob.GetFilename()+".dec")
+		case KeyDecryptedBlob:
+			layers[i], err = blob.DecryptFile(blob.GetFilename() + ".dec")
 		case CompressedBlob:
 			layers[i], err = blob.Decompress(blob.GetFilename() + ".dec")
 		default:

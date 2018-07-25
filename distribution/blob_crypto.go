@@ -89,7 +89,7 @@ func (eb *encryptedBlobNew) DecryptBlob(opts crypto.Opts, outname string) (Decry
 	if err != nil {
 		return nil, err
 	}
-	return kb.DecryptFile(opts, outname)
+	return kb.DecryptFile(outname)
 }
 
 func (kb *keyDecryptedBlob) EncryptKey(opts crypto.Opts) (EncryptedBlob, error) {
@@ -103,7 +103,7 @@ func (kb *keyDecryptedBlob) EncryptKey(opts crypto.Opts) (EncryptedBlob, error) 
 	}, nil
 }
 
-func (kb *keyDecryptedBlob) DecryptFile(opts crypto.Opts, outname string) (DecryptedBlob, error) {
+func (kb *keyDecryptedBlob) DecryptFile(outname string) (DecryptedBlob, error) {
 	r, err := kb.ReadCloser()
 	if err != nil {
 		return nil, errors.WithStack(err)
