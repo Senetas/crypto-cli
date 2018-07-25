@@ -41,7 +41,7 @@ import (
 // PullImage pulls an image from a remote repository
 func PullImage(
 	token dauth.Scope,
-	ref reference.Named,
+	ref names.NamedTaggedRepository,
 	endpoint *registry.APIEndpoint,
 	opts crypto.Opts,
 	downloadDir string,
@@ -51,6 +51,10 @@ func PullImage(
 	log.Info().Msg("Obtaining Manifest")
 	manifest, err := PullManifest(token, ref, bldr, downloadDir)
 	if err != nil {
+		return nil, err
+	}
+
+	if err = manifest.DecryptKeys(opts, ref); err != nil {
 		return nil, err
 	}
 

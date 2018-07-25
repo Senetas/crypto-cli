@@ -48,7 +48,7 @@ type EncryptedBlob interface {
 // decrypted but not their files
 type KeyDecryptedBlob interface {
 	Blob
-	DecryptFile(opts crypto.Opts, outfile string) (DecryptedBlob, error)
+	DecryptFile(outfile string) (DecryptedBlob, error)
 	EncryptKey(opts crypto.Opts) (EncryptedBlob, error)
 }
 
