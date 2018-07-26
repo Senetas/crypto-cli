@@ -16,18 +16,10 @@ package main
 
 import (
 	_ "crypto/sha256"
-	"os"
 
 	"github.com/Senetas/crypto-cli/cmd"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 func main() {
-	// use a prettier logger
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-	// hide debug logs
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-
 	cmd.Execute()
 }
