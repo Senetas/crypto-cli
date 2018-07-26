@@ -25,8 +25,9 @@ import (
 
 func main() {
 	// use a prettier logger
-	//log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-	log.Logger = zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).With().Logger()
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	// hide debug logs
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
 	cmd.Execute()
 }
