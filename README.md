@@ -48,8 +48,8 @@ The `go get` and `dep ensure` commands will take a long time to execute.
 
 ## Usage
 For now the syntax is limited and some parameters are hard coded.
-```
-crypto-cli (push|pull) NAME:TAG
+```console
+$ crypto-cli (push|pull) NAME:TAG [opts]
 ```
 Here, `NAME` is the name of a repository and `TAG` is a mandatory tag. For a `push` command, the image `NAME:TAG` must be present in the local docker engine. Furthermore, only images that were built with at least one occurrence of:
 ```Dockerfile
@@ -57,6 +57,26 @@ LABEL com.senetas.crypto.enabled=true
 ```
 in their `Dockerfile` will be supported.
 A compliant Dockerfile is provided in the `test` directory.
+
+### Global Options
+
+#### `--pass=PASSPHRASE`
+Specifies `PASSPHRASE` as the passphrase to use for encryption. Is ignored if encryption is disabled.
+
+#### `--verbose`
+Verbose output.
+
+### Push Options
+
+#### `--compat`
+Makes the produced image manifests adhere more strictly to the Docker v2.2 manifest schema.
+
+#### `--type=TYPE`
+Type specifies the encryption scheme to use. At the moment the options are `NONE` and `PBKDF2-AES256-GCM`.
+The former does no encryption, and the latter offers passphrase derived symmetric encryption.
+
+### Pull Options
+[None]
 
 ### Credentials
 The user must be able to `pull` and `push` to `registry-1.docker.io` (aka Docker Hub/Cloud). To do this, they should have logged in via the command:
