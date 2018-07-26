@@ -16,9 +16,11 @@ package distribution
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/registry/names"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 )
@@ -55,6 +57,20 @@ func (m *ImageManifest) Encrypt(
 		if err != nil {
 			return nil, err
 		}
+	case *NoncryptedBlob:
+		log.Info().Msgf("preparing config")
+
+		//configBlob, err = blob.Compress(blob.GetFilename() + ".gz")
+
+		// this sends the config in the clear
+		digester := digest.Canonical.Digester()
+		r, err := blob.ReadCloser()
+		size, err := io.Copy(digester.Hash(), r)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		d := digester.Digest()
+		configBlob = NewPlainConfigBlob(blob.GetFilename(), &d, size)
 	default:
 	}
 

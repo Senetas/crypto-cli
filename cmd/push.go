@@ -31,7 +31,11 @@ var pushCmd = &cobra.Command{
 	Long: `push will encrypt a docker images and upload it
 to a remote repositories. It maybe used to distribute docker images
 confidentially. It does not sign images so cannot garuntee identities.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
+		opts.EncType, err = crypto.ValidateAlgos(ctstr)
+		if err != nil {
+			return err
+		}
 		cmd.Flags().VisitAll(checkFlagsPush)
 		return runPush(args[0], opts)
 	},
@@ -41,7 +45,7 @@ confidentially. It does not sign images so cannot garuntee identities.`,
 func checkFlagsPush(f *pflag.Flag) {
 	switch f.Name {
 	case "pass":
-		if !f.Changed {
+		if !f.Changed && opts.EncType != crypto.None {
 			passphrase1 := getPassSTDIN("Enter passphrase: ")
 			passphrase2 := getPassSTDIN("Re-enter passphrase: ")
 			if passphrase1 == passphrase2 {
@@ -49,12 +53,6 @@ func checkFlagsPush(f *pflag.Flag) {
 			} else {
 				log.Fatal().Msg("Passphrases do not match.")
 			}
-		}
-	case "type":
-		var err error
-		opts.EncType, err = crypto.ValidateAlgos(ctstr)
-		if err != nil {
-			log.Fatal().Msgf("%v", err)
 		}
 	default:
 	}
