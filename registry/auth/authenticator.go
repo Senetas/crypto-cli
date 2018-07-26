@@ -50,12 +50,11 @@ func (a *authenticator) Authenticate(c *Challenge) (Token, error) {
 	req = a.credentials.SetAuth(req)
 
 	resp, err := httpclient.DoRequest(a.httpClient, req, true, true)
+	if resp != nil {
+		defer func() { err = utils.CheckedClose(resp.Body, err) }()
+	}
 	if err != nil {
 		return nil, errors.Wrapf(err, "req = %#v", req)
-	}
-
-	if resp.Close {
-		defer func() { err = utils.CheckedClose(resp.Body, err) }()
 	}
 
 	if resp.StatusCode != http.StatusOK {

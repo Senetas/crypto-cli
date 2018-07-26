@@ -100,10 +100,12 @@ func PushManifest(
 	auth.AddToReqest(token, req)
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
+	if resp != nil {
+		defer func() { err = utils.CheckedClose(resp.Body, err) }()
+	}
 	if err != nil {
 		return "", err
 	}
-	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	// close the channel after request is done
 	if err = utils.ConcatErrChan(errChan, 2); err != nil {
@@ -162,10 +164,12 @@ func checkLayer(token dauth.Scope, ref reference.Canonical, bldr *v2.URLBuilder)
 	auth.AddToReqest(token, req)
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
+	if resp != nil {
+		defer func() { err = utils.CheckedClose(resp.Body, err) }()
+	}
 	if err != nil {
 		return false, errors.Wrapf(err, "%v", req)
 	}
-	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	if resp.StatusCode == http.StatusOK {
 		return true, nil
@@ -196,10 +200,12 @@ func getUploadLoc(
 	auth.AddToReqest(token, req)
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
+	if resp != nil {
+		defer func() { err = utils.CheckedClose(resp.Body, err) }()
+	}
 	if err != nil {
 		return "", err
 	}
-	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	if resp.StatusCode != http.StatusAccepted {
 		return "", errors.New("upload of layer " + layerData.GetDigest().String() + " was not accepted")
@@ -255,10 +261,12 @@ func uploadBlob(
 	log.Info().Msgf("Uploading to: %s", u)
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, false, true)
+	if resp != nil {
+		defer func() { err = utils.CheckedClose(resp.Body, err) }()
+	}
 	if err != nil {
 		return err
 	}
-	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return errors.Errorf("upload of blob %s failed", blob.GetFilename())

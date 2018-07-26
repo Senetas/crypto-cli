@@ -63,10 +63,12 @@ func useTLS(
 	}
 
 	resp, err := httpclient.DoRequest(&httpClient, req, true, false)
+	if resp != nil {
+		defer func() { err = utils.CheckedClose(resp.Body, err) }()
+	}
 	if err != nil {
 		return false, err
 	}
-	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	switch resp.StatusCode {
 	case http.StatusMovedPermanently:
