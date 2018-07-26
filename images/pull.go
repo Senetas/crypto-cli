@@ -60,11 +60,7 @@ func PullImage(ref reference.Named, opts crypto.Opts) (err error) {
 
 	log.Info().Msg("image pulled successfully")
 
-	if err = os.RemoveAll(dir); err != nil {
-		return err
-	}
-
-	return nil
+	return os.RemoveAll(dir)
 }
 
 func pullAndDecrypt(

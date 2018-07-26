@@ -52,11 +52,15 @@ func DoRequest(client *http.Client, req *http.Request, dumpReqBody, dumpRespBody
 		err = errors.Wrapf(err, "%#v", req)
 	}
 
-	dump, err = httputil.DumpResponse(resp, dumpRespBody)
+	dump, err2 := httputil.DumpResponse(resp, dumpRespBody)
 	if err != nil {
-		return nil, errors.Wrapf(err, "%#v", resp)
+		err2 = errors.Wrapf(err2, "%#v", resp)
 	}
 	log.Debug().Msgf("%s", dump)
+
+	if err == nil {
+		err = err2
+	}
 
 	return resp, err
 }
