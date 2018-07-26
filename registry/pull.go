@@ -101,10 +101,12 @@ func PullManifest(
 	auth.AddToReqest(token, req)
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
+	if resp != nil {
+		defer func() { err = utils.CheckedClose(resp.Body, err) }()
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.New("manifest download failed with status: " + resp.Status)
@@ -152,6 +154,9 @@ func PullFromDigest(
 	auth.AddToReqest(token, req)
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, false)
+	if resp != nil {
+		defer func() { err = utils.CheckedClose(resp.Body, err) }()
+	}
 	if err != nil {
 		return "", err
 	}
@@ -172,10 +177,6 @@ func PullFromDigest(
 
 	if _, err = io.Copy(mw, resp.Body); err != nil {
 		return "", errors.Wrapf(err, "filename = %s", fn)
-	}
-
-	if err = resp.Body.Close(); err != nil {
-		return "", errors.Wrapf(err, "resp = %#v", resp)
 	}
 
 	if !vw.Verified() {

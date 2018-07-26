@@ -91,10 +91,12 @@ func ChallengeHeader(
 	}
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
+	if resp != nil {
+		defer func() { err = utils.CheckedClose(resp.Body, err) }()
+	}
 	if err != nil {
 		return "", err
 	}
-	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 
 	var auth string
 	if resp.StatusCode == http.StatusUnauthorized {
