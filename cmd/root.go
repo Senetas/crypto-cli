@@ -78,14 +78,7 @@ func init() {
 		"pass",
 		"p",
 		"",
-		"Specifies the passphrase to use if passphrase encryption is selected",
-	)
-	rootCmd.PersistentFlags().StringVarP(
-		&ctstr,
-		"type",
-		"t",
-		string(crypto.Pbkdf2Aes256Gcm),
-		"Specifies the type of encryption to use.",
+		"Specifies the passphrase to use for encryption or decryption as applicable. If absnet, a prompt with be presented.",
 	)
 }
 
