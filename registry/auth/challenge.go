@@ -64,10 +64,7 @@ func (c *Challenge) buildURL() *url.URL {
 	if c.scope != "" {
 		authParams.Set("scope", c.scope)
 	}
-
-	//authURL.RawQuery, _ = url.QueryUnescape(authParams.Encode())
 	authURL.RawQuery = authParams.Encode()
-
 	return &authURL
 }
 

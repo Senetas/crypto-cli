@@ -123,31 +123,31 @@ func PushManifest(
 func PushLayer(
 	token dauth.Scope,
 	ref reference.Named,
-	layerData distribution.Blob,
+	layer distribution.Blob,
 	endpoint *registry.APIEndpoint,
 ) (err error) {
 	sep := names.SeperateRepository(ref)
-	dig := names.AppendDigest(sep, *layerData.GetDigest())
+	dig := names.AppendDigest(sep, *layer.GetDigest())
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
 	layerExists, err := checkLayer(token, dig, bldr)
 	if err != nil {
 		return err
 	} else if layerExists {
-		log.Info().Msgf("Blob %s exists.", layerData.GetDigest())
+		log.Info().Msgf("Blob %s exists.", layer.GetDigest())
 		return nil
 	}
 
-	log.Info().Msgf("Blob %s is new, proceed to upload", layerData.GetDigest())
+	log.Info().Msgf("Blob %s is new, proceed to upload", layer.GetDigest())
 
 	// query the server for which location to upload to
-	loc, err := getUploadLoc(token, dig, bldr, layerData)
+	loc, err := getUploadLoc(token, dig, bldr, layer)
 	if err != nil {
 		return err
 	}
 
 	// now actually upload the blob
-	return uploadBlob(loc, token, dig, bldr, layerData)
+	return uploadBlob(loc, token, dig, bldr, layer)
 }
 
 func checkLayer(token dauth.Scope, ref reference.Canonical, bldr *v2.URLBuilder) (b bool, err error) {

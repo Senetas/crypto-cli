@@ -152,7 +152,16 @@ func newDecryptedBlob(
 	}
 }
 
-// NewConfigBlob creates a new Layer for a config layer
+// NewPlainConfigBlob creates a new unencrypted blob for a config
+func NewPlainConfigBlob(
+	filename string,
+	d *digest.Digest,
+	size int64,
+) DecompressedBlob {
+	return newPlainBlob(filename, d, size, MediaTypeImageConfig)
+}
+
+// NewConfigBlob creates a new encrypted blob for a config
 func NewConfigBlob(
 	filename string,
 	d *digest.Digest,
