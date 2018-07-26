@@ -56,8 +56,6 @@ Here, `NAME` is the name of a repository and `TAG` is a mandatory tag. For a `pu
 LABEL com.senetas.crypto.enabled=true
 ```
 in their `Dockerfile` will be supported.
-For the moment, only images that were built on the same machine and have never been removed from it are supported.
-This means that the ideal test image is one that was freshly built.
 A compliant Dockerfile is provided in the `test` directory.
 
 ### Credentials
