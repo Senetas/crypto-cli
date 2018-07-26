@@ -50,6 +50,13 @@ func checkFlagsPush(f *pflag.Flag) {
 				log.Fatal().Msg("Passphrases do not match.")
 			}
 		}
+	case "type":
+		var err error
+		opts.EncType, err = crypto.ValidateAlgos(ctstr)
+		if err != nil {
+			log.Fatal().Msgf("%v", err)
+		}
+	default:
 	}
 }
 
@@ -58,12 +65,7 @@ func runPush(remote string, opts crypto.Opts) error {
 	if err != nil {
 		return err
 	}
-
-	if err = images.PushImage(ref, opts); err != nil {
-		return err
-	}
-
-	return nil
+	return images.PushImage(ref, opts)
 }
 
 func init() {

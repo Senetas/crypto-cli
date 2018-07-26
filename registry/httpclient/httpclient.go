@@ -17,9 +17,11 @@ package httpclient
 import (
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -38,23 +40,23 @@ var (
 
 // DoRequest wraps http.Client.Do but dumps the request and response with optional bodies
 func DoRequest(client *http.Client, req *http.Request, dumpReqBody, dumpRespBody bool) (*http.Response, error) {
-	//dump, err := httputil.DumpRequestOut(req, dumpReqBody)
-	//if err != nil {
-	//return nil, errors.Wrapf(err, "%#v", req)
-	//}
-	//log.Debug().Msg(req.URL.String())
-	//log.Debug().Msgf("%s", dump)
+	dump, err := httputil.DumpRequestOut(req, dumpReqBody)
+	if err != nil {
+		return nil, errors.Wrapf(err, "%#v", req)
+	}
+	log.Debug().Msg(req.URL.String())
+	log.Debug().Msgf("%s", dump)
 
 	resp, err := client.Do(req)
 	if err != nil {
 		err = errors.Wrapf(err, "%#v", req)
 	}
 
-	//dump, err = httputil.DumpResponse(resp, dumpRespBody)
-	//if err != nil {
-	//return nil, errors.Wrapf(err, "%#v", resp)
-	//}
-	//log.Debug().Msgf("%s", dump)
+	dump, err = httputil.DumpResponse(resp, dumpRespBody)
+	if err != nil {
+		return nil, errors.Wrapf(err, "%#v", resp)
+	}
+	log.Debug().Msgf("%s", dump)
 
 	return resp, err
 }

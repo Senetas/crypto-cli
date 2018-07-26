@@ -16,9 +16,11 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"syscall"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
@@ -29,34 +31,36 @@ import (
 
 var (
 	ctstr string
-	opts  crypto.Opts
+	opts  = crypto.Opts{
+		Passphrase: "",
+		Salt:       "",
+		EncType:    crypto.Pbkdf2Aes256Gcm,
+		Compat:     false,
+	}
+	debug bool
 	//cfgFile    string
-)
 
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
-	Use:   "crypto-cli [OPTIONS] [command]",
-	Short: "A command line utility to encrypt and decrypt docker images and store them in docker registries",
-	Long: `Crypto-Cli is a command line utility to encrypt and decrypt docker images and stores
+	// rootCmd represents the base command when called without any subcommands
+	rootCmd = &cobra.Command{
+		Use:   "crypto-cli [OPTIONS] [command]",
+		Short: "A command line utility to encrypt and decrypt docker images and store them in docker registries",
+		Long: `Crypto-Cli is a command line utility to encrypt and decrypt docker images and stores
 them in repositories online. It maybe used to distribute docker images
-confidentially. It does not sign images so cannot garuntee identities.
+confidentially. It does not sign images so cannot guarantee identities.
 
-
-Its basic operations emulated docker push and docker pull and will encrypt then
-MAC the images before uploading them, and check the MAC and decrypt after
+The operations emulate docker push and docker pull but will encrypt then
+MAC the images before uploading them, and check the MAC then decrypt after
 downloading them.`,
-	SilenceErrors: true,
-	SilenceUsage:  true,
-}
+		SilenceErrors: true,
+		SilenceUsage:  true,
+	}
+)
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	var err error
-	opts.EncType, err = crypto.ValidateAlgos(ctstr)
-	if err != nil {
-		log.Fatal().Msgf("%v", err)
-	}
+	// use a prettier logger, <nil> timestamp
+	log.Logger = zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).With().Logger()
 
 	if err := rootCmd.Execute(); err != nil {
 		// comment out until * to print all stack traces
@@ -73,13 +77,43 @@ func Execute() {
 func init() {
 	//cobra.OnInitialize(initConfig)
 
+	cobra.OnInitialize(initLogging)
+
 	rootCmd.PersistentFlags().StringVarP(
 		&opts.Passphrase,
 		"pass",
 		"p",
 		"",
-		"Specifies the passphrase to use for encryption or decryption as applicable. If absnet, a prompt with be presented.",
+		`Specifies the passphrase to use for encryption or decryption as applicable.
+If absent, a prompt will be presented.`,
 	)
+
+	rootCmd.PersistentFlags().BoolVarP(
+		&debug,
+		"verbose",
+		"v",
+		false,
+		"Set the log level to 0 (debug)",
+	)
+}
+
+func initLogging() {
+	// hide debug logs by default
+	if debug {
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	} else {
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	}
+}
+
+func getPassSTDIN(prompt string) string {
+	fmt.Print(prompt)
+	passphrase, err := terminal.ReadPassword(syscall.Stdin)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("password typed: %s", passphrase)
+	}
+	fmt.Println()
+	return string(passphrase)
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -106,13 +140,3 @@ func init() {
 //fmt.Println("Using config file:", viper.ConfigFileUsed())
 //}
 //}
-
-func getPassSTDIN(prompt string) string {
-	fmt.Print(prompt)
-	passphrase, err := terminal.ReadPassword(syscall.Stdin)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("password typed: %s", passphrase)
-	}
-	fmt.Println()
-	return string(passphrase)
-}

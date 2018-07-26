@@ -14,9 +14,7 @@
 
 package crypto
 
-import (
-	"github.com/pkg/errors"
-)
+import "errors"
 
 // Algos represents the collection of algorithms used for encryption and authentication
 type Algos string

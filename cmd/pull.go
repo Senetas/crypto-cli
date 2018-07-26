@@ -15,12 +15,13 @@
 package cmd
 
 import (
-	"github.com/Senetas/crypto-cli/crypto"
-	"github.com/Senetas/crypto-cli/images"
 	"github.com/docker/distribution/reference"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/Senetas/crypto-cli/crypto"
+	"github.com/Senetas/crypto-cli/images"
 )
 
 // pullCmd represents the pull command
@@ -43,6 +44,7 @@ func checkFlagsPull(f *pflag.Flag) {
 		if !f.Changed {
 			opts.Passphrase = getPassSTDIN("Enter passphrase: ")
 		}
+	default:
 	}
 }
 
@@ -51,12 +53,7 @@ func runPull(remote string, opts crypto.Opts) error {
 	if err != nil {
 		return errors.Wrapf(err, "remote = ", remote)
 	}
-
-	if err = images.PullImage(ref, opts); err != nil {
-		return err
-	}
-
-	return nil
+	return images.PullImage(ref, opts)
 }
 
 func init() {
