@@ -40,8 +40,8 @@ type EncryptedBlob interface {
 	//     The data stream in the FileHandle io.Reader
 	// The data is also decompressed and written to a file which is referenced
 	// in the "Filename"
-	DecryptBlob(opts crypto.Opts, outfile string) (DecryptedBlob, error)
-	DecryptKey(opts crypto.Opts) (KeyDecryptedBlob, error)
+	DecryptBlob(opts *crypto.Opts, outfile string) (DecryptedBlob, error)
+	DecryptKey(opts *crypto.Opts) (KeyDecryptedBlob, error)
 }
 
 // KeyDecryptedBlob is a type for blobs that have had their key objects
@@ -49,7 +49,7 @@ type EncryptedBlob interface {
 type KeyDecryptedBlob interface {
 	Blob
 	DecryptFile(outfile string) (DecryptedBlob, error)
-	EncryptKey(opts crypto.Opts) (EncryptedBlob, error)
+	EncryptKey(opts *crypto.Opts) (EncryptedBlob, error)
 }
 
 // DecryptedBlob is a blob that may be encrypted
@@ -58,7 +58,7 @@ type DecryptedBlob interface {
 	// EncryptBlob compresses the blob file and encryptes
 	//     The Key encryption key contained in the "DeCrypto" struct
 	//     The data stream in the FileHandle io.Reader
-	EncryptBlob(opts crypto.Opts, outfile string) (EncryptedBlob, error)
+	EncryptBlob(opts *crypto.Opts, outfile string) (EncryptedBlob, error)
 }
 
 // CompressedBlob is a blob that may be decompressed

@@ -73,7 +73,7 @@ func decBlobReader(in io.Reader, key []byte) (io.Reader, error) {
 	return out, nil
 }
 
-func (eb *encryptedBlobNew) DecryptKey(opts crypto.Opts) (KeyDecryptedBlob, error) {
+func (eb *encryptedBlobNew) DecryptKey(opts *crypto.Opts) (KeyDecryptedBlob, error) {
 	dk, err := DecryptKey(*eb.EnCrypto, opts)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -84,7 +84,7 @@ func (eb *encryptedBlobNew) DecryptKey(opts crypto.Opts) (KeyDecryptedBlob, erro
 	}, nil
 }
 
-func (eb *encryptedBlobNew) DecryptBlob(opts crypto.Opts, outname string) (DecryptedBlob, error) {
+func (eb *encryptedBlobNew) DecryptBlob(opts *crypto.Opts, outname string) (DecryptedBlob, error) {
 	kb, err := eb.DecryptKey(opts)
 	if err != nil {
 		return nil, err
@@ -92,7 +92,7 @@ func (eb *encryptedBlobNew) DecryptBlob(opts crypto.Opts, outname string) (Decry
 	return kb.DecryptFile(outname)
 }
 
-func (kb *keyDecryptedBlob) EncryptKey(opts crypto.Opts) (EncryptedBlob, error) {
+func (kb *keyDecryptedBlob) EncryptKey(opts *crypto.Opts) (EncryptedBlob, error) {
 	ek, err := EncryptKey(*kb.DeCrypto, opts)
 	if err != nil {
 		return nil, err
@@ -152,7 +152,7 @@ func (kb *keyDecryptedBlob) DecryptFile(outname string) (DecryptedBlob, error) {
 	}, nil
 }
 
-func (e *encryptedBlobCompat) DecryptKey(opts crypto.Opts) (KeyDecryptedBlob, error) {
+func (e *encryptedBlobCompat) DecryptKey(opts *crypto.Opts) (KeyDecryptedBlob, error) {
 	eb, err := compat2New(e)
 	if err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func compat2New(e *encryptedBlobCompat) (*encryptedBlobNew, error) {
 	}, nil
 }
 
-func (e *encryptedBlobCompat) DecryptBlob(opts crypto.Opts, outname string) (DecryptedBlob, error) {
+func (e *encryptedBlobCompat) DecryptBlob(opts *crypto.Opts, outname string) (DecryptedBlob, error) {
 	eb, err := compat2New(e)
 	if err != nil {
 		return nil, err
@@ -205,7 +205,7 @@ func (e *encryptedBlobCompat) DecryptBlob(opts crypto.Opts, outname string) (Dec
 }
 
 // EncryptBlob encrypts the key for the layer
-func (db *decryptedBlob) EncryptBlob(opts crypto.Opts, outname string) (_ EncryptedBlob, err error) {
+func (db *decryptedBlob) EncryptBlob(opts *crypto.Opts, outname string) (_ EncryptedBlob, err error) {
 	r, err := db.ReadCloser()
 	if err != nil {
 		return nil, errors.WithStack(err)

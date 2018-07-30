@@ -33,7 +33,7 @@ load that images into the local docker engine. It is then avaliable to be run un
 name as it was downloaded.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cmd.Flags().VisitAll(checkFlagsPull)
-		return runPull(args[0], opts)
+		return runPull(args[0], &opts)
 	},
 	Args: cobra.ExactArgs(1),
 }
@@ -41,14 +41,14 @@ name as it was downloaded.`,
 func checkFlagsPull(f *pflag.Flag) {
 	switch f.Name {
 	case "pass":
-		if !f.Changed {
-			opts.Passphrase = getPassSTDIN("Enter passphrase: ")
+		if f.Changed {
+			opts.SetPassphrase(passphrase)
 		}
 	default:
 	}
 }
 
-func runPull(remote string, opts crypto.Opts) error {
+func runPull(remote string, opts *crypto.Opts) error {
 	ref, err := reference.ParseNormalizedNamed(remote)
 	if err != nil {
 		return errors.Wrapf(err, "remote = ", remote)

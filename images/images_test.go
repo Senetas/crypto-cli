@@ -28,7 +28,7 @@ import (
 	"github.com/Senetas/crypto-cli/registry/names"
 )
 
-func createManifest(t *testing.T, opts crypto.Opts) (
+func createManifest(t *testing.T, opts *crypto.Opts) (
 	*distribution.ImageManifest,
 	names.NamedTaggedRepository,
 ) {
@@ -51,7 +51,7 @@ func createManifest(t *testing.T, opts crypto.Opts) (
 }
 
 // Todo, compare contents
-func testEncDecImage(t *testing.T, opts crypto.Opts) {
+func testEncDecImage(t *testing.T, opts *crypto.Opts) {
 	manifest, ref := createManifest(t, opts)
 
 	encManifest, err := manifest.Encrypt(ref, opts)
@@ -100,22 +100,22 @@ func testEncDecImage(t *testing.T, opts crypto.Opts) {
 
 func TestEncDecImage(t *testing.T) {
 	opts := crypto.Opts{
-		Passphrase: "hunter2",
-		EncType:    crypto.Pbkdf2Aes256Gcm,
-		Compat:     false,
+		EncType: crypto.Pbkdf2Aes256Gcm,
+		Compat:  false,
 	}
+	opts.SetPassphrase("hunter2")
 	t.Logf("testing non-compat")
-	testEncDecImage(t, opts)
+	testEncDecImage(t, &opts)
 }
 
 func TestCompatEncDecImage(t *testing.T) {
 	opts := crypto.Opts{
-		Passphrase: "hunter2",
-		EncType:    crypto.Pbkdf2Aes256Gcm,
-		Compat:     true,
+		EncType: crypto.Pbkdf2Aes256Gcm,
+		Compat:  true,
 	}
+	opts.SetPassphrase("hunter2")
 	t.Logf("testing compat")
-	testEncDecImage(t, opts)
+	testEncDecImage(t, &opts)
 }
 
 func cleanUp(t *testing.T, manifest *distribution.ImageManifest) {

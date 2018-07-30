@@ -40,7 +40,7 @@ import (
 // CreateManifest creates an unencrypted manifest (with the data necessary for encryption)
 func CreateManifest(
 	ref names.NamedTaggedRepository,
-	opts crypto.Opts,
+	opts *crypto.Opts,
 ) (
 	manifest *distribution.ImageManifest,
 	err error,
@@ -146,7 +146,7 @@ func extractTarBall(tarFH io.Reader, manifest *distribution.ImageManifest) (err 
 func mkBlobs(
 	repo, tag, path string,
 	layers []string,
-	opts crypto.Opts,
+	opts *crypto.Opts,
 ) (
 	configBlob distribution.Blob,
 	layerBlobs []distribution.Blob,
@@ -171,43 +171,71 @@ func mkBlobs(
 		return nil, nil, err
 	}
 
-	layerBlobs = make([]distribution.Blob, len(image.Layers))
 	switch opts.EncType {
 	case crypto.Pbkdf2Aes256Gcm:
-		// make the config
+		return pbkdf2Aes256GcmEncrypt(path, layerSet, image, opts)
+	case crypto.None:
+		return noneEncrypt(path, layerSet, image, opts)
+	default:
+	}
+	return nil, nil, errors.Errorf("%v is not a valid encryption type", opts.EncType)
+}
+
+func noneEncrypt(
+	path string,
+	layerSet map[string]bool,
+	image *archiveStruct,
+	opts *crypto.Opts,
+) (
+	distribution.Blob,
+	[]distribution.Blob,
+	error,
+) {
+	layerBlobs := make([]distribution.Blob, len(image.Layers))
+	configBlob := distribution.NewPlainConfigBlob(filepath.Join(path, image.Config), nil, 0)
+	for i, f := range image.Layers {
+		layerBlobs[i] = distribution.NewPlainLayer(filepath.Join(path, f), nil, 0)
+	}
+	return configBlob, layerBlobs, nil
+}
+
+func pbkdf2Aes256GcmEncrypt(
+	path string,
+	layerSet map[string]bool,
+	image *archiveStruct,
+	opts *crypto.Opts,
+) (
+	_ distribution.Blob,
+	_ []distribution.Blob,
+	err error,
+) {
+	// make the config
+	dec, err := distribution.NewDecrypto(opts)
+	if err != nil {
+		return nil, nil, err
+	}
+	configBlob := distribution.NewConfigBlob(filepath.Join(path, image.Config), nil, 0, dec)
+
+	layerBlobs := make([]distribution.Blob, len(image.Layers))
+	for i, f := range image.Layers {
+		basename := filepath.Join(path, f)
+
 		dec, err := distribution.NewDecrypto(opts)
 		if err != nil {
 			return nil, nil, err
 		}
-		configBlob = distribution.NewConfigBlob(filepath.Join(path, image.Config), nil, 0, dec)
 
-		for i, f := range image.Layers {
-			basename := filepath.Join(path, f)
-
-			dec, err := distribution.NewDecrypto(opts)
-			if err != nil {
-				return nil, nil, err
-			}
-
-			d, err := fileDigest(basename)
-			if err != nil {
-				return nil, nil, err
-			}
-
-			if layerSet[d.String()] {
-				log.Info().Msgf("preparing %s", d)
-				layerBlobs[i] = distribution.NewLayerBlob(filepath.Join(path, f), d, 0, dec)
-			} else {
-				layerBlobs[i] = distribution.NewPlainLayer(filepath.Join(path, f), d, 0)
-			}
+		d, err := fileDigest(basename)
+		if err != nil {
+			return nil, nil, err
 		}
-	case crypto.None:
-		configBlob = distribution.NewPlainConfigBlob(filepath.Join(path, image.Config), nil, 0)
-		for i, f := range image.Layers {
-			layerBlobs[i] = distribution.NewPlainLayer(filepath.Join(path, f), nil, 0)
+
+		if layerSet[d.String()] {
+			log.Info().Msgf("preparing %s", d)
+			layerBlobs[i] = distribution.NewLayerBlob(filepath.Join(path, f), d, 0, dec)
+		} else {
+			layerBlobs[i] = distribution.NewPlainLayer(filepath.Join(path, f), d, 0)
 		}
-	default:
-		return nil, nil, errors.Errorf("%v is not a valid encryption type", opts.EncType)
 	}
 
 	return configBlob, layerBlobs, nil

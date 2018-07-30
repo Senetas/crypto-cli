@@ -14,7 +14,14 @@
 
 package crypto
 
-import "errors"
+import (
+	"fmt"
+	"syscall"
+
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
+	"golang.org/x/crypto/ssh/terminal"
+)
 
 // Algos represents the collection of algorithms used for encryption and authentication
 type Algos string
@@ -39,9 +46,43 @@ func ValidateAlgos(ctstr string) (Algos, error) {
 
 // Opts stores data necessary for encryption
 type Opts struct {
-	Passphrase string
-	Salt       string
-	EncType    Algos
 	// whether the encryption data should be stored in a v2.2 compatible manifest or not
-	Compat bool
+	Compat        bool
+	passphraseSet bool
+	passphrase    string
+	Salt          string
+	EncType       Algos
+}
+
+// SetPassphrase sets the passphrase
+func (o *Opts) SetPassphrase(passphrase string) {
+	o.passphrase = passphrase
+	o.passphraseSet = true
+}
+
+// GetPassphrase prompt the user to enter a passphrase to decrypt
+func (o *Opts) GetPassphrase() (_ string, err error) {
+	log.Debug().Msgf("%#v", o)
+	if !o.passphraseSet {
+		o.passphrase, err = GetPassSTDIN("Enter passphrase: ")
+		if err != nil {
+			return "", err
+		}
+		o.passphraseSet = true
+	}
+	return o.passphrase, nil
+}
+
+// GetPassSTDIN prompte the user for a passphrase
+func GetPassSTDIN(prompt string) (_ string, err error) {
+	fmt.Print(prompt)
+	passphrase := []byte{}
+	for len(passphrase) == 0 {
+		passphrase, err = terminal.ReadPassword(syscall.Stdin)
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+		fmt.Println()
+	}
+	return string(passphrase), err
 }

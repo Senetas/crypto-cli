@@ -30,12 +30,14 @@ import (
 	"github.com/udhos/equalfile"
 )
 
-var opts = crypto.Opts{
-	Passphrase: "196884 = 196883 + 1",
-	Salt:       "MgSO4(H2O)x",
-	EncType:    crypto.Pbkdf2Aes256Gcm,
-	Compat:     false,
-}
+var (
+	passphrase = "196884 = 196883 + 1"
+	opts       = crypto.Opts{
+		Salt:    "MgSO4(H2O)x",
+		EncType: crypto.Pbkdf2Aes256Gcm,
+		Compat:  false,
+	}
+)
 
 type ConstReader byte
 
@@ -47,17 +49,19 @@ func (r ConstReader) Read(b []byte) (int, error) {
 }
 
 func TestCrypto(t *testing.T) {
-	c, err := distribution.NewDecrypto(opts)
+	opts.SetPassphrase(passphrase)
+
+	c, err := distribution.NewDecrypto(&opts)
 	if err != nil {
 		t.Fatal("could not create decrypto")
 	}
 
-	e, err := distribution.EncryptKey(*c, opts)
+	e, err := distribution.EncryptKey(*c, &opts)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	d, err := distribution.DecryptKey(e, opts)
+	d, err := distribution.DecryptKey(e, &opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,26 +72,26 @@ func TestCrypto(t *testing.T) {
 }
 
 func TestCryptoBlobs(t *testing.T) {
+	opts.SetPassphrase(passphrase)
+
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
-
 	size, d, fn := mkTempFile(t, dir)
-
 	encpath := filepath.Join(dir, "enc")
 	decpath := filepath.Join(dir, "dec")
 
-	c, err := distribution.NewDecrypto(opts)
+	c, err := distribution.NewDecrypto(&opts)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	blob := distribution.NewLayerBlob(fn, &d, size, c)
 
-	enc, err := blob.EncryptBlob(opts, encpath+"file")
+	enc, err := blob.EncryptBlob(&opts, encpath+"file")
 	if err != nil {
 		t.Error(err)
 	}
 
-	dec, err := enc.DecryptBlob(opts, encpath+"file")
+	dec, err := enc.DecryptBlob(&opts, encpath+"file")
 	if err != nil {
 		t.Error(err)
 	}
@@ -112,10 +116,10 @@ func TestCryptoBlobs(t *testing.T) {
 }
 
 func TestCompressBlobs(t *testing.T) {
+	opts.SetPassphrase(passphrase)
+
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
-
 	size, d, fn := createTempFile(t, dir)
-
 	compath := filepath.Join(dir, "enc.gz")
 	decpath := filepath.Join(dir, "dec")
 
