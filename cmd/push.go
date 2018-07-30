@@ -37,7 +37,7 @@ confidentially. It does not sign images so cannot garuntee identities.`,
 			return err
 		}
 		cmd.Flags().VisitAll(checkFlagsPush)
-		return runPush(args[0], opts)
+		return runPush(args[0], &opts)
 	},
 	Args: cobra.ExactArgs(1),
 }
@@ -45,20 +45,30 @@ confidentially. It does not sign images so cannot garuntee identities.`,
 func checkFlagsPush(f *pflag.Flag) {
 	switch f.Name {
 	case "pass":
-		if !f.Changed && opts.EncType != crypto.None {
-			passphrase1 := getPassSTDIN("Enter passphrase: ")
-			passphrase2 := getPassSTDIN("Re-enter passphrase: ")
-			if passphrase1 == passphrase2 {
-				opts.Passphrase = passphrase1
-			} else {
-				log.Fatal().Msg("Passphrases do not match.")
+		if opts.EncType != crypto.None {
+			if !f.Changed {
+				var err error
+				passphrase, err = crypto.GetPassSTDIN("Enter passphrase: ")
+				if err != nil {
+					log.Fatal().Err(err).Msgf("Could not obtain passphrase")
+				}
+
+				passphrase1, err := crypto.GetPassSTDIN("Re-enter passphrase: ")
+				if err != nil {
+					log.Fatal().Err(err).Msgf("Could not obtain passphrase")
+				}
+
+				if passphrase != passphrase1 {
+					log.Fatal().Msg("Passphrases do not match.")
+				}
 			}
+			opts.SetPassphrase(passphrase)
 		}
 	default:
 	}
 }
 
-func runPush(remote string, opts crypto.Opts) error {
+func runPush(remote string, opts *crypto.Opts) error {
 	ref, err := reference.ParseNormalizedNamed(remote)
 	if err != nil {
 		return err

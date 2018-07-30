@@ -34,7 +34,7 @@ import (
 func Manifest2Tar(
 	manifest *distribution.ImageManifest,
 	ref auth.Scope,
-	opts crypto.Opts,
+	opts *crypto.Opts,
 ) (tarball string, err error) {
 	dir := manifest.DirName
 

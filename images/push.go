@@ -25,7 +25,7 @@ import (
 )
 
 // PushImage encrypts then pushes an image
-func PushImage(ref reference.Named, opts crypto.Opts) (err error) {
+func PushImage(ref reference.Named, opts *crypto.Opts) (err error) {
 	token, nTRep, endpoint, err := authProcedure(ref)
 	if err != nil {
 		return err

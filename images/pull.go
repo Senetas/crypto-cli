@@ -32,7 +32,7 @@ import (
 )
 
 // PullImage pulls an image from the registry
-func PullImage(ref reference.Named, opts crypto.Opts) (err error) {
+func PullImage(ref reference.Named, opts *crypto.Opts) (err error) {
 	token, nTRep, endpoint, err := authProcedure(ref)
 	if err != nil {
 		return err
@@ -72,7 +72,7 @@ func pullAndDecrypt(
 	token auth.Scope,
 	endpoint *dregistry.APIEndpoint,
 	dir string,
-	opts crypto.Opts,
+	opts *crypto.Opts,
 ) (
 	*distribution.ImageManifest,
 	error,

@@ -43,7 +43,7 @@ func PullImage(
 	token dauth.Scope,
 	ref names.NamedTaggedRepository,
 	endpoint *registry.APIEndpoint,
-	opts crypto.Opts,
+	opts *crypto.Opts,
 	downloadDir string,
 ) (*distribution.ImageManifest, error) {
 	bldr := v2.NewURLBuilder(endpoint.URL, false)

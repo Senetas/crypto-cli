@@ -40,38 +40,49 @@ type ImageManifest struct {
 	DirName       string `json:"-"`
 }
 
-// Encrypt an image, generating an image manifest suitable for upload to a repo
-func (m *ImageManifest) Encrypt(
-	ref names.NamedTaggedRepository,
-	opts crypto.Opts,
-) (
-	out *ImageManifest,
-	err error,
-) {
-	var configBlob Blob
-	switch blob := m.Config.(type) {
+func unencryptedConfig(blob *NoncryptedBlob) (Blob, error) {
+	digester := digest.Canonical.Digester()
+	r, err := blob.ReadCloser()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	size, err := io.Copy(digester.Hash(), r)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	d := digester.Digest()
+	return NewPlainConfigBlob(blob.GetFilename(), &d, size), nil
+}
+
+func prepareConfig(config Blob, opts *crypto.Opts, ref names.NamedTaggedRepository) (Blob, error) {
+	switch blob := config.(type) {
 	case DecryptedBlob:
 		log.Info().Msg("encrypting config")
 		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
-		configBlob, err = blob.EncryptBlob(opts, blob.GetFilename()+".aes")
-		if err != nil {
-			return nil, err
-		}
+		return blob.EncryptBlob(opts, blob.GetFilename()+".aes")
 	case *NoncryptedBlob:
 		log.Info().Msgf("preparing config")
 
 		//configBlob, err = blob.Compress(blob.GetFilename() + ".gz")
 
 		// this sends the config in the clear
-		digester := digest.Canonical.Digester()
-		r, err := blob.ReadCloser()
-		size, err := io.Copy(digester.Hash(), r)
-		if err != nil {
-			return nil, errors.WithStack(err)
-		}
-		d := digester.Digest()
-		configBlob = NewPlainConfigBlob(blob.GetFilename(), &d, size)
+		return unencryptedConfig(blob)
 	default:
+	}
+	return nil, errors.New("config is of wrong type")
+}
+
+// Encrypt an image, generating an image manifest suitable for upload to a repo
+func (m *ImageManifest) Encrypt(
+	ref names.NamedTaggedRepository,
+	opts *crypto.Opts,
+) (
+	_ *ImageManifest,
+	err error,
+) {
+	configBlob, err := prepareConfig(m.Config, opts, ref)
+	if err != nil {
+		return nil, err
 	}
 
 	layerBlobs := make([]Blob, len(m.Layers))
@@ -102,7 +113,7 @@ func (m *ImageManifest) Encrypt(
 
 // DecryptKeys attempts to decrypt all keys in a manifest
 func (m *ImageManifest) DecryptKeys(
-	opts crypto.Opts,
+	opts *crypto.Opts,
 	ref names.NamedTaggedRepository,
 ) (err error) {
 	switch blob := m.Config.(type) {

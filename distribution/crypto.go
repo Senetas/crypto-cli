@@ -36,7 +36,7 @@ type DeCrypto struct {
 }
 
 // NewDecrypto create a new DeCrypto struct that holds decrupted key data
-func NewDecrypto(opts crypto.Opts) (*DeCrypto, error) {
+func NewDecrypto(opts *crypto.Opts) (*DeCrypto, error) {
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
 		return nil, err
@@ -48,10 +48,15 @@ func NewDecrypto(opts crypto.Opts) (*DeCrypto, error) {
 }
 
 // EncryptKey encrypts a plaintext key with a passphrase and salt
-func EncryptKey(d DeCrypto, opts crypto.Opts) (EnCrypto, error) {
+func EncryptKey(d DeCrypto, opts *crypto.Opts) (EnCrypto, error) {
 	e := EnCrypto{Algos: d.Algos}
 
-	ciphertextKey, err := crypto.Enckey(d.DecKey, opts.Passphrase, opts.Salt)
+	passphrase, err := opts.GetPassphrase()
+	if err != nil {
+		return EnCrypto{}, err
+	}
+
+	ciphertextKey, err := crypto.Enckey(d.DecKey, passphrase, opts.Salt)
 	if err != nil {
 		return EnCrypto{}, errors.WithStack(utils.ErrEncrypt)
 	}
@@ -62,7 +67,7 @@ func EncryptKey(d DeCrypto, opts crypto.Opts) (EnCrypto, error) {
 }
 
 // DecryptKey is the inverse function of EncryptKey (up to error)
-func DecryptKey(e EnCrypto, opts crypto.Opts) (DeCrypto, error) {
+func DecryptKey(e EnCrypto, opts *crypto.Opts) (DeCrypto, error) {
 	if e.Algos != opts.EncType {
 		return DeCrypto{}, utils.NewError("encryption type does not match decryption type", false)
 	}
@@ -74,7 +79,12 @@ func DecryptKey(e EnCrypto, opts crypto.Opts) (DeCrypto, error) {
 		return DeCrypto{}, errors.WithStack(utils.ErrDecrypt)
 	}
 
-	d.DecKey, err = crypto.Deckey(decoded, opts.Passphrase, opts.Salt)
+	passphrase, err := opts.GetPassphrase()
+	if err != nil {
+		return DeCrypto{}, err
+	}
+
+	d.DecKey, err = crypto.Deckey(decoded, passphrase, opts.Salt)
 	if err != nil {
 		return DeCrypto{}, errors.WithStack(utils.ErrDecrypt)
 	}

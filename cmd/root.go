@@ -15,29 +15,26 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
-	"syscall"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/utils"
 )
 
 var (
-	ctstr string
-	opts  = crypto.Opts{
-		Passphrase: "",
-		Salt:       "",
-		EncType:    crypto.Pbkdf2Aes256Gcm,
-		Compat:     false,
+	ctstr      string
+	passphrase string
+	debug      bool
+	opts       = crypto.Opts{
+		Salt:    "",
+		EncType: crypto.Pbkdf2Aes256Gcm,
+		Compat:  false,
 	}
-	debug bool
 	//cfgFile    string
 
 	// rootCmd represents the base command when called without any subcommands
@@ -80,7 +77,7 @@ func init() {
 	cobra.OnInitialize(initLogging)
 
 	rootCmd.PersistentFlags().StringVarP(
-		&opts.Passphrase,
+		&passphrase,
 		"pass",
 		"p",
 		"",
@@ -104,16 +101,6 @@ func initLogging() {
 	} else {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
-}
-
-func getPassSTDIN(prompt string) string {
-	fmt.Print(prompt)
-	passphrase, err := terminal.ReadPassword(syscall.Stdin)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("password typed: %s", passphrase)
-	}
-	fmt.Println()
-	return string(passphrase)
 }
 
 // initConfig reads in config file and ENV variables if set.
