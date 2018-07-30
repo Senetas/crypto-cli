@@ -59,7 +59,7 @@ func PushImage(
 	if err != nil {
 		return err
 	}
-	log.Info().Msgf("Successfully uploaded manifest with digest: %s", mdigest)
+	log.Info().Msgf("Successfully uploaded manifest: %s", mdigest)
 
 	return nil
 }

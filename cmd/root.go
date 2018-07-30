@@ -35,7 +35,6 @@ var (
 		EncType: crypto.Pbkdf2Aes256Gcm,
 		Compat:  false,
 	}
-	//cfgFile    string
 
 	// rootCmd represents the base command when called without any subcommands
 	rootCmd = &cobra.Command{
@@ -60,20 +59,15 @@ func Execute() {
 	log.Logger = zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).With().Logger()
 
 	if err := rootCmd.Execute(); err != nil {
-		// comment out until * to print all stack traces
-		e, ok := errors.Cause(err).(utils.Error)
-		if ok && !e.HasStack {
-			log.Fatal().Msgf("%v", err)
+		c, ok := errors.Cause(err).(utils.Error)
+		if debug && (!ok || c.HasStack) {
+			log.Fatal().Msgf("%+v", err)
 		}
-		// *
-
-		log.Fatal().Msgf("%+v", err)
+		log.Fatal().Msgf("%v", err)
 	}
 }
 
 func init() {
-	//cobra.OnInitialize(initConfig)
-
 	cobra.OnInitialize(initLogging)
 
 	rootCmd.PersistentFlags().StringVarP(
@@ -90,7 +84,7 @@ If absent, a prompt will be presented.`,
 		"verbose",
 		"v",
 		false,
-		"Set the log level to 0 (debug)",
+		"Set the log level to debug",
 	)
 }
 
@@ -102,28 +96,3 @@ func initLogging() {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
 }
-
-// initConfig reads in config file and ENV variables if set.
-//func initConfig() {
-//if cfgFile != "" {
-//// Use config file from the flag.
-//viper.SetConfigFile(cfgFile)
-//} else {
-//// Find home directory.
-//home, err := homedir.Dir()
-//if err != nil {
-//log.Fatal().Msgf("%+v", err)
-//}
-
-//// Search config in home directory with name ".crypto-cli" (without extension).
-//viper.AddConfigPath(home)
-//viper.SetConfigName(".crypto-cli")
-//}
-
-//viper.AutomaticEnv() // read in environment variables that match
-
-//// If a config file is found, read it in.
-//if err := viper.ReadInConfig(); err == nil {
-//fmt.Println("Using config file:", viper.ConfigFileUsed())
-//}
-//}
