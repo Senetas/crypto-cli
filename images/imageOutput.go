@@ -210,11 +210,11 @@ func pbkdf2Aes256GcmEncrypt(
 	err error,
 ) {
 	// make the config
-	dec, err := distribution.NewDecrypto(opts)
-	if err != nil {
-		return nil, nil, err
-	}
-	configBlob := distribution.NewConfigBlob(filepath.Join(path, image.Config), nil, 0, dec)
+	//dec, err := distribution.NewDecrypto(opts)
+	//if err != nil {
+	//return nil, nil, err
+	//}
+	configBlob := distribution.NewPlainConfigBlob(filepath.Join(path, image.Config), nil, 0)
 
 	layerBlobs := make([]distribution.Blob, len(image.Layers))
 	for i, f := range image.Layers {
