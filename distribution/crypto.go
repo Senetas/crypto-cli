@@ -29,6 +29,32 @@ type EnCrypto struct {
 	EncKey string       `json:"key"`
 }
 
+// DecryptKey is the inverse function of EncryptKey (up to error)
+func DecryptKey(e EnCrypto, opts *crypto.Opts) (DeCrypto, error) {
+	if e.Algos != opts.EncType {
+		return DeCrypto{}, utils.NewError("encryption type does not match decryption type", false)
+	}
+
+	d := DeCrypto{Algos: e.Algos}
+
+	decoded, err := base64.URLEncoding.DecodeString(e.EncKey)
+	if err != nil {
+		return DeCrypto{}, errors.WithStack(utils.ErrDecrypt)
+	}
+
+	passphrase, err := opts.GetPassphrase()
+	if err != nil {
+		return DeCrypto{}, err
+	}
+
+	d.DecKey, err = crypto.Deckey(decoded, passphrase, opts.Salt)
+	if err != nil {
+		return DeCrypto{}, errors.WithStack(utils.ErrDecrypt)
+	}
+
+	return d, nil
+}
+
 // DeCrypto is a decrypted key with the algotithms used to encrypt it and the data
 type DeCrypto struct {
 	Algos  crypto.Algos `json:"cryptoType"`
@@ -64,30 +90,4 @@ func EncryptKey(d DeCrypto, opts *crypto.Opts) (EnCrypto, error) {
 	e.EncKey = base64.URLEncoding.EncodeToString(ciphertextKey)
 
 	return e, nil
-}
-
-// DecryptKey is the inverse function of EncryptKey (up to error)
-func DecryptKey(e EnCrypto, opts *crypto.Opts) (DeCrypto, error) {
-	if e.Algos != opts.EncType {
-		return DeCrypto{}, utils.NewError("encryption type does not match decryption type", false)
-	}
-
-	d := DeCrypto{Algos: e.Algos}
-
-	decoded, err := base64.URLEncoding.DecodeString(e.EncKey)
-	if err != nil {
-		return DeCrypto{}, errors.WithStack(utils.ErrDecrypt)
-	}
-
-	passphrase, err := opts.GetPassphrase()
-	if err != nil {
-		return DeCrypto{}, err
-	}
-
-	d.DecKey, err = crypto.Deckey(decoded, passphrase, opts.Salt)
-	if err != nil {
-		return DeCrypto{}, errors.WithStack(utils.ErrDecrypt)
-	}
-
-	return d, nil
 }
