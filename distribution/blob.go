@@ -18,7 +18,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/Senetas/crypto-cli/crypto"
 	digest "github.com/opencontainers/go-digest"
 )
 
@@ -30,70 +29,6 @@ type Blob interface {
 	GetFilename() string
 	SetFilename(filename string)
 	ReadCloser() (io.ReadCloser, error)
-}
-
-// EncryptedBlob is a blob that may be decrypted
-type EncryptedBlob interface {
-	Blob
-	// DecryptBlob decrypts:
-	//     The Key encryption key contained in the "EnCrypto" struct
-	//     The data stream in the FileHandle io.Reader
-	// The data is also decompressed and written to a file which is referenced
-	// in the "Filename"
-	DecryptBlob(opts *crypto.Opts, outfile string) (DecryptedBlob, error)
-	DecryptKey(opts *crypto.Opts) (KeyDecryptedBlob, error)
-}
-
-// KeyDecryptedBlob is a type for blobs that have had their key objects
-// decrypted but not their files
-type KeyDecryptedBlob interface {
-	Blob
-	DecryptFile(outfile string) (DecryptedBlob, error)
-	EncryptKey(opts *crypto.Opts) (EncryptedBlob, error)
-}
-
-// DecryptedBlob is a blob that may be encrypted
-type DecryptedBlob interface {
-	Blob
-	// EncryptBlob compresses the blob file and encryptes
-	//     The Key encryption key contained in the "DeCrypto" struct
-	//     The data stream in the FileHandle io.Reader
-	EncryptBlob(opts *crypto.Opts, outfile string) (EncryptedBlob, error)
-}
-
-// CompressedBlob is a blob that may be decompressed
-type CompressedBlob interface {
-	Blob
-	Decompress(outfile string) (DecompressedBlob, error)
-}
-
-// DecompressedBlob is a blob that may be compressed
-type DecompressedBlob interface {
-	Blob
-	Compress(outfile string) (CompressedBlob, error)
-}
-
-// EncryptedBlob is the go type for an encrypted element in the layer array
-type encryptedBlobNew struct {
-	*NoncryptedBlob
-	*EnCrypto `json:"crypto"`
-}
-
-// EncryptedBlob is the go type for an encrypted element in the layer array
-type encryptedBlobCompat struct {
-	*NoncryptedBlob
-	URLs []string `json:"urls"`
-}
-
-type keyDecryptedBlob struct {
-	*NoncryptedBlob
-	*DeCrypto `json:"-"`
-}
-
-// DecryptedBlob is the go type for encryptable element in the layer array
-type decryptedBlob struct {
-	*NoncryptedBlob
-	*DeCrypto `json:"-"`
 }
 
 // NoncryptedBlob is a vanilla blob with no encrpytion data
