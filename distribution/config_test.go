@@ -38,7 +38,7 @@ func TestMarshalling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	opts := crypto.Opts{
+	opts := &crypto.Opts{
 		Salt:    "Hello",
 		EncType: crypto.Pbkdf2Aes256Gcm,
 	}

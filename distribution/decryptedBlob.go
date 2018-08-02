@@ -35,7 +35,7 @@ type DecryptedBlob interface {
 	// EncryptBlob compresses the blob file and encryptes
 	//     The Key encryption key contained in the "DeCrypto" struct
 	//     The data stream in the FileHandle io.Reader
-	EncryptBlob(opts crypto.Opts, outfile string) (EncryptedBlob, error)
+	EncryptBlob(opts *crypto.Opts, outfile string) (EncryptedBlob, error)
 }
 
 type decryptedBlob struct {
@@ -43,7 +43,7 @@ type decryptedBlob struct {
 	*DeCrypto `json:"-"`
 }
 
-func (db *decryptedBlob) EncryptBlob(opts crypto.Opts, outname string) (_ EncryptedBlob, err error) {
+func (db *decryptedBlob) EncryptBlob(opts *crypto.Opts, outname string) (_ EncryptedBlob, err error) {
 	r, err := db.ReadCloser()
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -122,7 +122,7 @@ type decryptedConfig struct {
 	*DeCrypto `json:"-"`
 }
 
-func (db *decryptedConfig) EncryptBlob(opts crypto.Opts, outname string) (_ EncryptedBlob, err error) {
+func (db *decryptedConfig) EncryptBlob(opts *crypto.Opts, outname string) (_ EncryptedBlob, err error) {
 	r, err := db.ReadCloser()
 	if err != nil {
 		return nil, errors.WithStack(err)

@@ -29,8 +29,8 @@ type EncryptedBlob interface {
 	//     The data stream in the FileHandle io.Reader
 	// The data is also decompressed and written to a file which is referenced
 	// in the "Filename"
-	DecryptBlob(opts crypto.Opts, outfile string) (DecryptedBlob, error)
-	DecryptKey(opts crypto.Opts) (KeyDecryptedBlob, error)
+	DecryptBlob(opts *crypto.Opts, outfile string) (DecryptedBlob, error)
+	DecryptKey(opts *crypto.Opts) (KeyDecryptedBlob, error)
 }
 
 // EncryptedBlob is the go type for an encrypted element in the layer array
@@ -39,7 +39,7 @@ type encryptedBlobNew struct {
 	*EnCrypto `json:"crypto"`
 }
 
-func (eb *encryptedBlobNew) DecryptBlob(opts crypto.Opts, outname string) (DecryptedBlob, error) {
+func (eb *encryptedBlobNew) DecryptBlob(opts *crypto.Opts, outname string) (DecryptedBlob, error) {
 	kb, err := eb.DecryptKey(opts)
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func (eb *encryptedBlobNew) DecryptBlob(opts crypto.Opts, outname string) (Decry
 	return kb.DecryptFile(opts, outname)
 }
 
-func (eb *encryptedBlobNew) DecryptKey(opts crypto.Opts) (KeyDecryptedBlob, error) {
+func (eb *encryptedBlobNew) DecryptKey(opts *crypto.Opts) (KeyDecryptedBlob, error) {
 	dk, err := DecryptKey(*eb.EnCrypto, opts)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -64,7 +64,7 @@ type encryptedBlobCompat struct {
 	URLs []string `json:"urls"`
 }
 
-func (e *encryptedBlobCompat) DecryptBlob(opts crypto.Opts, outname string) (DecryptedBlob, error) {
+func (e *encryptedBlobCompat) DecryptBlob(opts *crypto.Opts, outname string) (DecryptedBlob, error) {
 	ek, err := newEncrypto(e.URLs)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func (e *encryptedBlobCompat) DecryptBlob(opts crypto.Opts, outname string) (Dec
 	return eb.DecryptBlob(opts, outname)
 }
 
-func (e *encryptedBlobCompat) DecryptKey(opts crypto.Opts) (KeyDecryptedBlob, error) {
+func (e *encryptedBlobCompat) DecryptKey(opts *crypto.Opts) (KeyDecryptedBlob, error) {
 	ek, err := newEncrypto(e.URLs)
 	if err != nil {
 		return nil, err
@@ -121,7 +121,7 @@ type encryptedConfigNew struct {
 	*EnCrypto `json:"-"`
 }
 
-func (ec *encryptedConfigNew) DecryptBlob(opts crypto.Opts, outname string) (DecryptedBlob, error) {
+func (ec *encryptedConfigNew) DecryptBlob(opts *crypto.Opts, outname string) (DecryptedBlob, error) {
 	kc, err := ec.DecryptKey(opts)
 	if err != nil {
 		return nil, err
@@ -129,7 +129,7 @@ func (ec *encryptedConfigNew) DecryptBlob(opts crypto.Opts, outname string) (Dec
 	return kc.DecryptFile(opts, outname)
 }
 
-func (ec *encryptedConfigNew) DecryptKey(opts crypto.Opts) (KeyDecryptedBlob, error) {
+func (ec *encryptedConfigNew) DecryptKey(opts *crypto.Opts) (KeyDecryptedBlob, error) {
 	dk, err := DecryptKey(*ec.EnCrypto, opts)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -145,7 +145,7 @@ type encryptedConfigCompat struct {
 	URLs []string `json:"urls"`
 }
 
-func (e *encryptedConfigCompat) DecryptBlob(opts crypto.Opts, outname string) (DecryptedBlob, error) {
+func (e *encryptedConfigCompat) DecryptBlob(opts *crypto.Opts, outname string) (DecryptedBlob, error) {
 	ek, err := newEncrypto(e.URLs)
 	if err != nil {
 		return nil, err
@@ -159,7 +159,7 @@ func (e *encryptedConfigCompat) DecryptBlob(opts crypto.Opts, outname string) (D
 	return eb.DecryptBlob(opts, outname)
 }
 
-func (e *encryptedConfigCompat) DecryptKey(opts crypto.Opts) (KeyDecryptedBlob, error) {
+func (e *encryptedConfigCompat) DecryptKey(opts *crypto.Opts) (KeyDecryptedBlob, error) {
 	ek, err := newEncrypto(e.URLs)
 	if err != nil {
 		return nil, err

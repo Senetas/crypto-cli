@@ -56,7 +56,7 @@ type clearFields struct {
 
 // DecConfig is config that may be encrypted
 type DecConfig interface {
-	Encrypt(key []byte, opts crypto.Opts) (EncConfig, error)
+	Encrypt(key []byte, opts *crypto.Opts) (EncConfig, error)
 }
 
 type decConfig struct {
@@ -87,7 +87,7 @@ func (c *decConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(sorted)
 }
 
-func (c *decConfig) Encrypt(key []byte, opts crypto.Opts) (EncConfig, error) {
+func (c *decConfig) Encrypt(key []byte, opts *crypto.Opts) (EncConfig, error) {
 	enc, err := crypto.EncryptJSON(c.secretFields, key, []byte(opts.Salt))
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -101,7 +101,7 @@ func (c *decConfig) Encrypt(key []byte, opts crypto.Opts) (EncConfig, error) {
 
 // EncConfig has the secretFields encrypted
 type EncConfig interface {
-	Decrypt(key []byte, opts crypto.Opts) (DecConfig, error)
+	Decrypt(key []byte, opts *crypto.Opts) (DecConfig, error)
 }
 
 type encConfig struct {
@@ -109,7 +109,7 @@ type encConfig struct {
 	clearFields
 }
 
-func (c *encConfig) Decrypt(key []byte, opts crypto.Opts) (DecConfig, error) {
+func (c *encConfig) Decrypt(key []byte, opts *crypto.Opts) (DecConfig, error) {
 	dc := decConfig{clearFields: c.clearFields}
 	log.Debug().Msgf("%v", opts)
 	if err := crypto.DecryptJSON(c.Enc, key, []byte(opts.Salt), &dc.secretFields); err != nil {

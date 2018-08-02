@@ -59,7 +59,7 @@ func prepareConfig(config Blob, opts *crypto.Opts, ref names.NamedTaggedReposito
 	case DecryptedBlob:
 		log.Info().Msg("encrypting config")
 		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
-		return blob.EncryptBlob(*opts, blob.GetFilename()+".aes")
+		return blob.EncryptBlob(opts, blob.GetFilename()+".aes")
 	case *NoncryptedBlob:
 		log.Info().Msgf("preparing config")
 		return unencryptedConfig(blob)
@@ -87,7 +87,7 @@ func (m *ImageManifest) Encrypt(
 		case DecryptedBlob:
 			log.Info().Msgf("encrypting layer %d", i)
 			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
-			layerBlobs[i], err = blob.EncryptBlob(*opts, blob.GetFilename()+".aes")
+			layerBlobs[i], err = blob.EncryptBlob(opts, blob.GetFilename()+".aes")
 		case *NoncryptedBlob:
 			log.Info().Msgf("compressing layer %d", i)
 			layerBlobs[i], err = blob.Compress(blob.GetFilename() + ".gz")
@@ -115,7 +115,7 @@ func (m *ImageManifest) DecryptKeys(
 	switch blob := m.Config.(type) {
 	case EncryptedBlob:
 		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
-		m.Config, err = blob.DecryptKey(*opts)
+		m.Config, err = blob.DecryptKey(opts)
 		if err != nil {
 			return err
 		}
@@ -128,7 +128,7 @@ func (m *ImageManifest) DecryptKeys(
 		switch blob := l.(type) {
 		case EncryptedBlob:
 			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
-			m.Layers[i], err = blob.DecryptKey(*opts)
+			m.Layers[i], err = blob.DecryptKey(opts)
 			if err != nil {
 				return err
 			}
@@ -151,7 +151,7 @@ func DecryptManifest(
 	switch blob := manifest.Config.(type) {
 	case KeyDecryptedBlob:
 		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
-		config, err = blob.DecryptFile(*opts, blob.GetFilename()+".dec")
+		config, err = blob.DecryptFile(opts, blob.GetFilename()+".dec")
 	case *NoncryptedBlob:
 		config = blob
 	default:
@@ -167,7 +167,7 @@ func DecryptManifest(
 		switch blob := l.(type) {
 		case KeyDecryptedBlob:
 			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
-			layers[i], err = blob.DecryptFile(*opts, blob.GetFilename()+".dec")
+			layers[i], err = blob.DecryptFile(opts, blob.GetFilename()+".dec")
 		case CompressedBlob:
 			layers[i], err = blob.Decompress(blob.GetFilename() + ".dec")
 		default:

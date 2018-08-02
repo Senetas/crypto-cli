@@ -32,8 +32,8 @@ import (
 // decrypted but not their files
 type KeyDecryptedBlob interface {
 	Blob
-	DecryptFile(opts crypto.Opts, outfile string) (DecryptedBlob, error)
-	EncryptKey(opts crypto.Opts) (EncryptedBlob, error)
+	DecryptFile(opts *crypto.Opts, outfile string) (DecryptedBlob, error)
+	EncryptKey(opts *crypto.Opts) (EncryptedBlob, error)
 }
 
 type keyDecryptedBlob struct {
@@ -41,7 +41,7 @@ type keyDecryptedBlob struct {
 	*DeCrypto `json:"-"`
 }
 
-func (kb *keyDecryptedBlob) DecryptFile(opts crypto.Opts, outfile string) (DecryptedBlob, error) {
+func (kb *keyDecryptedBlob) DecryptFile(opts *crypto.Opts, outfile string) (DecryptedBlob, error) {
 	r, err := kb.ReadCloser()
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -90,7 +90,7 @@ func (kb *keyDecryptedBlob) DecryptFile(opts crypto.Opts, outfile string) (Decry
 	}, nil
 }
 
-func (kb *keyDecryptedBlob) EncryptKey(opts crypto.Opts) (EncryptedBlob, error) {
+func (kb *keyDecryptedBlob) EncryptKey(opts *crypto.Opts) (EncryptedBlob, error) {
 	ek, err := EncryptKey(*kb.DeCrypto, opts)
 	if err != nil {
 		return nil, err
@@ -106,7 +106,7 @@ type keyDecryptedConfig struct {
 	*DeCrypto `json:"-"`
 }
 
-func (kc *keyDecryptedConfig) DecryptFile(opts crypto.Opts, outname string) (DecryptedBlob, error) {
+func (kc *keyDecryptedConfig) DecryptFile(opts *crypto.Opts, outname string) (DecryptedBlob, error) {
 	r, err := kc.ReadCloser()
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -152,7 +152,7 @@ func (kc *keyDecryptedConfig) DecryptFile(opts crypto.Opts, outname string) (Dec
 	}, nil
 }
 
-func (kc *keyDecryptedConfig) EncryptKey(opts crypto.Opts) (EncryptedBlob, error) {
+func (kc *keyDecryptedConfig) EncryptKey(opts *crypto.Opts) (EncryptedBlob, error) {
 	ek, err := EncryptKey(*kc.DeCrypto, opts)
 	if err != nil {
 		return nil, err

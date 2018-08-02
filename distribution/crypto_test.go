@@ -32,7 +32,7 @@ import (
 
 var (
 	passphrase = "196884 = 196883 + 1"
-	opts       = crypto.Opts{
+	opts       = &crypto.Opts{
 		Salt:    "MgSO4(H2O)x",
 		EncType: crypto.Pbkdf2Aes256Gcm,
 		Compat:  false,

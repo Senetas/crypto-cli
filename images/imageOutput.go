@@ -210,7 +210,7 @@ func pbkdf2Aes256GcmEncrypt(
 	err error,
 ) {
 	// make the config
-	dec, err := distribution.NewDecrypto(*opts)
+	dec, err := distribution.NewDecrypto(opts)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -220,7 +220,7 @@ func pbkdf2Aes256GcmEncrypt(
 	for i, f := range image.Layers {
 		basename := filepath.Join(path, f)
 
-		dec, err := distribution.NewDecrypto(*opts)
+		dec, err := distribution.NewDecrypto(opts)
 		if err != nil {
 			return nil, nil, err
 		}
