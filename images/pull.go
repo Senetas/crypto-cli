@@ -81,5 +81,5 @@ func pullAndDecrypt(
 	if err != nil {
 		return nil, err
 	}
-	return distribution.DecryptManifest(manifest)
+	return distribution.DecryptManifest(opts, nTRep, manifest)
 }

@@ -39,8 +39,7 @@ func Enckey(plaintext []byte, pass, salt string) ([]byte, error) {
 		return nil, utils.ErrEncrypt
 	}
 
-	var aesgcm cipher.AEAD
-	aesgcm, err = cipher.NewGCM(block)
+	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
 		return nil, utils.ErrEncrypt
 	}

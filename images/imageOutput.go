@@ -192,7 +192,7 @@ func noneEncrypt(
 	error,
 ) {
 	layerBlobs := make([]distribution.Blob, len(image.Layers))
-	configBlob := distribution.NewPlainConfigBlob(filepath.Join(path, image.Config), nil, 0)
+	configBlob := distribution.NewPlainConfig(filepath.Join(path, image.Config), nil, 0)
 	for i, f := range image.Layers {
 		layerBlobs[i] = distribution.NewPlainLayer(filepath.Join(path, f), nil, 0)
 	}
@@ -210,17 +210,17 @@ func pbkdf2Aes256GcmEncrypt(
 	err error,
 ) {
 	// make the config
-	//dec, err := distribution.NewDecrypto(opts)
-	//if err != nil {
-	//return nil, nil, err
-	//}
-	configBlob := distribution.NewPlainConfigBlob(filepath.Join(path, image.Config), nil, 0)
+	dec, err := distribution.NewDecrypto(*opts)
+	if err != nil {
+		return nil, nil, err
+	}
+	configBlob := distribution.NewConfig(filepath.Join(path, image.Config), nil, 0, dec)
 
 	layerBlobs := make([]distribution.Blob, len(image.Layers))
 	for i, f := range image.Layers {
 		basename := filepath.Join(path, f)
 
-		dec, err := distribution.NewDecrypto(opts)
+		dec, err := distribution.NewDecrypto(*opts)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -230,9 +230,9 @@ func pbkdf2Aes256GcmEncrypt(
 			return nil, nil, err
 		}
 
+		log.Info().Msgf("preparing %s", d)
 		if layerSet[d.String()] {
-			log.Info().Msgf("preparing %s", d)
-			layerBlobs[i] = distribution.NewLayerBlob(filepath.Join(path, f), d, 0, dec)
+			layerBlobs[i] = distribution.NewLayer(filepath.Join(path, f), d, 0, dec)
 		} else {
 			layerBlobs[i] = distribution.NewPlainLayer(filepath.Join(path, f), d, 0)
 		}

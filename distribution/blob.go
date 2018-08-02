@@ -74,46 +74,30 @@ func newPlainBlob(
 	}
 }
 
-func newDecryptedBlob(
+// NewConfig creates a new blob for a config
+func NewConfig(
 	filename string,
 	d *digest.Digest,
 	size int64,
-	contentType string,
 	dec *DeCrypto,
-) *decryptedBlob {
-	return &decryptedBlob{
-		NoncryptedBlob: newPlainBlob(filename, d, size, contentType),
+) DecryptedBlob {
+	return &decryptedConfig{
+		NoncryptedBlob: newPlainBlob(filename, d, size, MediaTypeImageConfig),
 		DeCrypto:       dec,
 	}
 }
 
-// NewPlainConfigBlob creates a new unencrypted blob for a config
-func NewPlainConfigBlob(
-	filename string,
-	d *digest.Digest,
-	size int64,
-) DecompressedBlob {
-	return newPlainBlob(filename, d, size, MediaTypeImageConfig)
-}
-
-// NewConfigBlob creates a new encrypted blob for a config
-func NewConfigBlob(
+// NewLayer creates a new LayerJSON for a data layer
+func NewLayer(
 	filename string,
 	d *digest.Digest,
 	size int64,
 	dec *DeCrypto,
 ) DecryptedBlob {
-	return newDecryptedBlob(filename, d, size, MediaTypeImageConfig, dec)
-}
-
-// NewLayerBlob creates a new LayerJSON for a data layer
-func NewLayerBlob(
-	filename string,
-	d *digest.Digest,
-	size int64,
-	dec *DeCrypto,
-) DecryptedBlob {
-	return newDecryptedBlob(filename, d, size, MediaTypeLayer, dec)
+	return &decryptedBlob{
+		NoncryptedBlob: newPlainBlob(filename, d, size, MediaTypeLayer),
+		DeCrypto:       dec,
+	}
 }
 
 // NewPlainLayer creates a new LayerJSON for an unencrypted data layer
@@ -122,6 +106,14 @@ func NewPlainLayer(
 	d *digest.Digest,
 	size int64,
 ) DecompressedBlob {
-	blob := newPlainBlob(filename, d, size, MediaTypeLayer)
-	return blob
+	return newPlainBlob(filename, d, size, MediaTypeLayer)
+}
+
+// NewPlainConfig creates a new LayerJSON for an unencrypted data layer
+func NewPlainConfig(
+	filename string,
+	d *digest.Digest,
+	size int64,
+) DecompressedBlob {
+	return newPlainBlob(filename, d, size, MediaTypeImageConfig)
 }

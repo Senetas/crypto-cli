@@ -34,17 +34,17 @@ func createManifest(t *testing.T, opts *crypto.Opts) (
 ) {
 	ref, err := reference.ParseNormalizedNamed("narthanaepa1/my-alpine:test")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("%+v", err)
 	}
 
 	ref2, err := names.CastToTagged(ref)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("%+v", err)
 	}
 
 	manifest, err := images.CreateManifest(ref2, opts)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("%+v", err)
 	}
 
 	return manifest, ref2
@@ -54,9 +54,11 @@ func createManifest(t *testing.T, opts *crypto.Opts) (
 func testEncDecImage(t *testing.T, opts *crypto.Opts) {
 	manifest, ref := createManifest(t, opts)
 
+	defer cleanUp(t, manifest)
+
 	encManifest, err := manifest.Encrypt(ref, opts)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("%+v", err)
 	}
 
 	t.Log(spew.Sdump(manifest))
@@ -65,15 +67,15 @@ func testEncDecImage(t *testing.T, opts *crypto.Opts) {
 		t.Fatalf("%+v", err)
 	}
 
-	decManifest, err := distribution.DecryptManifest(encManifest)
+	decManifest, err := distribution.DecryptManifest(opts, ref, encManifest)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("%+v", err)
 	}
 
 	t.Log(spew.Sdump(manifest))
 
 	if _, err = images.Manifest2Tar(manifest, ref, opts); err != nil {
-		t.Fatal(err)
+		t.Fatalf("%+v", err)
 	}
 
 	cmp := equalfile.New(nil, equalfile.Options{})
@@ -94,8 +96,6 @@ func testEncDecImage(t *testing.T, opts *crypto.Opts) {
 			t.Error("files not equal")
 		}
 	}
-
-	cleanUp(t, manifest)
 }
 
 func TestEncDecImage(t *testing.T) {
@@ -108,15 +108,15 @@ func TestEncDecImage(t *testing.T) {
 	testEncDecImage(t, &opts)
 }
 
-func TestCompatEncDecImage(t *testing.T) {
-	opts := crypto.Opts{
-		EncType: crypto.Pbkdf2Aes256Gcm,
-		Compat:  true,
-	}
-	opts.SetPassphrase("hunter2")
-	t.Logf("testing compat")
-	testEncDecImage(t, &opts)
-}
+//func TestCompatEncDecImage(t *testing.T) {
+//opts := crypto.Opts{
+//EncType: crypto.Pbkdf2Aes256Gcm,
+//Compat:  true,
+//}
+//opts.SetPassphrase("hunter2")
+//t.Logf("testing compat")
+//testEncDecImage(t, &opts)
+//}
 
 func cleanUp(t *testing.T, manifest *distribution.ImageManifest) {
 	if err := os.RemoveAll(manifest.DirName); err != nil {

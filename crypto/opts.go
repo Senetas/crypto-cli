@@ -19,7 +19,6 @@ import (
 	"syscall"
 
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -41,7 +40,6 @@ func (o *Opts) SetPassphrase(passphrase string) {
 
 // GetPassphrase prompt the user to enter a passphrase to decrypt
 func (o *Opts) GetPassphrase() (_ string, err error) {
-	log.Debug().Msgf("%#v", o)
 	if !o.passphraseSet {
 		o.passphrase, err = GetPassSTDIN("Enter passphrase: ")
 		if err != nil {

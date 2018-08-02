@@ -16,6 +16,7 @@ package distribution
 
 import (
 	"compress/gzip"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
@@ -31,8 +32,8 @@ import (
 // decrypted but not their files
 type KeyDecryptedBlob interface {
 	Blob
-	DecryptFile(outfile string) (DecryptedBlob, error)
-	EncryptKey(opts *crypto.Opts) (EncryptedBlob, error)
+	DecryptFile(opts crypto.Opts, outfile string) (DecryptedBlob, error)
+	EncryptKey(opts crypto.Opts) (EncryptedBlob, error)
 }
 
 type keyDecryptedBlob struct {
@@ -40,7 +41,7 @@ type keyDecryptedBlob struct {
 	*DeCrypto `json:"-"`
 }
 
-func (kb *keyDecryptedBlob) DecryptFile(outname string) (DecryptedBlob, error) {
+func (kb *keyDecryptedBlob) DecryptFile(opts crypto.Opts, outfile string) (DecryptedBlob, error) {
 	r, err := kb.ReadCloser()
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -58,11 +59,11 @@ func (kb *keyDecryptedBlob) DecryptFile(outname string) (DecryptedBlob, error) {
 	}
 	defer func() { err = utils.CheckedClose(zr, err) }()
 
-	if err = os.MkdirAll(filepath.Dir(outname), 0700); err != nil {
+	if err = os.MkdirAll(filepath.Dir(outfile), 0700); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	out, err := os.Create(outname)
+	out, err := os.Create(outfile)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -80,22 +81,84 @@ func (kb *keyDecryptedBlob) DecryptFile(outname string) (DecryptedBlob, error) {
 
 	return &decryptedBlob{
 		NoncryptedBlob: &NoncryptedBlob{
-			Filename:    outname,
 			Size:        n,
 			ContentType: kb.ContentType,
 			Digest:      &dgst,
+			Filename:    outfile,
 		},
 		DeCrypto: kb.DeCrypto,
 	}, nil
 }
 
-func (kb *keyDecryptedBlob) EncryptKey(opts *crypto.Opts) (EncryptedBlob, error) {
+func (kb *keyDecryptedBlob) EncryptKey(opts crypto.Opts) (EncryptedBlob, error) {
 	ek, err := EncryptKey(*kb.DeCrypto, opts)
 	if err != nil {
 		return nil, err
 	}
 	return &encryptedBlobNew{
 		NoncryptedBlob: kb.NoncryptedBlob,
+		EnCrypto:       &ek,
+	}, nil
+}
+
+type keyDecryptedConfig struct {
+	*NoncryptedBlob
+	*DeCrypto `json:"-"`
+}
+
+func (kc *keyDecryptedConfig) DecryptFile(opts crypto.Opts, outname string) (DecryptedBlob, error) {
+	r, err := kc.ReadCloser()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	defer func() { err = utils.CheckedClose(r, err) }()
+
+	out, err := os.Create(outname)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	defer func() { err = utils.CheckedClose(out, err) }()
+
+	digester := digest.Canonical.Digester()
+	mw := io.MultiWriter(digester.Hash(), out)
+
+	ec := &encConfig{}
+	if err = json.NewDecoder(r).Decode(ec); err != nil {
+		return nil, err
+	}
+
+	dc, err := ec.Decrypt(kc.DecKey, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	cw := &utils.CounterWriter{Writer: mw}
+	nnw := &utils.NoNewlineWriter{Writer: cw}
+
+	if err = json.NewEncoder(nnw).Encode(dc); err != nil {
+		return nil, err
+	}
+
+	dgst := digester.Digest()
+
+	return &decryptedConfig{
+		NoncryptedBlob: &NoncryptedBlob{
+			Size:        int64(cw.Count),
+			ContentType: kc.ContentType,
+			Digest:      &dgst,
+			Filename:    outname,
+		},
+		DeCrypto: kc.DeCrypto,
+	}, nil
+}
+
+func (kc *keyDecryptedConfig) EncryptKey(opts crypto.Opts) (EncryptedBlob, error) {
+	ek, err := EncryptKey(*kc.DeCrypto, opts)
+	if err != nil {
+		return nil, err
+	}
+	return &encryptedConfigNew{
+		NoncryptedBlob: kc.NoncryptedBlob,
 		EnCrypto:       &ek,
 	}, nil
 }
