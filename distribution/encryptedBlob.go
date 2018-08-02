@@ -118,7 +118,7 @@ func newEncrypto(urls []string) (*EnCrypto, error) {
 
 type encryptedConfigNew struct {
 	*NoncryptedBlob
-	*EnCrypto `json:"-"`
+	*EnCrypto `json:"crypto"`
 }
 
 func (ec *encryptedConfigNew) DecryptBlob(opts *crypto.Opts, outname string) (DecryptedBlob, error) {

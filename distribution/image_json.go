@@ -41,6 +41,7 @@ func (m *ImageManifest) UnmarshalJSON(data []byte) (err error) {
 			return errors.WithStack(err)
 		}
 	}
+
 	return nil
 }
 
@@ -75,7 +76,7 @@ func unmarshalBlob(m json.RawMessage) (_ Blob, err error) {
 		return nil, errors.WithStack(err)
 	}
 
-	bT, err := loadFields(blobMap, &mediaType, &size, d, &enCrypto, &urls)
+	bT, err := loadFields(blobMap, &mediaType, &size, &d, &enCrypto, &urls)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +94,7 @@ func loadFields(
 	blobMap map[string]json.RawMessage,
 	mediaType *string,
 	size *int64,
-	d digest.Digest,
+	d *digest.Digest,
 	enCrypto *EnCrypto,
 	urls *[]string,
 ) (_ blobType, err error) {
@@ -119,11 +120,10 @@ func parseKey(
 	bT *blobType,
 	mediaType *string,
 	size *int64,
-	d digest.Digest,
+	d *digest.Digest,
 	enCrypto *EnCrypto,
 	urls *[]string,
 ) (err error) {
-
 	switch k {
 	case "mediaType":
 		return json.Unmarshal(v, mediaType)
@@ -146,13 +146,13 @@ func parseKey(
 	}
 }
 
-func unmarshalDigest(v json.RawMessage, d digest.Digest) (err error) {
+func unmarshalDigest(v json.RawMessage, d *digest.Digest) (err error) {
 	var digestStr string
 	err = json.Unmarshal(v, &digestStr)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	d, err = digest.Parse(digestStr)
+	*d, err = digest.Parse(digestStr)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -162,15 +162,35 @@ func unmarshalDigest(v json.RawMessage, d digest.Digest) (err error) {
 func fillBlob(bT blobType, nb *NoncryptedBlob, enCrypto *EnCrypto, urls []string) (Blob, error) {
 	switch bT {
 	case current:
-		return &encryptedBlobNew{
-			NoncryptedBlob: nb,
-			EnCrypto:       enCrypto,
-		}, nil
+		switch nb.ContentType {
+		case MediaTypeImageConfig:
+			return &encryptedConfigNew{
+				NoncryptedBlob: nb,
+				EnCrypto:       enCrypto,
+			}, nil
+		case MediaTypeLayer:
+			return &encryptedBlobNew{
+				NoncryptedBlob: nb,
+				EnCrypto:       enCrypto,
+			}, nil
+		default:
+			return nil, errors.New("could not determine type of crypto")
+		}
 	case compat:
-		return &encryptedBlobCompat{
-			NoncryptedBlob: nb,
-			URLs:           urls,
-		}, nil
+		switch nb.ContentType {
+		case MediaTypeImageConfig:
+			return &encryptedConfigCompat{
+				NoncryptedBlob: nb,
+				URLs:           urls,
+			}, nil
+		case MediaTypeLayer:
+			return &encryptedBlobCompat{
+				NoncryptedBlob: nb,
+				URLs:           urls,
+			}, nil
+		default:
+			return nil, errors.New("could not determine type of crypto")
+		}
 	case plain:
 		return nb, nil
 	default:
