@@ -192,9 +192,9 @@ func noneEncrypt(
 	error,
 ) {
 	layerBlobs := make([]distribution.Blob, len(image.Layers))
-	configBlob := distribution.NewPlainConfig(filepath.Join(path, image.Config), nil, 0)
+	configBlob := distribution.NewPlainConfig(filepath.Join(path, image.Config), "", 0)
 	for i, f := range image.Layers {
-		layerBlobs[i] = distribution.NewPlainLayer(filepath.Join(path, f), nil, 0)
+		layerBlobs[i] = distribution.NewPlainLayer(filepath.Join(path, f), "", 0)
 	}
 	return configBlob, layerBlobs, nil
 }
@@ -214,7 +214,7 @@ func pbkdf2Aes256GcmEncrypt(
 	if err != nil {
 		return nil, nil, err
 	}
-	configBlob := distribution.NewConfig(filepath.Join(path, image.Config), nil, 0, dec)
+	configBlob := distribution.NewConfig(filepath.Join(path, image.Config), "", 0, dec)
 
 	layerBlobs := make([]distribution.Blob, len(image.Layers))
 	for i, f := range image.Layers {
@@ -227,7 +227,7 @@ func pbkdf2Aes256GcmEncrypt(
 
 		d, err := fileDigest(basename)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, errors.WithStack(err)
 		}
 
 		log.Info().Msgf("preparing %s", d)
@@ -241,19 +241,14 @@ func pbkdf2Aes256GcmEncrypt(
 	return configBlob, layerBlobs, nil
 }
 
-func fileDigest(filename string) (*digest.Digest, error) {
+func fileDigest(filename string) (d digest.Digest, err error) {
 	fh, err := os.Open(filename)
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not open file: %s", filename)
+		return
 	}
 	defer func() { err = utils.CheckedClose(fh, err) }()
 
-	d, err := digest.Canonical.FromReader(fh)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not calculate digest: %s", filename)
-	}
-
-	return &d, nil
+	return digest.Canonical.FromReader(fh)
 }
 
 func numLayers(hist []image.HistoryResponseItem) (n int, err error) {

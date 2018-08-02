@@ -90,7 +90,7 @@ func (db *decryptedBlob) EncryptBlob(opts *crypto.Opts, outname string) (_ Encry
 	nb := &NoncryptedBlob{
 		Size:        n,
 		ContentType: db.ContentType,
-		Digest:      &dgst,
+		Digest:      dgst,
 		Filename:    outname,
 	}
 
@@ -159,7 +159,7 @@ func (db *decryptedConfig) EncryptBlob(opts *crypto.Opts, outname string) (_ Enc
 	nb := &NoncryptedBlob{
 		Size:        int64(cw.Count),
 		ContentType: db.ContentType,
-		Digest:      &dgst,
+		Digest:      dgst,
 		Filename:    outname,
 	}
 

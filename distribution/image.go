@@ -51,7 +51,7 @@ func unencryptedConfig(blob *NoncryptedBlob) (Blob, error) {
 		return nil, errors.WithStack(err)
 	}
 	d := digester.Digest()
-	return NewPlainConfig(blob.GetFilename(), &d, size), nil
+	return NewPlainConfig(blob.GetFilename(), d, size), nil
 }
 
 func prepareConfig(config Blob, opts *crypto.Opts, ref names.NamedTaggedRepository) (Blob, error) {

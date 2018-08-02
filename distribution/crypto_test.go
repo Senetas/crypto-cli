@@ -84,7 +84,7 @@ func TestCryptoBlobs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	blob := distribution.NewLayer(fn, &d, size, c)
+	blob := distribution.NewLayer(fn, d, size, c)
 
 	enc, err := blob.EncryptBlob(opts, encpath+"file")
 	if err != nil {
@@ -123,7 +123,7 @@ func TestCompressBlobs(t *testing.T) {
 	compath := filepath.Join(dir, "enc.gz")
 	decpath := filepath.Join(dir, "dec")
 
-	blob := distribution.NewPlainLayer(fn, &d, size)
+	blob := distribution.NewPlainLayer(fn, d, size)
 
 	com, err := blob.Compress(compath)
 	if err != nil {

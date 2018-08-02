@@ -127,7 +127,7 @@ func PushLayer(
 	endpoint *registry.APIEndpoint,
 ) (err error) {
 	sep := names.SeperateRepository(ref)
-	dig := names.AppendDigest(sep, *layer.GetDigest())
+	dig := names.AppendDigest(sep, layer.GetDigest())
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
 	layerExists, err := checkLayer(token, dig, bldr)

@@ -83,7 +83,7 @@ func (kb *keyDecryptedBlob) DecryptFile(opts *crypto.Opts, outfile string) (Decr
 		NoncryptedBlob: &NoncryptedBlob{
 			Size:        n,
 			ContentType: kb.ContentType,
-			Digest:      &dgst,
+			Digest:      dgst,
 			Filename:    outfile,
 		},
 		DeCrypto: kb.DeCrypto,
@@ -145,7 +145,7 @@ func (kc *keyDecryptedConfig) DecryptFile(opts *crypto.Opts, outname string) (De
 		NoncryptedBlob: &NoncryptedBlob{
 			Size:        int64(cw.Count),
 			ContentType: kc.ContentType,
-			Digest:      &dgst,
+			Digest:      dgst,
 			Filename:    outname,
 		},
 		DeCrypto: kc.DeCrypto,

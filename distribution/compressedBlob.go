@@ -70,7 +70,7 @@ func (b *NoncryptedBlob) Decompress(outfile string) (_ DecompressedBlob, err err
 	return &NoncryptedBlob{
 		Size:        size,
 		ContentType: b.ContentType,
-		Digest:      &dgst,
+		Digest:      dgst,
 		Filename:    outfile,
 	}, nil
 }
@@ -107,7 +107,7 @@ func (b *NoncryptedBlob) Compress(outfile string) (_ CompressedBlob, err error) 
 	return &NoncryptedBlob{
 		Size:        size,
 		ContentType: b.ContentType,
-		Digest:      &dgst,
+		Digest:      dgst,
 		Filename:    outfile,
 	}, nil
 }

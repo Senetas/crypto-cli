@@ -75,7 +75,7 @@ func unmarshalBlob(m json.RawMessage) (_ Blob, err error) {
 		return nil, errors.WithStack(err)
 	}
 
-	bT, err := loadFields(blobMap, &mediaType, &size, &d, &enCrypto, &urls)
+	bT, err := loadFields(blobMap, &mediaType, &size, d, &enCrypto, &urls)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func unmarshalBlob(m json.RawMessage) (_ Blob, err error) {
 	nb := &NoncryptedBlob{
 		ContentType: mediaType,
 		Size:        size,
-		Digest:      &d,
+		Digest:      d,
 	}
 
 	return fillBlob(bT, nb, &enCrypto, urls)
@@ -93,7 +93,7 @@ func loadFields(
 	blobMap map[string]json.RawMessage,
 	mediaType *string,
 	size *int64,
-	d *digest.Digest,
+	d digest.Digest,
 	enCrypto *EnCrypto,
 	urls *[]string,
 ) (_ blobType, err error) {
@@ -119,7 +119,7 @@ func parseKey(
 	bT *blobType,
 	mediaType *string,
 	size *int64,
-	d *digest.Digest,
+	d digest.Digest,
 	enCrypto *EnCrypto,
 	urls *[]string,
 ) (err error) {
@@ -146,13 +146,13 @@ func parseKey(
 	}
 }
 
-func unmarshalDigest(v json.RawMessage, d *digest.Digest) (err error) {
+func unmarshalDigest(v json.RawMessage, d digest.Digest) (err error) {
 	var digestStr string
 	err = json.Unmarshal(v, &digestStr)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	*d, err = digest.Parse(digestStr)
+	d, err = digest.Parse(digestStr)
 	if err != nil {
 		return errors.WithStack(err)
 	}

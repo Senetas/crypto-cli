@@ -132,12 +132,12 @@ func PullManifest(
 func PullFromDigest(
 	token dauth.Scope,
 	ref reference.Named,
-	d *digest.Digest,
+	d digest.Digest,
 	bldr *v2.URLBuilder,
 	dir string,
 ) (fn string, err error) {
 	sep := names.SeperateRepository(ref)
-	can := names.AppendDigest(sep, *d)
+	can := names.AppendDigest(sep, d)
 
 	urlStr, err := bldr.BuildBlobURL(can)
 	if err != nil {
