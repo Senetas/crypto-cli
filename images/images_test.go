@@ -108,15 +108,15 @@ func TestEncDecImage(t *testing.T) {
 	testEncDecImage(t, &opts)
 }
 
-//func TestCompatEncDecImage(t *testing.T) {
-//opts := crypto.Opts{
-//EncType: crypto.Pbkdf2Aes256Gcm,
-//Compat:  true,
-//}
-//opts.SetPassphrase("hunter2")
-//t.Logf("testing compat")
-//testEncDecImage(t, &opts)
-//}
+func TestCompatEncDecImage(t *testing.T) {
+	opts := crypto.Opts{
+		EncType: crypto.Pbkdf2Aes256Gcm,
+		Compat:  true,
+	}
+	opts.SetPassphrase("hunter2")
+	t.Logf("testing compat")
+	testEncDecImage(t, &opts)
+}
 
 func cleanUp(t *testing.T, manifest *distribution.ImageManifest) {
 	if err := os.RemoveAll(manifest.DirName); err != nil {
