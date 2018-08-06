@@ -32,7 +32,7 @@ import (
 
 var (
 	passphrase = "196884 = 196883 + 1"
-	opts       = crypto.Opts{
+	opts       = &crypto.Opts{
 		Salt:    "MgSO4(H2O)x",
 		EncType: crypto.Pbkdf2Aes256Gcm,
 		Compat:  false,
@@ -51,17 +51,17 @@ func (r ConstReader) Read(b []byte) (int, error) {
 func TestCrypto(t *testing.T) {
 	opts.SetPassphrase(passphrase)
 
-	c, err := distribution.NewDecrypto(&opts)
+	c, err := distribution.NewDecrypto(opts)
 	if err != nil {
 		t.Fatal("could not create decrypto")
 	}
 
-	e, err := distribution.EncryptKey(*c, &opts)
+	e, err := distribution.EncryptKey(*c, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	d, err := distribution.DecryptKey(e, &opts)
+	d, err := distribution.DecryptKey(e, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,19 +79,19 @@ func TestCryptoBlobs(t *testing.T) {
 	encpath := filepath.Join(dir, "enc")
 	decpath := filepath.Join(dir, "dec")
 
-	c, err := distribution.NewDecrypto(&opts)
+	c, err := distribution.NewDecrypto(opts)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	blob := distribution.NewLayerBlob(fn, &d, size, c)
+	blob := distribution.NewLayer(fn, d, size, c)
 
-	enc, err := blob.EncryptBlob(&opts, encpath+"file")
+	enc, err := blob.EncryptBlob(opts, encpath+"file")
 	if err != nil {
 		t.Error(err)
 	}
 
-	dec, err := enc.DecryptBlob(&opts, encpath+"file")
+	dec, err := enc.DecryptBlob(opts, encpath+"file")
 	if err != nil {
 		t.Error(err)
 	}
@@ -123,7 +123,7 @@ func TestCompressBlobs(t *testing.T) {
 	compath := filepath.Join(dir, "enc.gz")
 	decpath := filepath.Join(dir, "dec")
 
-	blob := distribution.NewPlainLayer(fn, &d, size)
+	blob := distribution.NewPlainLayer(fn, d, size)
 
 	com, err := blob.Compress(compath)
 	if err != nil {

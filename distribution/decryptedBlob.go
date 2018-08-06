@@ -16,8 +16,10 @@ package distribution
 
 import (
 	"compress/gzip"
+	"encoding/json"
 	"io"
 	"net/url"
+
 	"os"
 
 	digest "github.com/opencontainers/go-digest"
@@ -36,7 +38,6 @@ type DecryptedBlob interface {
 	EncryptBlob(opts *crypto.Opts, outfile string) (EncryptedBlob, error)
 }
 
-// DecryptedBlob is the go type for encryptable element in the layer array
 type decryptedBlob struct {
 	*NoncryptedBlob
 	*DeCrypto `json:"-"`
@@ -87,10 +88,10 @@ func (db *decryptedBlob) EncryptBlob(opts *crypto.Opts, outname string) (_ Encry
 	}
 
 	nb := &NoncryptedBlob{
-		Filename:    outname,
 		Size:        n,
 		ContentType: db.ContentType,
-		Digest:      &dgst,
+		Digest:      dgst,
+		Filename:    outname,
 	}
 
 	if opts.Compat {
@@ -111,6 +112,80 @@ func (db *decryptedBlob) EncryptBlob(opts *crypto.Opts, outname string) (_ Encry
 	}
 
 	return &encryptedBlobNew{
+		NoncryptedBlob: nb,
+		EnCrypto:       &ek,
+	}, nil
+}
+
+type decryptedConfig struct {
+	*NoncryptedBlob
+	*DeCrypto `json:"-"`
+}
+
+func (db *decryptedConfig) EncryptBlob(opts *crypto.Opts, outname string) (_ EncryptedBlob, err error) {
+	r, err := db.ReadCloser()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	defer func() { err = utils.CheckedClose(r, err) }()
+
+	out, err := os.Create(outname)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	defer func() { err = utils.CheckedClose(out, err) }()
+
+	digester := digest.Canonical.Digester()
+	mw := io.MultiWriter(digester.Hash(), out)
+
+	dc := &decConfig{}
+	if err = json.NewDecoder(r).Decode(dc); err != nil {
+		return nil, err
+	}
+
+	ec, err := dc.Encrypt(db.DecKey, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	cw := &utils.CounterWriter{Writer: mw}
+
+	if err = json.NewEncoder(cw).Encode(ec); err != nil {
+		return nil, err
+	}
+
+	dgst := digester.Digest()
+
+	nb := &NoncryptedBlob{
+		Size:        int64(cw.Count),
+		ContentType: db.ContentType,
+		Digest:      dgst,
+		Filename:    outname,
+	}
+
+	ek, err := EncryptKey(*db.DeCrypto, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	if opts.Compat {
+		u, err := url.Parse(BaseCryptoURL)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		v := url.Values{}
+		v.Set(AlgosKey, string(ek.Algos))
+		v.Set(KeyKey, ek.EncKey)
+		u.RawQuery = v.Encode()
+
+		return &encryptedConfigCompat{
+			NoncryptedBlob: nb,
+			URLs:           []string{u.String()},
+		}, nil
+	}
+
+	return &encryptedConfigNew{
 		NoncryptedBlob: nb,
 		EnCrypto:       &ek,
 	}, nil

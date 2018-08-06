@@ -24,7 +24,7 @@ import (
 // Blob represents an entry for a blob in the image manifest
 type Blob interface {
 	GetContentType() string
-	GetDigest() *digest.Digest
+	GetDigest() digest.Digest
 	GetSize() int64
 	GetFilename() string
 	SetFilename(filename string)
@@ -35,14 +35,14 @@ type Blob interface {
 // Despite appearnces, the ContentType type is not indicative of whether
 // the blob is compressed or not
 type NoncryptedBlob struct {
-	ContentType string         `json:"mediaType"`
-	Size        int64          `json:"size"`
-	Digest      *digest.Digest `json:"digest"`
-	Filename    string         `json:"-"`
+	ContentType string        `json:"mediaType"`
+	Size        int64         `json:"size"`
+	Digest      digest.Digest `json:"digest"`
+	Filename    string        `json:"-"`
 }
 
 // GetDigest returnts the digest
-func (b *NoncryptedBlob) GetDigest() *digest.Digest { return b.Digest }
+func (b *NoncryptedBlob) GetDigest() digest.Digest { return b.Digest }
 
 //GetContentType returns the content type
 func (b *NoncryptedBlob) GetContentType() string { return b.ContentType }
@@ -62,7 +62,7 @@ func (b *NoncryptedBlob) ReadCloser() (io.ReadCloser, error) { return os.Open(b.
 
 func newPlainBlob(
 	filename string,
-	d *digest.Digest,
+	d digest.Digest,
 	size int64,
 	contentType string,
 ) *NoncryptedBlob {
@@ -74,54 +74,46 @@ func newPlainBlob(
 	}
 }
 
-func newDecryptedBlob(
+// NewConfig creates a new blob for a config
+func NewConfig(
 	filename string,
-	d *digest.Digest,
+	d digest.Digest,
 	size int64,
-	contentType string,
 	dec *DeCrypto,
-) *decryptedBlob {
-	return &decryptedBlob{
-		NoncryptedBlob: newPlainBlob(filename, d, size, contentType),
+) DecryptedBlob {
+	return &decryptedConfig{
+		NoncryptedBlob: newPlainBlob(filename, d, size, MediaTypeImageConfig),
 		DeCrypto:       dec,
 	}
 }
 
-// NewPlainConfigBlob creates a new unencrypted blob for a config
-func NewPlainConfigBlob(
+// NewLayer creates a new LayerJSON for a data layer
+func NewLayer(
 	filename string,
-	d *digest.Digest,
-	size int64,
-) DecompressedBlob {
-	return newPlainBlob(filename, d, size, MediaTypeImageConfig)
-}
-
-// NewConfigBlob creates a new encrypted blob for a config
-func NewConfigBlob(
-	filename string,
-	d *digest.Digest,
+	d digest.Digest,
 	size int64,
 	dec *DeCrypto,
 ) DecryptedBlob {
-	return newDecryptedBlob(filename, d, size, MediaTypeImageConfig, dec)
-}
-
-// NewLayerBlob creates a new LayerJSON for a data layer
-func NewLayerBlob(
-	filename string,
-	d *digest.Digest,
-	size int64,
-	dec *DeCrypto,
-) DecryptedBlob {
-	return newDecryptedBlob(filename, d, size, MediaTypeLayer, dec)
+	return &decryptedBlob{
+		NoncryptedBlob: newPlainBlob(filename, d, size, MediaTypeLayer),
+		DeCrypto:       dec,
+	}
 }
 
 // NewPlainLayer creates a new LayerJSON for an unencrypted data layer
 func NewPlainLayer(
 	filename string,
-	d *digest.Digest,
+	d digest.Digest,
 	size int64,
 ) DecompressedBlob {
-	blob := newPlainBlob(filename, d, size, MediaTypeLayer)
-	return blob
+	return newPlainBlob(filename, d, size, MediaTypeLayer)
+}
+
+// NewPlainConfig creates a new LayerJSON for an unencrypted data layer
+func NewPlainConfig(
+	filename string,
+	d digest.Digest,
+	size int64,
+) DecompressedBlob {
+	return newPlainBlob(filename, d, size, MediaTypeImageConfig)
 }

@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/v2"
 	dauth "github.com/docker/distribution/registry/client/auth"
@@ -123,6 +124,7 @@ func PullManifest(
 	}
 
 	log.Info().Msgf("%s", body)
+	log.Debug().Msg(spew.Sdump(manifest))
 
 	return manifest, nil
 }
@@ -132,12 +134,12 @@ func PullManifest(
 func PullFromDigest(
 	token dauth.Scope,
 	ref reference.Named,
-	d *digest.Digest,
+	d digest.Digest,
 	bldr *v2.URLBuilder,
 	dir string,
 ) (fn string, err error) {
 	sep := names.SeperateRepository(ref)
-	can := names.AppendDigest(sep, *d)
+	can := names.AppendDigest(sep, d)
 
 	urlStr, err := bldr.BuildBlobURL(can)
 	if err != nil {

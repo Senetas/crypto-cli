@@ -51,7 +51,7 @@ func unencryptedConfig(blob *NoncryptedBlob) (Blob, error) {
 		return nil, errors.WithStack(err)
 	}
 	d := digester.Digest()
-	return NewPlainConfigBlob(blob.GetFilename(), &d, size), nil
+	return NewPlainConfig(blob.GetFilename(), d, size), nil
 }
 
 func prepareConfig(config Blob, opts *crypto.Opts, ref names.NamedTaggedRepository) (Blob, error) {
@@ -62,10 +62,6 @@ func prepareConfig(config Blob, opts *crypto.Opts, ref names.NamedTaggedReposito
 		return blob.EncryptBlob(opts, blob.GetFilename()+".aes")
 	case *NoncryptedBlob:
 		log.Info().Msgf("preparing config")
-
-		//configBlob, err = blob.Compress(blob.GetFilename() + ".gz")
-
-		// this sends the config in the clear
 		return unencryptedConfig(blob)
 	default:
 	}
@@ -144,16 +140,18 @@ func (m *ImageManifest) DecryptKeys(
 	return nil
 }
 
-// DecryptManifest attempts to decrypt a manifest from the manIn channel,
+// DecryptManifest attempts to decrypt a manifest
 // sending to manOut. It will call cancel on error.
 func DecryptManifest(
+	opts *crypto.Opts,
+	ref names.NamedTaggedRepository,
 	manifest *ImageManifest,
 ) (_ *ImageManifest, err error) {
-	log.Info().Msg("begin decryption of keys")
 	var config Blob
 	switch blob := manifest.Config.(type) {
 	case KeyDecryptedBlob:
-		config, err = blob.DecryptFile(blob.GetFilename() + ".dec")
+		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
+		config, err = blob.DecryptFile(opts, blob.GetFilename()+".dec")
 	case *NoncryptedBlob:
 		config = blob
 	default:
@@ -168,7 +166,8 @@ func DecryptManifest(
 	for i, l := range manifest.Layers {
 		switch blob := l.(type) {
 		case KeyDecryptedBlob:
-			layers[i], err = blob.DecryptFile(blob.GetFilename() + ".dec")
+			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
+			layers[i], err = blob.DecryptFile(opts, blob.GetFilename()+".dec")
 		case CompressedBlob:
 			layers[i], err = blob.Decompress(blob.GetFilename() + ".dec")
 		default:
@@ -178,7 +177,6 @@ func DecryptManifest(
 		}
 	}
 
-	log.Info().Msg("finished decryption of keys")
 	return &ImageManifest{
 		SchemaVersion: manifest.SchemaVersion,
 		MediaType:     manifest.MediaType,
