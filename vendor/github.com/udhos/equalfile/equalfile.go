@@ -2,7 +2,6 @@ package equalfile
 
 import (
 	"bytes"
-	//"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"hash"
@@ -11,59 +10,20 @@ import (
 )
 
 const defaultMaxSize = 10000000000 // Only the first 10^10 bytes are compared.
-const defaultBufSize = 20000
 
 type Options struct {
 	Debug         bool // enable debugging to stdout
 	ForceFileRead bool // prevent shortcut at filesystem level (link, pathname, etc)
-	MaxSize       int64
 }
 
-type Cmp struct {
-	Opt Options
-
-	readCount int
-	readMin   int
-	readMax   int
-	readSum   int64
-
-	hashType         hash.Hash
-	hashMatchCompare bool
-	hashTable        map[string]hashSum
-
-	buf []byte
+// CompareFile verifies that files with names path1, path2 have identical contents.
+// Only the first 10^10 bytes are compared.
+func CompareFile(path1, path2 string) (bool, error) {
+	return CompareFileBufLimit(path1, path2, createBuf(), defaultMaxSize)
 }
 
-type hashSum struct {
-	result []byte
-	err    error
-}
-
-// New creates Cmp for multiple comparison mode.
-func NewMultiple(buf []byte, options Options, h hash.Hash, compareOnMatch bool) *Cmp {
-	c := &Cmp{
-		Opt:              options,
-		hashType:         h,
-		hashMatchCompare: compareOnMatch,
-		hashTable:        map[string]hashSum{},
-		buf:              buf,
-	}
-	if c.Opt.MaxSize == 0 {
-		c.Opt.MaxSize = defaultMaxSize
-	}
-	if c.buf == nil || len(c.buf) == 0 {
-		c.buf = make([]byte, defaultBufSize)
-	}
-	return c
-}
-
-// New creates Cmp for single comparison mode.
-func New(buf []byte, options Options) *Cmp {
-	return NewMultiple(buf, options, nil, true)
-}
-
-func (c *Cmp) getHash(path string) ([]byte, error) {
-	h, found := c.hashTable[path]
+func getHash(path string, maxSize int64) ([]byte, error) {
+	h, found := hashTable[path]
 	if found {
 		return h.result, h.err
 	}
@@ -74,42 +34,40 @@ func (c *Cmp) getHash(path string) ([]byte, error) {
 	}
 	defer f.Close()
 
-	sum := make([]byte, c.hashType.Size())
-	c.hashType.Reset()
-	n, copyErr := io.CopyN(c.hashType, f, c.Opt.MaxSize)
-	copy(sum, c.hashType.Sum(nil))
+	sum := make([]byte, hashType.Size())
+	hashType.Reset()
+	n, copyErr := io.CopyN(hashType, f, maxSize)
+	copy(sum, hashType.Sum(nil))
 
-	if copyErr == io.EOF && n < c.Opt.MaxSize {
+	if copyErr == io.EOF && n < maxSize {
 		copyErr = nil
 	}
 
-	return c.newHash(path, sum, copyErr)
+	return newHash(path, sum, copyErr)
 }
 
-func (c *Cmp) newHash(path string, sum []byte, e error) ([]byte, error) {
+func newHash(path string, sum []byte, e error) ([]byte, error) {
 
-	c.hashTable[path] = hashSum{sum, e}
+	hashTable[path] = hashSum{sum, e}
 
-	if c.Opt.Debug {
+	if options.Debug {
 		fmt.Printf("newHash[%s]=%v: error=[%v]\n", path, hex.EncodeToString(sum), e)
 	}
 
 	return sum, e
 }
 
-func (c *Cmp) multipleMode() bool {
-	return c.hashType != nil
-}
+// CompareFileBufLimit verifies that files with names path1, path2 have same contents.
+// You must provide a pre-allocated memory buffer.
+// You must provide the maximum number of bytes to compare.
+func CompareFileBufLimit(path1, path2 string, buf []byte, maxSize int64) (bool, error) {
 
-// CompareFile verifies that files with names path1, path2 have same contents.
-func (c *Cmp) CompareFile(path1, path2 string) (bool, error) {
-
-	if c.multipleMode() {
-		h1, err1 := c.getHash(path1)
+	if multipleMode() {
+		h1, err1 := getHash(path1, maxSize)
 		if err1 != nil {
 			return false, err1
 		}
-		h2, err2 := c.getHash(path2)
+		h2, err2 := getHash(path2, maxSize)
 		if err2 != nil {
 			return false, err2
 		}
@@ -117,12 +75,12 @@ func (c *Cmp) CompareFile(path1, path2 string) (bool, error) {
 			return false, nil // hashes mismatch
 		}
 		// hashes match
-		if !c.hashMatchCompare {
+		if !hashMatchCompare {
 			return true, nil // accept hash match without byte-by-byte comparison
 		}
 		// do byte-by-byte comparison
-		if c.Opt.Debug {
-			fmt.Printf("CompareFile(%s,%s): hash match, will compare bytes\n", path1, path2)
+		if options.Debug {
+			fmt.Printf("CompareFileBufLimit(%s,%s): hash match, will compare bytes\n", path1, path2)
 		}
 	}
 
@@ -150,61 +108,125 @@ func (c *Cmp) CompareFile(path1, path2 string) (bool, error) {
 		return false, nil
 	}
 
-	if !c.Opt.ForceFileRead {
+	if !options.ForceFileRead {
 		// shortcut: ask the filesystem: are these files the same? (link, pathname, etc)
 		if os.SameFile(info1, info2) {
 			return true, nil
 		}
 	}
 
-	return c.CompareReader(r1, r2)
+	return CompareReaderBufLimit(r1, r2, buf, maxSize)
 }
 
-func (c *Cmp) read(r io.Reader, buf []byte) (int, error) {
+// CompareReader verifies that two readers provide same content.
+// Only the first 10^10 bytes are compared.
+func CompareReader(r1, r2 io.Reader) (bool, error) {
+	return CompareReaderBufLimit(r1, r2, createBuf(), defaultMaxSize)
+}
+
+var (
+	options Options
+
+	readCount int
+	readMin   int
+	readMax   int
+	readSum   int64
+
+	hashType         hash.Hash
+	hashTable        map[string]hashSum
+	hashMatchCompare bool
+)
+
+type hashSum struct {
+	result []byte
+	err    error
+}
+
+// CompareSingle puts package in single comparison mode.
+// Single comparison is the default mode.
+// In single comparison mode, files are always compared byte-by-byte.
+func CompareSingle() {
+	hashType = nil
+	hashTable = nil
+	rejectMultiple()
+}
+
+// CompareMultiple puts package in multiple comparison mode.
+// In multiple comparison mode, file hashes are used to speed up repeated comparisons of the same file.
+// Use compareOnMatch to control byte-by-byte comparison when the hashes do match.
+func CompareMultiple(h hash.Hash, compareOnMatch bool) {
+	hashType = h
+	hashTable = map[string]hashSum{}
+	hashMatchCompare = compareOnMatch
+	requireMultiple()
+}
+
+func SetOptions(o Options) {
+	options = o
+}
+
+func multipleMode() bool {
+	return hashType != nil && hashTable != nil
+}
+
+func requireMultiple() {
+	if !multipleMode() {
+		panic("refusing to run in single mode")
+	}
+}
+
+func rejectMultiple() {
+	if multipleMode() {
+		panic("refusing to run in multiple mode")
+	}
+}
+
+func read(r io.Reader, buf []byte) (int, error) {
 	n, err := r.Read(buf)
 
-	if c.Opt.Debug {
-		c.readCount++
-		c.readSum += int64(n)
-		if n < c.readMin {
-			c.readMin = n
+	if options.Debug {
+		readCount++
+		readSum += int64(n)
+		if n < readMin {
+			readMin = n
 		}
-		if n > c.readMax {
-			c.readMax = n
+		if n > readMax {
+			readMax = n
 		}
 	}
 
 	return n, err
 }
 
-// CompareReader verifies that two readers provide same content.
-func (c *Cmp) CompareReader(r1, r2 io.Reader) (bool, error) {
+// CompareReaderBufLimit verifies that two readers provide same content.
+// You must provide a pre-allocated memory buffer.
+// You must provide the maximum number of bytes to compare.
+func CompareReaderBufLimit(r1, r2 io.Reader, buf []byte, maxSize int64) (bool, error) {
 
-	if c.Opt.Debug {
-		c.readCount = 0
-		c.readMin = 2000000000
-		c.readMax = 0
-		c.readSum = 0
+	if options.Debug {
+		readCount = 0
+		readMin = 2000000000
+		readMax = 0
+		readSum = 0
 	}
 
-	equal, err := c.compareReader(r1, r2)
+	equal, err := compareReaderBufLimit(r1, r2, buf, maxSize)
 
-	if c.Opt.Debug {
-		fmt.Printf("DEBUG CompareReader(%d,%d): readCount=%d readMin=%d readMax=%d readSum=%d\n",
-			len(c.buf), c.Opt.MaxSize, c.readCount, c.readMin, c.readMax, c.readSum)
+	if options.Debug {
+		fmt.Printf("DEBUG compareReaderBufLimit(%d,%d): readCount=%d readMin=%d readMax=%d readSum=%d\n", len(buf), maxSize, readCount, readMin, readMax, readSum)
 	}
 
 	return equal, err
 }
 
-func (c *Cmp) compareReader(r1, r2 io.Reader) (bool, error) {
+// CompareReaderBufLimit: verifies that two readers provide same content.
+// You must provide a pre-allocated memory buffer.
+// You must provide the maximum number of bytes to compare.
+func compareReaderBufLimit(r1, r2 io.Reader, buf []byte, maxSize int64) (bool, error) {
 
-	maxSize := c.Opt.MaxSize
 	if maxSize < 1 {
 		return false, fmt.Errorf("nonpositive max size")
 	}
-
-	buf := c.buf
 
 	size := len(buf) / 2
 	if size < 1 {
@@ -218,7 +240,7 @@ func (c *Cmp) compareReader(r1, r2 io.Reader) (bool, error) {
 	var readSize int64
 
 	for !eof1 && !eof2 {
-		n1, err1 := c.read(r1, buf1)
+		n1, err1 := read(r1, buf1)
 		switch err1 {
 		case io.EOF:
 			eof1 = true
@@ -227,7 +249,7 @@ func (c *Cmp) compareReader(r1, r2 io.Reader) (bool, error) {
 			return false, err1
 		}
 
-		n2, err2 := c.read(r2, buf2)
+		n2, err2 := read(r2, buf2)
 		switch err2 {
 		case io.EOF:
 			eof2 = true
@@ -237,7 +259,7 @@ func (c *Cmp) compareReader(r1, r2 io.Reader) (bool, error) {
 		}
 
 		if n1 != n2 {
-			return false, fmt.Errorf("compareReader: internal failure: readers returned different sizes")
+			return false, fmt.Errorf("compareReaderBufLimit: internal failure: readers returned different sizes")
 		}
 
 		if !bytes.Equal(buf1[:n1], buf2[:n2]) {
@@ -255,4 +277,8 @@ func (c *Cmp) compareReader(r1, r2 io.Reader) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func createBuf() []byte {
+	return make([]byte, 20000)
 }

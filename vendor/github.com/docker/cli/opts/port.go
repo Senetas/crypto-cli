@@ -151,22 +151,17 @@ func ConvertPortToPortConfig(
 		if binding.HostIP != "" && binding.HostIP != "0.0.0.0" {
 			logrus.Warnf("ignoring IP-address (%s:%s:%s) service will listen on '0.0.0.0'", binding.HostIP, binding.HostPort, port)
 		}
-
-		startHostPort, endHostPort, err := nat.ParsePortRange(binding.HostPort)
-
+		hostPort, err := strconv.ParseUint(binding.HostPort, 10, 16)
 		if err != nil && binding.HostPort != "" {
 			return nil, fmt.Errorf("invalid hostport binding (%s) for port (%s)", binding.HostPort, port.Port())
 		}
-
-		for i := startHostPort; i <= endHostPort; i++ {
-			ports = append(ports, swarm.PortConfig{
-				//TODO Name: ?
-				Protocol:      swarm.PortConfigProtocol(strings.ToLower(port.Proto())),
-				TargetPort:    uint32(port.Int()),
-				PublishedPort: uint32(i),
-				PublishMode:   swarm.PortConfigPublishModeIngress,
-			})
-		}
+		ports = append(ports, swarm.PortConfig{
+			//TODO Name: ?
+			Protocol:      swarm.PortConfigProtocol(strings.ToLower(port.Proto())),
+			TargetPort:    uint32(port.Int()),
+			PublishedPort: uint32(hostPort),
+			PublishMode:   swarm.PortConfigPublishModeIngress,
+		})
 	}
 	return ports, nil
 }
