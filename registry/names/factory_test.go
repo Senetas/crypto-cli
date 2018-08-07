@@ -1,3 +1,17 @@
+// Copyright © 2018 SENETAS SECURITY PTY LTD
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package names_test
 
 import (
@@ -7,6 +21,7 @@ import (
 
 	"github.com/docker/distribution/reference"
 	digest "github.com/opencontainers/go-digest"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/Senetas/crypto-cli/registry/names"
 )
@@ -20,161 +35,122 @@ const (
 )
 
 func TestTrimedNamed(t *testing.T) {
+	assert := assert.New(t)
+
 	ref, err := reference.ParseNamed(fmt.Sprintf("%s/%s:%s", domain, repo, tag))
-	if err != nil {
-		t.Fatal(err)
+	assert.Nil(err)
+
+	type results struct {
+		domain string
+		path   string
 	}
 
-	trimed := names.TrimNamed(ref)
-
-	if trimed.Domain() != domain {
-		t.Fatalf("domain is %s, should be %s", trimed.Domain(), domain)
+	tests := []struct {
+		ref reference.Named
+		results
+	}{
+		{ref, results{domain, repo}},
 	}
 
-	if trimed.Path() != repo {
-		t.Fatalf("path is %s, should be %s", trimed.Path(), repo)
+	for _, test := range tests {
+		trimed := names.TrimNamed(ref)
+		assert.Equal(trimed.Domain(), test.domain)
+		assert.Equal(trimed.Path(), test.path)
 	}
 }
 
 func TestSeperateRepository(t *testing.T) {
-	ref, err := reference.ParseNamed(fmt.Sprintf("%s/%s:%s", domain, repo, tag))
-	if err != nil {
-		t.Fatal(err)
+	assert := assert.New(t)
+
+	ref1, err := reference.ParseNamed(fmt.Sprintf("%s/%s:%s", domain, repo, tag))
+	assert.Nil(err)
+	ref2, err := reference.ParseNormalizedNamed(fmt.Sprintf("%s:%s", repo, tag))
+	assert.Nil(err)
+	ref3, err := reference.ParseNormalizedNamed(fmt.Sprintf("%s/%s:%s", domain, repo, tag))
+	assert.Nil(err)
+
+	type results struct {
+		domain string
+		path   string
+		name   string
 	}
 
-	sep := names.SeperateRepository(ref)
-
-	if sep.Domain() != domain {
-		t.Fatalf("domain is %s, should be %s", sep.Domain(), domain)
+	tests := []struct {
+		ref reference.Named
+		results
+	}{
+		{ref1, results{domain, repo, repo}},
+		{ref2, results{defaultDomain, repo, repo}},
+		{ref3, results{domain, repo, repo}},
 	}
 
-	if sep.Path() != repo {
-		t.Fatalf("path is %s, should be %s", sep.Path(), repo)
-	}
-
-	if sep.Name() != repo {
-		t.Fatalf("name is %s, should be %s", sep.Name(), repo)
-	}
-
-	ref, err = reference.ParseNormalizedNamed(fmt.Sprintf("%s:%s", repo, tag))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	sep = names.SeperateRepository(ref)
-
-	if sep.Domain() != defaultDomain {
-		t.Fatalf("domain is %s, should be %s", sep.Domain(), defaultDomain)
-	}
-
-	if sep.Path() != repo {
-		t.Fatalf("path is %s, should be %s", sep.Path(), repo)
-	}
-
-	if sep.Name() != repo {
-		t.Fatalf("name is %s, should be %s", sep.Name(), repo)
+	for _, test := range tests {
+		sep := names.SeperateRepository(test.ref)
+		assert.Equal(sep.Domain(), test.domain)
+		assert.Equal(sep.Path(), test.path)
+		assert.Equal(sep.Name(), test.name)
 	}
 }
 
 func TestSeperateTaggedRepository(t *testing.T) {
+	assert := assert.New(t)
+
 	ref, err := reference.ParseNamed(fmt.Sprintf("%s/%s", domain, repo))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Nil(err)
 
 	tagged, err := reference.WithTag(ref, tag)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Nil(err)
 
 	sep := names.SeperateTaggedRepository(tagged)
-
-	if sep.Domain() != domain {
-		t.Fatalf("domain is %s, should be %s", sep.Domain(), domain)
-	}
-
-	if sep.Path() != repo {
-		t.Fatalf("path is %s, should be %s", sep.Path(), repo)
-	}
-
-	if sep.Name() != repo {
-		t.Fatalf("name is %s, should be %s", sep.Name(), repo)
-	}
-
-	if sep.Tag() != tag {
-		t.Fatalf("tag is %s, should be %s", sep.Tag(), tag)
-	}
+	assert.Equal(sep.Domain(), domain)
+	assert.Equal(sep.Path(), repo)
+	assert.Equal(sep.Name(), repo)
+	assert.Equal(sep.Tag(), tag)
 }
 
 func TestCastToTagged(t *testing.T) {
-	ref, err := reference.ParseNamed(fmt.Sprintf("%s/%s", domain, repo))
-	if err != nil {
-		t.Fatal(err)
+	assert := assert.New(t)
+
+	ref1, err := reference.ParseNamed(fmt.Sprintf("%s/%s", domain, repo))
+	assert.Nil(err)
+	ref2, err := reference.ParseNamed(fmt.Sprintf("%s/%s:%s", domain, repo, tag))
+	assert.Nil(err)
+
+	type results struct {
+		domain string
+		path   string
+		name   string
+		tag    string
 	}
 
-	cast, err := names.CastToTagged(ref)
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		ref reference.Named
+		results
+	}{
+		{ref1, results{domain, repo, repo, defaultTag}},
+		{ref2, results{domain, repo, repo, tag}},
 	}
 
-	if cast.Domain() != domain {
-		t.Fatalf("domain is %s, should be %s", cast.Domain(), domain)
-	}
-
-	if cast.Path() != repo {
-		t.Fatalf("path is %s, should be %s", cast.Path(), repo)
-	}
-
-	if cast.Name() != repo {
-		t.Fatalf("name is %s, should be %s", cast.Name(), repo)
-	}
-
-	if cast.Tag() != defaultTag {
-		t.Fatalf("tag is %s, should be %s", cast.Tag(), defaultTag)
-	}
-
-	ref, err = reference.ParseNamed(fmt.Sprintf("%s/%s:%s", domain, repo, tag))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cast, err = names.CastToTagged(ref)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if cast.Domain() != domain {
-		t.Fatalf("domain is %s, should be %s", cast.Domain(), domain)
-	}
-
-	if cast.Path() != repo {
-		t.Fatalf("path is %s, should be %s", cast.Path(), repo)
-	}
-
-	if cast.Name() != repo {
-		t.Fatalf("name is %s, should be %s", cast.Name(), repo)
-	}
-
-	if cast.Tag() != tag {
-		t.Fatalf("tag is %s, should be %s", cast.Tag(), tag)
+	for _, test := range tests {
+		cast, err := names.CastToTagged(test.ref)
+		assert.Nil(err)
+		assert.Equal(cast.Domain(), test.domain)
+		assert.Equal(cast.Path(), test.path)
+		assert.Equal(cast.Name(), test.name)
+		assert.Equal(cast.Tag(), test.tag)
 	}
 }
 
 func TestAppendDigest(t *testing.T) {
+	assert := assert.New(t)
+
 	ref, err := reference.ParseNamed(fmt.Sprintf("%s/%s", domain, repo))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Nil(err)
 
 	sep := names.SeperateRepository(ref)
 	d := digest.Canonical.FromString("foobar")
+
 	dig := names.AppendDigest(sep, d)
-
-	if dig.Name() != repo {
-		t.Fatalf("name is %s, should be %s", dig.Name(), repo)
-	}
-
-	if dig.Digest() != d {
-		t.Fatalf("tag is %s, should be %s", dig.Digest(), d)
-	}
+	assert.Equal(dig.Name(), repo)
+	assert.Equal(dig.Digest(), d)
 }
