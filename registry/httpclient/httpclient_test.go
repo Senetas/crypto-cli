@@ -36,14 +36,16 @@ func TestHTTPClient(t *testing.T) {
 	defer server.Close()
 
 	req, err := http.NewRequest("GET", server.URL, nil)
+	assert.Nil(err)
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
 	assert.Nil(err)
 
 	body := bytes.NewBuffer([]byte{})
-	io.Copy(body, resp.Body)
+
+	_, err = io.Copy(body, resp.Body)
 	defer resp.Body.Close()
 	assert.Nil(err)
 
-	assert.Equal(string(body.Bytes()), "OK")
+	assert.Equal(body.String(), "OK")
 }

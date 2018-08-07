@@ -133,7 +133,7 @@ func (kc *keyDecryptedConfig) DecryptFile(opts *crypto.Opts, outname string) (De
 	}
 
 	cw := &utils.CounterWriter{Writer: mw}
-	nnw := &utils.NoNewlineWriter{Writer: cw}
+	nnw := utils.NewNoNewlineWriter(cw)
 
 	if err = json.NewEncoder(nnw).Encode(dc); err != nil {
 		return nil, err

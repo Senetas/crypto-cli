@@ -68,11 +68,11 @@ func (es Errors) Error() string {
 		msg = bytes.NewBufferString(es[i].Error())
 	}
 
-	for ; i < len(es); i++ {
+	for j := i + 1; j < len(es); j++ {
 		if _, err := msg.WriteString("\n"); err != nil {
 			return "buffer became too large"
 		}
-		if _, err := msg.WriteString(es[i].Error()); err != nil {
+		if _, err := msg.WriteString(es[j].Error()); err != nil {
 			return "buffer became too large"
 		}
 	}
