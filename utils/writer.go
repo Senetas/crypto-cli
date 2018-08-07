@@ -14,7 +14,13 @@
 
 package utils
 
-import "io"
+import (
+	"io"
+
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/rangetable"
+)
 
 // CounterWriter is a writer that counts the number bytes writen to it
 type CounterWriter struct {
@@ -31,19 +37,8 @@ func (cw *CounterWriter) Write(p []byte) (n int, err error) {
 	return cw.Count, nil
 }
 
-// NoNewlineWriter is a writer that filters out newlines, only '\n'
-type NoNewlineWriter struct {
-	io.Writer
-}
-
-func (nnw *NoNewlineWriter) Write(p []byte) (n int, err error) {
-	for _, b := range p {
-		if b != '\n' {
-			if _, err = nnw.Writer.Write([]byte{b}); err != nil {
-				break
-			}
-			n++
-		}
-	}
-	return n, err
+// NewNoNewlineWriter wrap a writer and filters out '\n' runes
+func NewNoNewlineWriter(w io.Writer) io.Writer {
+	t := runes.Remove(runes.In(rangetable.New('\n')))
+	return transform.NewWriter(w, t)
 }

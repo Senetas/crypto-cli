@@ -33,14 +33,14 @@ func TrimNamed(ref reference.Named) NamedRepository {
 }
 
 // SeperateRepository converts a named into a named where the output of the Name()
-// function will not had the domain as a prefi
+// function will not have the domain as a prefix
 func SeperateRepository(ref reference.Named) NamedRepository {
 	domain, path := reference.SplitHostname(ref)
 	return &repository{domain: domain, path: path}
 }
 
 // SeperateTaggedRepository converts a named into a named where the output of the Name()
-// function will not had the domain as a prefi
+// method will not have the domain as a prefix
 func SeperateTaggedRepository(ref reference.NamedTagged) NamedTaggedRepository {
 	domain, path := reference.SplitHostname(ref)
 	return &taggedRepository{domain: domain, path: path, tag: ref.Tag()}
