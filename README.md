@@ -44,12 +44,23 @@ For now the syntax is limited to:
 ```console
 crypto-cli (push|pull) NAME:TAG [opts]
 ```
-Here, `NAME` is the name of a repository and `TAG` is a mandatory tag. For a `push` command, the image `NAME:TAG` must be present in the local docker engine. Furthermore, only images that were built with at least one occurrence of:
+Here, `NAME` is the name of a repository and `TAG` is a mandatory tag. For a `push` command, the image `NAME:TAG` must be present in the local docker engine.
+
+To specify which layers to encrypt, insert the line
 ```Dockerfile
 LABEL com.senetas.crypto.enabled=true
 ```
-in their `Dockerfile` will be supported.
+in the `Dockerfile` before building the image.
+Any layers that result from lines in the docker file between this and the next
+```Dockerfile
+LABEL com.senetas.crypto.enabled=false
+```
+or the end of the file will be encrypted.
+As many of these may be specified to encrypt any subset of the layers apart from the empty set, but the typical usage is expected to be exactly one `com.senetas.crypto.enabled=true` after the initial `FROM` line.
+This will leave the base image unencrypted but encrypt any layers created on top of it.
 A compliant example Dockerfile is provided in the `test` directory.
+
+Note that although in general a `LABEL` line may contain multiple labels, this is not supported for the `com.senetas.crypto.enabled` label for the purposes of this application.
 
 ### Global Options
 
