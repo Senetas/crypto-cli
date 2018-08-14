@@ -53,16 +53,16 @@ func colorize(s interface{}, color int, enabled bool) string {
 }
 
 const (
-	cReset    = 0
-	cBold     = 1
-	cRed      = 31
-	cGreen    = 32
-	cYellow   = 33
-	cBlue     = 34
-	cMagenta  = 35
-	cCyan     = 36
-	cGray     = 37
-	cDarkGray = 90
+	cReset = 0
+	//cBold     = 1
+	cRed    = 31
+	cGreen  = 32
+	cYellow = 33
+	//cBlue     = 34
+	cMagenta = 35
+	cCyan    = 36
+	//cGray    = 37
+	//cDarkGray = 90
 )
 
 func levelColor(level string) int {
@@ -111,18 +111,24 @@ func (w ConsoleWriter) Write(p []byte) (n int, err error) {
 
 	// don't render info messages to look like log messages
 	if event[LevelFieldName] == "info" {
-		fmt.Fprintf(
+		_, err = fmt.Fprintf(
 			buf,
 			"%s",
 			colorize(event[MessageFieldName], cReset, !w.NoColor),
 		)
+		if err != nil {
+			return n, err
+		}
 	} else {
-		fmt.Fprintf(
+		_, err = fmt.Fprintf(
 			buf,
 			"|%s| %s",
 			colorize(level, lvlColor, !w.NoColor),
 			colorize(event[MessageFieldName], cReset, !w.NoColor),
 		)
+		if err != nil {
+			return n, err
+		}
 	}
 
 	fields := make([]string, 0, len(event))
@@ -135,27 +141,46 @@ func (w ConsoleWriter) Write(p []byte) (n int, err error) {
 	}
 	sort.Strings(fields)
 	for _, field := range fields {
-		fmt.Fprintf(buf, " %s=", colorize(field, cCyan, !w.NoColor))
+		_, err = fmt.Fprintf(buf, " %s=", colorize(field, cCyan, !w.NoColor))
+		if err != nil {
+			return n, err
+		}
 		switch value := event[field].(type) {
 		case string:
 			if needsQuote(value) {
-				buf.WriteString(strconv.Quote(value))
+				_, err = buf.WriteString(strconv.Quote(value))
+				if err != nil {
+					return n, err
+				}
 			} else {
-				buf.WriteString(value)
+				_, err = buf.WriteString(value)
+				if err != nil {
+					return n, err
+				}
 			}
 		case json.Number:
-			fmt.Fprint(buf, value)
-		default:
-			b, err := json.Marshal(value)
+			_, err = fmt.Fprint(buf, value)
 			if err != nil {
-				fmt.Fprintf(buf, "[error: %v]", err)
-			} else {
-				fmt.Fprint(buf, string(b))
+				return n, err
+			}
+		default:
+			b, err2 := json.Marshal(value)
+			if err2 != nil {
+				return n, err2
+			}
+			_, err = fmt.Fprint(buf, string(b))
+			if err != nil {
+				return n, err
 			}
 		}
 	}
-	buf.WriteByte('\n')
-	buf.WriteTo(w.Out)
+	if err = buf.WriteByte('\n'); err != nil {
+		return n, err
+	}
+	_, err = buf.WriteTo(w.Out)
+	if err != nil {
+		return n, err
+	}
 	n = len(p)
 	return
 }

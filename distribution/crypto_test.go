@@ -96,22 +96,21 @@ func TestCryptoBlobs(t *testing.T) {
 		t.Error(err)
 	}
 
-	cmp := equalfile.New(nil, equalfile.Options{})
-	equal, err := cmp.CompareFile(fn, dec.GetFilename())
+	equal, err := equalfile.CompareFile(fn, dec.GetFilename())
 	if err != nil {
 		t.Error(err)
 	}
 
 	if !equal {
 		handleError(t, fn, decpath)
-	}
 
-	if blob.GetDigest().String() != dec.GetDigest().String() {
-		t.Errorf("digests do not match: orig: %s decrypted: %s", blob.GetDigest(), dec.GetDigest())
-	}
+		if blob.GetDigest().String() != dec.GetDigest().String() {
+			t.Errorf("digests do not match: orig: %s decrypted: %s", blob.GetDigest(), dec.GetDigest())
+		}
 
-	if err = os.RemoveAll(dir); err != nil {
-		t.Logf(err.Error())
+		if err = os.RemoveAll(dir); err != nil {
+			t.Logf(err.Error())
+		}
 	}
 }
 
@@ -135,8 +134,7 @@ func TestCompressBlobs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmp := equalfile.New(nil, equalfile.Options{})
-	equal, err := cmp.CompareFile(fn, dec.GetFilename())
+	equal, err := equalfile.CompareFile(fn, dec.GetFilename())
 	if err != nil {
 		t.Fatal(err)
 	}
