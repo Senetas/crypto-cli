@@ -8,16 +8,12 @@ The following sections provide guidance on how to install these on Ubuntu 18.04 
 
 ### Docker
 Follow these instructions: <https://docs.docker.com/install/linux/docker-ce/ubuntu/> to install `docker`.
-It is convenient to run `docker` as a non-privileged user: <https://docs.docker.com/install/linux/linux-postinstall/>.
+It is more convenient to run `docker` as a non-privileged user, and these instructions assume that you are able to.
+Follow these instructions to enable this: <https://docs.docker.com/install/linux/linux-postinstall/> and note the warnings.
 
 ### Go
 ```console
-$ sudo apt-get install golang
-```
-
-### Dep
-```console
-$ sudo apt-get install go-dep
+sudo apt-get install golang
 ```
 
 ### \$GOPATH, etc
@@ -30,33 +26,30 @@ to the file `~/.bashrc`. A relogin may be necessary to complete the process.
 
 ## Installation
 ```console
-$ go get github.com/Senetas/crypto-cli
+go get github.com/Senetas/crypto-cli
 ```
-Unfortunately, because the repository is private, the `go get` command may not work if you use ssh keys.
-Furthermore, because of the way the dependencies are currently set up, the semi-official package manager `dep` may need to be used as well.
 
-If the previous command fails, the following sequence of commands should rectify it.
+If this command fails, it is likely because the github repository is private.
+The following sequence of commands should rectify the error, provided you have enough permissions.
 ```console
-$ cd $GOPATH/src/github.com/Senetas
-$ git clone git@github.com:Senetas/crypto-cli.git
-$ cd crypto-cli
-$ dep ensure
-$ go get github.com/Senetas/crypto-cli
+cd $GOPATH/src/github.com/Senetas
+git clone https://github.com/Senetas/crypto-cli.git
+cd crypto-cli
+go install
 ```
-Note: use `https://github.com/Senetas/crypto-cli.git` if not using ssh keys for authentication.
-The `go get` and `dep ensure` commands will take a long time to execute.
+Note: you may need to use `git@github.com:Senetas/crypto-cli.git` if using ssh keys for authentication.
 
 ## Usage
-For now the syntax is limited and some parameters are hard coded.
+For now the syntax is limited to:
 ```console
-$ crypto-cli (push|pull) NAME:TAG [opts]
+crypto-cli (push|pull) NAME:TAG [opts]
 ```
 Here, `NAME` is the name of a repository and `TAG` is a mandatory tag. For a `push` command, the image `NAME:TAG` must be present in the local docker engine. Furthermore, only images that were built with at least one occurrence of:
 ```Dockerfile
 LABEL com.senetas.crypto.enabled=true
 ```
 in their `Dockerfile` will be supported.
-A compliant Dockerfile is provided in the `test` directory.
+A compliant example Dockerfile is provided in the `test` directory.
 
 ### Global Options
 
@@ -72,18 +65,19 @@ Verbose output.
 Makes the produced image manifests adhere more strictly to the Docker v2.2 manifest schema.
 
 #### `--type=TYPE`
-Type specifies the encryption scheme to use. At the moment the options are `NONE` and `PBKDF2-AES256-GCM`.
+Specifies the encryption scheme to use. At the moment the options are `NONE` and `PBKDF2-AES256-GCM`.
 The former does no encryption, and the latter offers passphrase derived symmetric encryption.
 
 ### Pull Options
 [None]
 
 ### Credentials
-The user must be able to `pull` and `push` to `registry-1.docker.io` (aka Docker Hub/Cloud). To do this, they should have logged in via the command:
+The user must be able to `pull` and `push` to a repository.
+For the default `registry-1.docker.io` (aka Docker Hub/Cloud), then need to run the following command:
 ```console
-$ docker login -u <docker-hub-username>
+docker login -u <docker-hub-username>
 ```
 and entered the password in `STDIN`. See also the privacy note below.
 
 ## Privacy
-The user MUST be logged into a docker hub account. Because `docker login` stores and encoded username and password, the clear text password is exposed to this utility. While the password is not transmitted anywhere other then Docker Hub in either a clear, encoded or encrypted form, it may be logged to `STDOUT` in certain situations. Thus, it is strongly recommended to set up a temporary Docker Hub account and login to it with `docker login` prior to running this utility while it is under development.
+The user MUST be logged into a docker hub account. Because `docker login` stores an encoded username and password, the clear text password is exposed to this utility. While the password is not transmitted anywhere other then the repository in either a clear, encoded or encrypted form, it may be logged to `STDOUT` in certain situations. Thus, it is strongly recommended to set up an alternate Docker Hub account and login to it with `docker login` prior to running this utility while it is under development.
