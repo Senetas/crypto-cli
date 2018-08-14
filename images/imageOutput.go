@@ -20,7 +20,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
+	"regexp"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/image"
@@ -92,26 +92,6 @@ func CreateManifest(
 	manifest.Layers = layerBlobs
 
 	return manifest, nil
-}
-
-func layersToEncrypt(ctx context.Context, cli *client.Client, inspt types.ImageInspect) ([]string, error) {
-	// get the history
-	hist, err := cli.ImageHistory(ctx, inspt.ID)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	// the number of layers to encrypt
-	n, err := numLayers(hist)
-	if err != nil {
-		return nil, err
-	}
-
-	// the total number of layers
-	m := len(inspt.RootFS.Layers)
-
-	// the last n entries in this array are the diffIDs of the layers to encrypt
-	return inspt.RootFS.Layers[m-n:], nil
 }
 
 func extractTarBall(tarFH io.Reader, manifest *distribution.ImageManifest) (err error) {
@@ -251,15 +231,64 @@ func fileDigest(filename string) (d digest.Digest, err error) {
 	return digest.Canonical.FromReader(fh)
 }
 
-func numLayers(hist []image.HistoryResponseItem) (n int, err error) {
-	for _, h := range hist {
-		if h.Size != 0 || !strings.Contains(h.CreatedBy, "#(nop)") {
+func layersToEncrypt(ctx context.Context, cli *client.Client, inspt types.ImageInspect) ([]string, error) {
+	// get the history
+	hist, err := cli.ImageHistory(ctx, inspt.ID)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	// the positions of the layers to encrypt
+	eps, err := encryptPositions(hist)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debug().Msgf("%v", eps)
+	log.Debug().Msgf("%v", inspt.RootFS.Layers)
+
+	// the total number of layers
+	diffIDsToEncrypt := make([]string, len(eps))
+	for i, n := range eps {
+		diffIDsToEncrypt[i] = inspt.RootFS.Layers[n]
+	}
+
+	log.Debug().Msgf("%v", diffIDsToEncrypt)
+
+	// the last n entries in this array are the diffIDs of the layers to encrypt
+	return diffIDsToEncrypt, nil
+}
+
+func encryptPositions(hist []image.HistoryResponseItem) (encryptPos []int, err error) {
+	n := 0
+	toEncrypt := false
+	createdRE := `#\(nop\)\s+` + labelString + `=(true|false)|(#\(nop\))`
+	re := regexp.MustCompile(createdRE)
+
+	for i := len(hist) - 1; i >= 0; i-- {
+		matches := re.FindSubmatch([]byte(hist[i].CreatedBy))
+
+		if hist[i].Size != 0 || len(matches) == 0 {
+			if toEncrypt {
+				encryptPos = append(encryptPos, n)
+			}
 			n++
-		} else if strings.Contains(h.CreatedBy, labelString) {
-			return n, nil
+		} else {
+			switch string(matches[1]) {
+			case "true":
+				toEncrypt = true
+			case "false":
+				toEncrypt = false
+			default:
+			}
 		}
 	}
-	return 0, utils.NewError("this image was not built with the correct LABEL", false)
+
+	if len(encryptPos) == 0 {
+		return nil, utils.NewError("this image was not built with the correct LABEL", false)
+	}
+
+	return encryptPos, nil
 }
 
 type archiveStruct struct {
