@@ -18,7 +18,7 @@ type ConsoleWriter struct {
 	NoColor bool
 }
 
-var (
+const (
 	// TimestampFieldName is the field name used for the timestamp field.
 	TimestampFieldName = "time"
 
@@ -53,16 +53,12 @@ func colorize(s interface{}, color int, enabled bool) string {
 }
 
 const (
-	cReset = 0
-	//cBold     = 1
-	cRed    = 31
-	cGreen  = 32
-	cYellow = 33
-	//cBlue     = 34
+	cReset   = 0
+	cRed     = 31
+	cGreen   = 32
+	cYellow  = 33
 	cMagenta = 35
 	cCyan    = 36
-	//cGray    = 37
-	//cDarkGray = 90
 )
 
 func levelColor(level string) int {
@@ -117,7 +113,7 @@ func (w ConsoleWriter) Write(p []byte) (n int, err error) {
 			colorize(event[MessageFieldName], cReset, !w.NoColor),
 		)
 		if err != nil {
-			return n, err
+			return
 		}
 	} else {
 		_, err = fmt.Fprintf(
@@ -127,10 +123,25 @@ func (w ConsoleWriter) Write(p []byte) (n int, err error) {
 			colorize(event[MessageFieldName], cReset, !w.NoColor),
 		)
 		if err != nil {
-			return n, err
+			return
 		}
 	}
 
+	err = writeFields(&w, p, event, buf)
+	if err != nil {
+		return
+	}
+
+	n = len(p)
+	return
+}
+
+func writeFields(
+	w *ConsoleWriter,
+	p []byte,
+	event map[string]interface{},
+	buf *bytes.Buffer,
+) (err error) {
 	fields := make([]string, 0, len(event))
 	for field := range event {
 		switch field {
@@ -141,46 +152,44 @@ func (w ConsoleWriter) Write(p []byte) (n int, err error) {
 	}
 	sort.Strings(fields)
 	for _, field := range fields {
-		_, err = fmt.Fprintf(buf, " %s=", colorize(field, cCyan, !w.NoColor))
-		if err != nil {
-			return n, err
-		}
-		switch value := event[field].(type) {
-		case string:
-			if needsQuote(value) {
-				_, err = buf.WriteString(strconv.Quote(value))
-				if err != nil {
-					return n, err
-				}
-			} else {
-				_, err = buf.WriteString(value)
-				if err != nil {
-					return n, err
-				}
-			}
-		case json.Number:
-			_, err = fmt.Fprint(buf, value)
-			if err != nil {
-				return n, err
-			}
-		default:
-			b, err2 := json.Marshal(value)
-			if err2 != nil {
-				return n, err2
-			}
-			_, err = fmt.Fprint(buf, string(b))
-			if err != nil {
-				return n, err
-			}
+		if err = writeField(field, w, event, buf); err != nil {
+			return
 		}
 	}
+
 	if err = buf.WriteByte('\n'); err != nil {
-		return n, err
+		return
 	}
 	_, err = buf.WriteTo(w.Out)
+	return err
+}
+
+func writeField(
+	field string,
+	w *ConsoleWriter,
+	event map[string]interface{},
+	buf *bytes.Buffer,
+) (err error) {
+	_, err = fmt.Fprintf(buf, " %s=", colorize(field, cCyan, !w.NoColor))
 	if err != nil {
-		return n, err
+		return
 	}
-	n = len(p)
-	return
+
+	switch value := event[field].(type) {
+	case string:
+		if needsQuote(value) {
+			_, err = buf.WriteString(strconv.Quote(value))
+		} else {
+			_, err = buf.WriteString(value)
+		}
+	case json.Number:
+		_, err = fmt.Fprint(buf, value)
+	default:
+		b, err2 := json.Marshal(value)
+		if err2 != nil {
+			return err2
+		}
+		_, err = fmt.Fprint(buf, string(b))
+	}
+	return err
 }
