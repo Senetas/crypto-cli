@@ -49,17 +49,17 @@ func PullImage(
 ) (*distribution.ImageManifest, error) {
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
-	log.Info().Msg("Obtaining Manifest")
 	manifest, err := PullManifest(token, ref, bldr, downloadDir)
 	if err != nil {
 		return nil, err
 	}
+	log.Info().Msg("Mainfest obtained.")
 
 	if err = manifest.DecryptKeys(opts, ref); err != nil {
 		return nil, err
 	}
 
-	log.Info().Msgf("Downloading config: %s", manifest.Config.GetDigest())
+	log.Info().Msgf("Downloading config: %s.", manifest.Config.GetDigest())
 	filename, err := PullFromDigest(token, ref, manifest.Config.GetDigest(), bldr, downloadDir)
 	if err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func PullImage(
 
 	log.Info().Msg("Downloading layers:")
 	for _, l := range manifest.Layers {
-		log.Info().Msgf("Downloading: %s", l.GetDigest())
+		log.Info().Msgf("Downloading: %s.", l.GetDigest())
 		filename, err := PullFromDigest(token, ref, l.GetDigest(), bldr, downloadDir)
 		if err != nil {
 			return nil, err
@@ -123,7 +123,6 @@ func PullManifest(
 		return nil, errors.WithStack(err)
 	}
 
-	log.Info().Msgf("%s", body)
 	log.Debug().Msg(spew.Sdump(manifest))
 
 	return manifest, nil

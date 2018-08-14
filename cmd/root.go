@@ -56,7 +56,7 @@ downloading them.`,
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	// use a prettier logger, <nil> timestamp
-	log.Logger = zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).With().Logger()
+	log.Logger = zerolog.New(ConsoleWriter{Out: os.Stderr}).With().Logger()
 
 	if err := rootCmd.Execute(); err != nil {
 		c, ok := errors.Cause(err).(utils.Error)

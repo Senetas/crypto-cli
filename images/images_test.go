@@ -78,8 +78,7 @@ func testEncDecImage(t *testing.T, opts *crypto.Opts) {
 		t.Fatalf("%+v", err)
 	}
 
-	cmp := equalfile.New(nil, equalfile.Options{})
-	equal, err := cmp.CompareFile(manifest.Config.GetFilename(), decManifest.Config.GetFilename())
+	equal, err := equalfile.CompareFile(manifest.Config.GetFilename(), decManifest.Config.GetFilename())
 	if err != nil {
 		t.Error(err)
 	}
@@ -88,7 +87,7 @@ func testEncDecImage(t *testing.T, opts *crypto.Opts) {
 	}
 
 	for i, l := range manifest.Layers {
-		equal, err := cmp.CompareFile(l.GetFilename(), decManifest.Layers[i].GetFilename())
+		equal, err := equalfile.CompareFile(l.GetFilename(), decManifest.Layers[i].GetFilename())
 		if err != nil {
 			t.Error(err)
 		}
