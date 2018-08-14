@@ -56,7 +56,8 @@ Any layers that result from lines in the docker file between this and the next
 LABEL com.senetas.crypto.enabled=false
 ```
 or the end of the file will be encrypted.
-As many of these may be specified to encrypt any subset of the layers apart from the empty set, but the typical usage is expected to be exactly one `com.senetas.crypto.enabled=true` after the initial `FROM` line.
+As many of these may be specified to encrypt any nonempty subset of the layers that either contains all or none of the base image layers.
+However, the typical usage is expected to have the `Dockerfile` containing exactly one `com.senetas.crypto.enabled=true` after the initial `FROM`.
 This will leave the base image unencrypted but encrypt any layers created on top of it.
 A compliant example Dockerfile is provided in the `test` directory.
 
