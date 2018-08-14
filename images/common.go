@@ -32,9 +32,7 @@ import (
 	"github.com/Senetas/crypto-cli/utils"
 )
 
-const (
-	labelString = "LABEL com.senetas.crypto.enabled=true"
-)
+const labelString = "LABEL com.senetas.crypto.enabled"
 
 var tempRoot = filepath.Join(os.TempDir(), "com.senetas.crypto")
 
