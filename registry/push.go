@@ -53,13 +53,13 @@ func PushImage(
 			return err
 		}
 	}
-	log.Info().Msg("Layers and config uploaded successfully")
+	log.Info().Msg("Layers and config uploaded successfully.")
 
 	mdigest, err := PushManifest(token, ref, manifest, endpoint)
 	if err != nil {
 		return err
 	}
-	log.Info().Msgf("Successfully uploaded manifest: %s", mdigest)
+	log.Info().Msgf("Successfully uploaded manifest: %s.", mdigest)
 
 	return nil
 }
@@ -138,7 +138,7 @@ func PushLayer(
 		return nil
 	}
 
-	log.Info().Msgf("Blob %s is new, proceed to upload", layer.GetDigest())
+	log.Info().Msgf("Blob %s is new, proceed to upload.", layer.GetDigest())
 
 	// query the server for which location to upload to
 	loc, err := getUploadLoc(token, dig, bldr, layer)
@@ -257,8 +257,6 @@ func uploadBlob(
 	req.Header.Add("Content-Length", strconv.FormatInt(blob.GetSize(), 10))
 	req.Header.Add("Content-Type", "application/octect-stream")
 	auth.AddToReqest(token, req)
-
-	log.Info().Msgf("Uploading to: %s", u)
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, false, true)
 	if resp != nil {

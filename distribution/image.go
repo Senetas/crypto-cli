@@ -57,11 +57,11 @@ func unencryptedConfig(blob *NoncryptedBlob) (Blob, error) {
 func prepareConfig(config Blob, opts *crypto.Opts, ref names.NamedTaggedRepository) (Blob, error) {
 	switch blob := config.(type) {
 	case DecryptedBlob:
-		log.Info().Msg("encrypting config")
+		log.Debug().Msg("encrypting config")
 		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 		return blob.EncryptBlob(opts, blob.GetFilename()+".aes")
 	case *NoncryptedBlob:
-		log.Info().Msgf("preparing config")
+		log.Debug().Msgf("preparing config")
 		return unencryptedConfig(blob)
 	default:
 	}
@@ -85,11 +85,11 @@ func (m *ImageManifest) Encrypt(
 	for i, l := range m.Layers {
 		switch blob := l.(type) {
 		case DecryptedBlob:
-			log.Info().Msgf("encrypting layer %d", i)
+			log.Debug().Msgf("encrypting layer %d", i)
 			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
 			layerBlobs[i], err = blob.EncryptBlob(opts, blob.GetFilename()+".aes")
 		case *NoncryptedBlob:
-			log.Info().Msgf("compressing layer %d", i)
+			log.Debug().Msgf("compressing layer %d", i)
 			layerBlobs[i], err = blob.Compress(blob.GetFilename() + ".gz")
 		default:
 		}

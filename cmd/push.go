@@ -73,6 +73,7 @@ func runPush(remote string, opts *crypto.Opts) error {
 	if err != nil {
 		return err
 	}
+	log.Info().Msgf("Pushing image: %s.", ref)
 	return images.PushImage(ref, opts)
 }
 

@@ -58,7 +58,7 @@ func PullImage(ref reference.Named, opts *crypto.Opts) (err error) {
 		return err
 	}
 
-	log.Info().Msg("image pulled successfully")
+	log.Info().Msg("Image pulled successfully.")
 
 	if err = os.RemoveAll(dir); err != nil {
 		return errors.Wrapf(err, "could not remove temp files in: %s", dir)

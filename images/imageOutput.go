@@ -69,7 +69,7 @@ func CreateManifest(
 	}
 	defer func() { err = utils.CheckedClose(tarFH, err) }()
 
-	log.Info().Msgf("The following layers are to be encrypted: %v", layers)
+	log.Debug().Msgf("The following layers are to be encrypted: %v", layers)
 
 	// output manifest
 	manifest = &distribution.ImageManifest{
@@ -230,7 +230,7 @@ func pbkdf2Aes256GcmEncrypt(
 			return nil, nil, errors.WithStack(err)
 		}
 
-		log.Info().Msgf("preparing %s", d)
+		log.Debug().Msgf("preparing %s", d)
 		if layerSet[d.String()] {
 			layerBlobs[i] = distribution.NewLayer(filepath.Join(path, f), d, 0, dec)
 		} else {

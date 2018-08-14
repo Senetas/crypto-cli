@@ -17,6 +17,7 @@ package cmd
 import (
 	"github.com/docker/distribution/reference"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -53,6 +54,7 @@ func runPull(remote string, opts *crypto.Opts) error {
 	if err != nil {
 		return errors.Wrapf(err, "remote = ", remote)
 	}
+	log.Info().Msgf("Obtaining manifest for image: %s", ref)
 	return images.PullImage(ref, opts)
 }
 
