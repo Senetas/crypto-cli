@@ -16,6 +16,7 @@ package distribution_test
 
 import (
 	"crypto/rand"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -27,6 +28,7 @@ import (
 	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/google/uuid"
 	digest "github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 	"github.com/udhos/equalfile"
 )
 
@@ -75,42 +77,70 @@ func TestCryptoBlobs(t *testing.T) {
 	opts.SetPassphrase(passphrase)
 
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
-	size, d, fn := mkTempFile(t, dir)
+	size, d, fn, err := mkRandFile(t, dir)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 	encpath := filepath.Join(dir, "enc")
 	decpath := filepath.Join(dir, "dec")
 
+	defer func() {
+		if err = os.RemoveAll(dir); err != nil {
+			t.Logf(err.Error())
+		}
+	}()
+
 	c, err := distribution.NewDecrypto(opts)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
+		return
 	}
 
 	blob := distribution.NewLayer(fn, d, size, c)
 
-	enc, err := blob.EncryptBlob(opts, encpath+"file")
+	enc, err := blob.EncryptBlob(opts, encpath)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
-	dec, err := enc.DecryptBlob(opts, encpath+"file")
+	fi, err := os.Stat(encpath)
 	if err != nil {
 		t.Error(err)
+		return
+	} else if fi.Size() != enc.GetSize() {
+		t.Error(errors.Errorf("encrypted file is incorrect size: %d vs %d", fi.Size(), enc.GetSize()))
+	}
+
+	dec, err := enc.DecryptBlob(opts, decpath)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	fi, err = os.Stat(decpath)
+	if err != nil {
+		t.Error(err)
+		return
+	} else if fi.Size() != dec.GetSize() {
+		t.Error(errors.Errorf("decrypted file is incorrect size: %d vs %d", fi.Size(), dec.GetSize()))
 	}
 
 	equal, err := equalfile.CompareFile(fn, dec.GetFilename())
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	if !equal {
-		handleError(t, fn, decpath)
+		showContents(t, fn, decpath)
+		return
+	}
 
-		if blob.GetDigest().String() != dec.GetDigest().String() {
-			t.Errorf("digests do not match: orig: %s decrypted: %s", blob.GetDigest(), dec.GetDigest())
-		}
-
-		if err = os.RemoveAll(dir); err != nil {
-			t.Logf(err.Error())
-		}
+	if blob.GetDigest().String() != dec.GetDigest().String() {
+		t.Errorf("digests do not match: orig: %s decrypted: %s", blob.GetDigest(), dec.GetDigest())
+		return
 	}
 }
 
@@ -118,49 +148,76 @@ func TestCompressBlobs(t *testing.T) {
 	opts.SetPassphrase(passphrase)
 
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
-	size, d, fn := createTempFile(t, dir)
+	size, d, fn, err := mkConstFile(t, dir)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 	compath := filepath.Join(dir, "enc.gz")
 	decpath := filepath.Join(dir, "dec")
+
+	defer func() {
+		if err = os.RemoveAll(dir); err != nil {
+			t.Logf(err.Error())
+		}
+	}()
 
 	blob := distribution.NewPlainLayer(fn, d, size)
 
 	com, err := blob.Compress(compath)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
+		return
+	}
+
+	fi, err := os.Stat(compath)
+	if err != nil {
+		t.Error(err)
+		return
+	} else if fi.Size() != com.GetSize() {
+		t.Error(errors.Errorf("compressed file is incorrect size: %d vs %d", fi.Size(), com.GetSize()))
 	}
 
 	dec, err := com.Decompress(decpath)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
+		return
+	}
+
+	fi, err = os.Stat(decpath)
+	if err != nil {
+		t.Error(err)
+		return
+	} else if fi.Size() != dec.GetSize() {
+		t.Error(errors.Errorf("decompressed file is incorrect size: %d vs %d", fi.Size(), dec.GetSize()))
 	}
 
 	equal, err := equalfile.CompareFile(fn, dec.GetFilename())
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
+		return
 	}
 
 	if !equal {
-		handleError(t, fn, decpath)
+		showContents(t, fn, decpath)
+		return
 	}
 
 	if blob.GetDigest().String() != dec.GetDigest().String() {
 		t.Errorf("digests do not match: orig: %s decrypted: %s", blob.GetDigest(), dec.GetDigest())
-	}
-
-	if err = os.RemoveAll(dir); err != nil {
-		t.Logf(err.Error())
+		return
 	}
 }
 
-func createTempFile(t *testing.T, dir string) (int64, digest.Digest, string) {
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		t.Fatal(err)
+func mkConstFile(t *testing.T, dir string) (_ int64, _ digest.Digest, _ string, err error) {
+	if err = os.MkdirAll(dir, 0700); err != nil {
+		return
 	}
 
 	file := filepath.Join(dir, "plain")
 	fh, err := os.Create(file)
 	if err != nil {
-		t.Fatal(err)
+		return
 	}
 	defer func() {
 		if err = fh.Close(); err != nil {
@@ -175,21 +232,21 @@ func createTempFile(t *testing.T, dir string) (int64, digest.Digest, string) {
 
 	n, err := io.CopyN(mw, z, 1024)
 	if err != nil {
-		t.Fatal(err)
+		return
 	}
 
-	return n, digester.Digest(), file
+	return n, digester.Digest(), file, nil
 }
 
-func mkTempFile(t *testing.T, dir string) (int64, digest.Digest, string) {
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		t.Error(err)
+func mkRandFile(t *testing.T, dir string) (_ int64, _ digest.Digest, _ string, err error) {
+	if err = os.MkdirAll(dir, 0700); err != nil {
+		return
 	}
 
 	fn := filepath.Join(dir, "plain")
 	fh, err := os.Create(fn)
 	if err != nil {
-		t.Error(err)
+		return
 	}
 	defer func() {
 		if err = fh.Close(); err != nil {
@@ -201,30 +258,29 @@ func mkTempFile(t *testing.T, dir string) (int64, digest.Digest, string) {
 	mw := io.MultiWriter(digester.Hash(), fh)
 
 	r := rand.Reader
-	_, err = io.CopyN(mw, r, 1024)
+
+	n, err := io.CopyN(mw, r, 1024)
 	if err != nil {
-		t.Error(err)
+		return
 	}
 
-	return 1024, digester.Digest(), fn
+	return n, digester.Digest(), fn, nil
 }
 
-func handleError(t *testing.T, fn, decpath string) {
-	fha, err := os.Open(fn)
-	if err != nil {
-		t.Error(err)
-	}
-	a, err := ioutil.ReadAll(fha)
-	if err != nil {
-		t.Error(err)
-	}
-	fhb, err := os.Open(decpath)
-	if err != nil {
-		t.Error(err)
-	}
-	b, err := ioutil.ReadAll(fhb)
-	if err != nil {
-		t.Error(err)
-	}
+func showContents(t *testing.T, fn, decpath string) {
+	a := readFile(t, fn)
+	b := readFile(t, decpath)
 	t.Errorf("decryption is not inverting encryption:\nPlaintext: %v\nDecrypted: %v", a, b)
+}
+
+func readFile(t *testing.T, filename string) []byte {
+	fh, err := os.Open(filename)
+	if err != nil {
+		return []byte(fmt.Sprintf("[could not read %s]", filename))
+	}
+	contents, err := ioutil.ReadAll(fh)
+	if err != nil {
+		return []byte(fmt.Sprintf("[could not read %s]", filename))
+	}
+	return contents
 }

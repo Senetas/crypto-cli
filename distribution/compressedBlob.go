@@ -79,33 +79,37 @@ func (b *NoncryptedBlob) Decompress(outfile string) (_ DecompressedBlob, err err
 func (b *NoncryptedBlob) Compress(outfile string) (_ CompressedBlob, err error) {
 	r, err := b.ReadCloser()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		err = errors.WithStack(err)
+		return
 	}
 	defer func() { err = utils.CheckedClose(r, err) }()
 
 	out, err := os.Create(outfile)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		err = errors.WithStack(err)
+		return
 	}
 	defer func() { err = utils.CheckedClose(out, err) }()
 
 	digester := digest.Canonical.Digester()
 	mw := io.MultiWriter(digester.Hash(), out)
-	zw := gzip.NewWriter(mw)
+	cw := &utils.CounterWriter{Writer: mw}
+	zw := gzip.NewWriter(cw)
 
-	size, err := io.Copy(zw, r)
-	if err != nil {
-		return nil, errors.WithStack(err)
+	if _, err = io.Copy(zw, r); err != nil {
+		err = errors.WithStack(err)
+		return
 	}
 
-	if err := zw.Close(); err != nil {
-		return nil, errors.WithStack(err)
+	if err = zw.Close(); err != nil {
+		err = errors.WithStack(err)
+		return
 	}
 
 	dgst := digester.Digest()
 
 	return &NoncryptedBlob{
-		Size:        size,
+		Size:        int64(cw.Count),
 		ContentType: b.ContentType,
 		Digest:      dgst,
 		Filename:    outfile,

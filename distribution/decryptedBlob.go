@@ -46,49 +46,55 @@ type decryptedBlob struct {
 func (db *decryptedBlob) EncryptBlob(opts *crypto.Opts, outname string) (_ EncryptedBlob, err error) {
 	r, err := db.ReadCloser()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		err = errors.WithStack(err)
+		return
 	}
 	defer func() { err = utils.CheckedClose(r, err) }()
 
 	out, err := os.Create(outname)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		err = errors.WithStack(err)
+		return
 	}
 	defer func() { err = utils.CheckedClose(out, err) }()
 
 	digester := digest.Canonical.Digester()
 	mw := io.MultiWriter(digester.Hash(), out)
+	cw := &utils.CounterWriter{Writer: mw}
 
-	ew, err := crypto.EncBlobWriter(mw, db.DecKey)
+	ew, err := crypto.EncBlobWriter(cw, db.DecKey)
 	if err != nil {
-		return nil, err
+		err = errors.WithStack(err)
+		return
 	}
 
 	zw := gzip.NewWriter(ew)
 
-	n, err := io.Copy(zw, r)
-	if err != nil {
-		return nil, errors.WithStack(err)
+	if _, err = io.Copy(zw, r); err != nil {
+		err = errors.WithStack(err)
+		return
 	}
 
 	// the writers must be closed for the data to be written
 	if err = zw.Close(); err != nil {
-		return nil, errors.WithStack(err)
+		err = errors.WithStack(err)
+		return
 	}
 
 	if err = ew.Close(); err != nil {
-		return nil, errors.WithStack(err)
+		err = errors.WithStack(err)
+		return
 	}
 
 	dgst := digester.Digest()
 
 	ek, err := EncryptKey(*db.DeCrypto, opts)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	nb := &NoncryptedBlob{
-		Size:        n,
+		Size:        int64(cw.Count),
 		ContentType: db.ContentType,
 		Digest:      dgst,
 		Filename:    outname,
