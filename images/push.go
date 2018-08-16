@@ -15,10 +15,7 @@
 package images
 
 import (
-	"os"
-
 	"github.com/docker/distribution/reference"
-	"github.com/pkg/errors"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/registry"
@@ -35,6 +32,7 @@ func PushImage(ref reference.Named, opts *crypto.Opts) (err error) {
 	if err != nil {
 		return err
 	}
+	defer func() { err = cleanup(manifest.DirName, err) }()
 
 	encManifest, err := manifest.Encrypt(nTRep, opts)
 	if err != nil {
@@ -43,15 +41,6 @@ func PushImage(ref reference.Named, opts *crypto.Opts) (err error) {
 
 	if err = registry.PushImage(token, nTRep, encManifest, endpoint); err != nil {
 		return err
-	}
-
-	// cleanup temporary files
-	if err = os.RemoveAll(manifest.DirName + ".tar"); err != nil {
-		return errors.Wrapf(err, "could not clean up temp file: %s", manifest.DirName+".tar")
-	}
-
-	if err = os.RemoveAll(manifest.DirName); err != nil {
-		return errors.Wrapf(err, "could not clean up temp files in: %s", manifest.DirName)
 	}
 
 	return nil
