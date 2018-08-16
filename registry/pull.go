@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/distribution/reference"
@@ -37,6 +38,7 @@ import (
 	"github.com/Senetas/crypto-cli/registry/httpclient"
 	"github.com/Senetas/crypto-cli/registry/names"
 	"github.com/Senetas/crypto-cli/utils"
+	pb "gopkg.in/cheggaaa/pb.v1"
 )
 
 // PullImage pulls an image from a remote repository
@@ -60,7 +62,13 @@ func PullImage(
 	}
 
 	log.Info().Msgf("Downloading config: %s.", manifest.Config.GetDigest())
-	filename, err := PullFromDigest(token, ref, manifest.Config.GetDigest(), bldr, downloadDir)
+	filename, err := PullFromDigest(
+		token,
+		ref,
+		manifest.Config.GetDigest(),
+		bldr,
+		downloadDir,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +77,13 @@ func PullImage(
 	log.Info().Msg("Downloading layers:")
 	for _, l := range manifest.Layers {
 		log.Info().Msgf("Downloading: %s.", l.GetDigest())
-		filename, err := PullFromDigest(token, ref, l.GetDigest(), bldr, downloadDir)
+		filename, err := PullFromDigest(
+			token,
+			ref,
+			l.GetDigest(),
+			bldr,
+			downloadDir,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -173,12 +187,22 @@ func PullFromDigest(
 	}
 	defer func() { err = utils.CheckedClose(fh, err) }()
 
+	size, err := strconv.Atoi(resp.Header.Get("Content-Length"))
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	bar := pb.New(size).SetUnits(pb.U_BYTES)
+	bar.Start()
+
 	vw := d.Verifier()
-	mw := io.MultiWriter(vw, fh)
+	mw := io.MultiWriter(vw, fh, bar)
 
 	if _, err = io.Copy(mw, resp.Body); err != nil {
 		return "", errors.Wrapf(err, "filename = %s", fn)
 	}
+
+	bar.Finish()
 
 	if !vw.Verified() {
 		return quitUnVerified(fn, fh, err)
