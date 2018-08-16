@@ -101,52 +101,20 @@ func TestCryptoBlobs(t *testing.T) {
 
 	enc, err := blob.EncryptBlob(opts, encpath)
 	if err != nil {
-		t.Error(err)
 		return
-	}
-
-	fi, err := os.Stat(encpath)
-	if err != nil {
-		t.Error(err)
-		return
-	} else if fi.Size() != enc.GetSize() {
-		t.Error(errors.Errorf("encrypted file is incorrect size: %d vs %d", fi.Size(), enc.GetSize()))
 	}
 
 	dec, err := enc.DecryptBlob(opts, decpath)
 	if err != nil {
+		return
+	}
+
+	if err = blobTest(t, dir, fn, encpath, decpath, blob, enc, dec); err != nil {
 		t.Error(err)
-		return
-	}
-
-	fi, err = os.Stat(decpath)
-	if err != nil {
-		t.Error(err)
-		return
-	} else if fi.Size() != dec.GetSize() {
-		t.Error(errors.Errorf("decrypted file is incorrect size: %d vs %d", fi.Size(), dec.GetSize()))
-	}
-
-	equal, err := equalfile.CompareFile(fn, dec.GetFilename())
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	if !equal {
-		showContents(t, fn, decpath)
-		return
-	}
-
-	if blob.GetDigest().String() != dec.GetDigest().String() {
-		t.Errorf("digests do not match: orig: %s decrypted: %s", blob.GetDigest(), dec.GetDigest())
-		return
 	}
 }
 
 func TestCompressBlobs(t *testing.T) {
-	opts.SetPassphrase(passphrase)
-
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
 	size, d, fn, err := mkConstFile(t, dir)
 	if err != nil {
@@ -164,49 +132,60 @@ func TestCompressBlobs(t *testing.T) {
 
 	blob := distribution.NewPlainLayer(fn, d, size)
 
-	com, err := blob.Compress(compath)
+	comp, err := blob.Compress(compath)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	fi, err := os.Stat(compath)
-	if err != nil {
-		t.Error(err)
-		return
-	} else if fi.Size() != com.GetSize() {
-		t.Error(errors.Errorf("compressed file is incorrect size: %d vs %d", fi.Size(), com.GetSize()))
-	}
-
-	dec, err := com.Decompress(decpath)
+	dec, err := comp.Decompress(decpath)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	fi, err = os.Stat(decpath)
-	if err != nil {
+	if err = blobTest(t, dir, fn, compath, decpath, blob, comp, dec); err != nil {
 		t.Error(err)
+	}
+}
+
+func blobTest(
+	t *testing.T,
+	dir, filename, convpath, deconvpath string,
+	blob, conv, deconv distribution.Blob,
+) (err error) {
+	fi, err := os.Stat(convpath)
+	if err != nil {
 		return
-	} else if fi.Size() != dec.GetSize() {
-		t.Error(errors.Errorf("decompressed file is incorrect size: %d vs %d", fi.Size(), dec.GetSize()))
+	} else if fi.Size() != conv.GetSize() {
+		t.Error(errors.Errorf("converted file is incorrect size: %d vs %d", fi.Size(), conv.GetSize()))
 	}
 
-	equal, err := equalfile.CompareFile(fn, dec.GetFilename())
+	fi, err = os.Stat(deconvpath)
 	if err != nil {
-		t.Error(err)
+		return
+	} else if fi.Size() != deconv.GetSize() {
+		t.Error(errors.Errorf("decompressed file is incorrect size: %d vs %d", fi.Size(), deconv.GetSize()))
+	}
+
+	equal, err := equalfile.CompareFile(filename, deconv.GetFilename())
+	if err != nil {
 		return
 	}
 
 	if !equal {
-		showContents(t, fn, decpath)
+		showContents(t, filename, deconvpath)
 		return
 	}
 
-	if blob.GetDigest().String() != dec.GetDigest().String() {
-		t.Errorf("digests do not match: orig: %s decrypted: %s", blob.GetDigest(), dec.GetDigest())
-		return
+	if blob.GetDigest().String() != deconv.GetDigest().String() {
+		err = errors.Errorf(
+			"digests do not match: orig: %s decrypted: %s",
+			blob.GetDigest(),
+			deconv.GetDigest(),
+		)
 	}
+	return
 }
 
 func mkConstFile(t *testing.T, dir string) (_ int64, _ digest.Digest, _ string, err error) {
@@ -267,10 +246,10 @@ func mkRandFile(t *testing.T, dir string) (_ int64, _ digest.Digest, _ string, e
 	return n, digester.Digest(), fn, nil
 }
 
-func showContents(t *testing.T, fn, decpath string) {
+func showContents(t *testing.T, fn, decpath string) error {
 	a := readFile(t, fn)
 	b := readFile(t, decpath)
-	t.Errorf("decryption is not inverting encryption:\nPlaintext: %v\nDecrypted: %v", a, b)
+	return errors.Errorf("decryption is not inverting encryption:\nPlaintext: %v\nDecrypted: %v", a, b)
 }
 
 func readFile(t *testing.T, filename string) []byte {
