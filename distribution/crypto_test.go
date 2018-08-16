@@ -16,6 +16,7 @@ package distribution_test
 
 import (
 	"crypto/rand"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -27,6 +28,7 @@ import (
 	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/google/uuid"
 	digest "github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 	"github.com/udhos/equalfile"
 )
 
@@ -75,92 +77,126 @@ func TestCryptoBlobs(t *testing.T) {
 	opts.SetPassphrase(passphrase)
 
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
-	size, d, fn := mkTempFile(t, dir)
+	size, d, fn, err := mkRandFile(t, dir)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 	encpath := filepath.Join(dir, "enc")
 	decpath := filepath.Join(dir, "dec")
 
+	defer func() {
+		if err = os.RemoveAll(dir); err != nil {
+			t.Logf(err.Error())
+		}
+	}()
+
 	c, err := distribution.NewDecrypto(opts)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
+		return
 	}
 
 	blob := distribution.NewLayer(fn, d, size, c)
 
-	enc, err := blob.EncryptBlob(opts, encpath+"file")
+	enc, err := blob.EncryptBlob(opts, encpath)
 	if err != nil {
-		t.Error(err)
+		return
 	}
 
-	dec, err := enc.DecryptBlob(opts, encpath+"file")
+	dec, err := enc.DecryptBlob(opts, decpath)
 	if err != nil {
-		t.Error(err)
+		return
 	}
 
-	equal, err := equalfile.CompareFile(fn, dec.GetFilename())
-	if err != nil {
+	if err = blobTest(t, dir, fn, encpath, decpath, blob, enc, dec); err != nil {
 		t.Error(err)
-	}
-
-	if !equal {
-		handleError(t, fn, decpath)
-
-		if blob.GetDigest().String() != dec.GetDigest().String() {
-			t.Errorf("digests do not match: orig: %s decrypted: %s", blob.GetDigest(), dec.GetDigest())
-		}
-
-		if err = os.RemoveAll(dir); err != nil {
-			t.Logf(err.Error())
-		}
 	}
 }
 
 func TestCompressBlobs(t *testing.T) {
-	opts.SetPassphrase(passphrase)
-
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
-	size, d, fn := createTempFile(t, dir)
+	size, d, fn, err := mkConstFile(t, dir)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 	compath := filepath.Join(dir, "enc.gz")
 	decpath := filepath.Join(dir, "dec")
 
+	defer func() {
+		if err = os.RemoveAll(dir); err != nil {
+			t.Logf(err.Error())
+		}
+	}()
+
 	blob := distribution.NewPlainLayer(fn, d, size)
 
-	com, err := blob.Compress(compath)
+	comp, err := blob.Compress(compath)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
+		return
 	}
 
-	dec, err := com.Decompress(decpath)
+	dec, err := comp.Decompress(decpath)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
+		return
 	}
 
-	equal, err := equalfile.CompareFile(fn, dec.GetFilename())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !equal {
-		handleError(t, fn, decpath)
-	}
-
-	if blob.GetDigest().String() != dec.GetDigest().String() {
-		t.Errorf("digests do not match: orig: %s decrypted: %s", blob.GetDigest(), dec.GetDigest())
-	}
-
-	if err = os.RemoveAll(dir); err != nil {
-		t.Logf(err.Error())
+	if err = blobTest(t, dir, fn, compath, decpath, blob, comp, dec); err != nil {
+		t.Error(err)
 	}
 }
 
-func createTempFile(t *testing.T, dir string) (int64, digest.Digest, string) {
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		t.Fatal(err)
+func blobTest(
+	t *testing.T,
+	dir, filename, convpath, deconvpath string,
+	blob, conv, deconv distribution.Blob,
+) (err error) {
+	fi, err := os.Stat(convpath)
+	if err != nil {
+		return
+	} else if fi.Size() != conv.GetSize() {
+		t.Error(errors.Errorf("converted file is incorrect size: %d vs %d", fi.Size(), conv.GetSize()))
+	}
+
+	fi, err = os.Stat(deconvpath)
+	if err != nil {
+		return
+	} else if fi.Size() != deconv.GetSize() {
+		t.Error(errors.Errorf("decompressed file is incorrect size: %d vs %d", fi.Size(), deconv.GetSize()))
+	}
+
+	equal, err := equalfile.CompareFile(filename, deconv.GetFilename())
+	if err != nil {
+		return
+	}
+
+	if !equal {
+		showContents(t, filename, deconvpath)
+		return
+	}
+
+	if blob.GetDigest().String() != deconv.GetDigest().String() {
+		err = errors.Errorf(
+			"digests do not match: orig: %s decrypted: %s",
+			blob.GetDigest(),
+			deconv.GetDigest(),
+		)
+	}
+	return
+}
+
+func mkConstFile(t *testing.T, dir string) (_ int64, _ digest.Digest, _ string, err error) {
+	if err = os.MkdirAll(dir, 0700); err != nil {
+		return
 	}
 
 	file := filepath.Join(dir, "plain")
 	fh, err := os.Create(file)
 	if err != nil {
-		t.Fatal(err)
+		return
 	}
 	defer func() {
 		if err = fh.Close(); err != nil {
@@ -175,21 +211,21 @@ func createTempFile(t *testing.T, dir string) (int64, digest.Digest, string) {
 
 	n, err := io.CopyN(mw, z, 1024)
 	if err != nil {
-		t.Fatal(err)
+		return
 	}
 
-	return n, digester.Digest(), file
+	return n, digester.Digest(), file, nil
 }
 
-func mkTempFile(t *testing.T, dir string) (int64, digest.Digest, string) {
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		t.Error(err)
+func mkRandFile(t *testing.T, dir string) (_ int64, _ digest.Digest, _ string, err error) {
+	if err = os.MkdirAll(dir, 0700); err != nil {
+		return
 	}
 
 	fn := filepath.Join(dir, "plain")
 	fh, err := os.Create(fn)
 	if err != nil {
-		t.Error(err)
+		return
 	}
 	defer func() {
 		if err = fh.Close(); err != nil {
@@ -201,30 +237,29 @@ func mkTempFile(t *testing.T, dir string) (int64, digest.Digest, string) {
 	mw := io.MultiWriter(digester.Hash(), fh)
 
 	r := rand.Reader
-	_, err = io.CopyN(mw, r, 1024)
+
+	n, err := io.CopyN(mw, r, 1024)
 	if err != nil {
-		t.Error(err)
+		return
 	}
 
-	return 1024, digester.Digest(), fn
+	return n, digester.Digest(), fn, nil
 }
 
-func handleError(t *testing.T, fn, decpath string) {
-	fha, err := os.Open(fn)
+func showContents(t *testing.T, fn, decpath string) error {
+	a := readFile(t, fn)
+	b := readFile(t, decpath)
+	return errors.Errorf("decryption is not inverting encryption:\nPlaintext: %v\nDecrypted: %v", a, b)
+}
+
+func readFile(t *testing.T, filename string) []byte {
+	fh, err := os.Open(filename)
 	if err != nil {
-		t.Error(err)
+		return []byte(fmt.Sprintf("[could not read %s]", filename))
 	}
-	a, err := ioutil.ReadAll(fha)
+	contents, err := ioutil.ReadAll(fh)
 	if err != nil {
-		t.Error(err)
+		return []byte(fmt.Sprintf("[could not read %s]", filename))
 	}
-	fhb, err := os.Open(decpath)
-	if err != nil {
-		t.Error(err)
-	}
-	b, err := ioutil.ReadAll(fhb)
-	if err != nil {
-		t.Error(err)
-	}
-	t.Errorf("decryption is not inverting encryption:\nPlaintext: %v\nDecrypted: %v", a, b)
+	return contents
 }

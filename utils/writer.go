@@ -31,10 +31,10 @@ type CounterWriter struct {
 func (cw *CounterWriter) Write(p []byte) (n int, err error) {
 	n, err = cw.Writer.Write(p)
 	if err != nil {
-		return 0, err
+		return
 	}
 	cw.Count += n
-	return cw.Count, nil
+	return
 }
 
 // NewNoNewlineWriter wrap a writer and filters out '\n' runes

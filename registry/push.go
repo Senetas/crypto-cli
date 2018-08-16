@@ -28,6 +28,7 @@ import (
 	"github.com/docker/docker/registry"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	pb "gopkg.in/cheggaaa/pb.v1"
 
 	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/registry/auth"
@@ -249,7 +250,12 @@ func uploadBlob(
 	}
 	// file will be closed by the http client
 
-	req, err := http.NewRequest("PUT", u.String(), blobFH)
+	bar := pb.New(int(blob.GetSize())).SetUnits(pb.U_BYTES)
+	bar.Start()
+
+	pr := bar.NewProxyReader(blobFH)
+
+	req, err := http.NewRequest("PUT", u.String(), pr)
 	if err != nil {
 		return errors.Wrapf(err, "could not make req = %v", req)
 	}
@@ -269,5 +275,7 @@ func uploadBlob(
 	if resp.StatusCode != http.StatusCreated {
 		return errors.Errorf("upload of blob %s failed", blob.GetFilename())
 	}
+
+	bar.Finish()
 	return nil
 }
