@@ -15,6 +15,7 @@
 package images
 
 import (
+	"archive/tar"
 	"context"
 	"encoding/json"
 	"io"
@@ -29,7 +30,6 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	tarinator "github.com/verybluebot/tarinator-go"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
@@ -50,24 +50,27 @@ func CreateManifest(
 	// TODO: fix hardcoded version if necessary
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
 	if err != nil {
-		return nil, utils.StripTrace(errors.Wrap(err, "could not create client for docker daemon"))
+		err = utils.StripTrace(errors.Wrap(err, "could not create client for docker daemon"))
+		return
 	}
 
 	inspt, _, err := cli.ImageInspectWithRaw(ctx, ref.String())
 	if err != nil {
-		return nil, errors.WithStack(err)
+		err = errors.WithStack(err)
+		return
 	}
 
-	tarFH, err := cli.ImageSave(ctx, []string{inspt.ID})
+	imageTar, err := cli.ImageSave(ctx, []string{inspt.ID})
 	if err != nil {
-		return nil, errors.WithStack(err)
+		err = errors.WithStack(err)
+		return
 	}
+	defer func() { err = utils.CheckedClose(imageTar, err) }()
 
 	layers, err := layersToEncrypt(ctx, cli, inspt)
 	if err != nil {
-		return nil, err
+		return
 	}
-	defer func() { err = utils.CheckedClose(tarFH, err) }()
 
 	log.Debug().Msgf("The following layers are to be encrypted: %v", layers)
 
@@ -79,13 +82,13 @@ func CreateManifest(
 	}
 
 	// extract image
-	if err = extractTarBall(tarFH, manifest); err != nil {
-		return nil, err
+	if err = extractTarBall(imageTar, manifest); err != nil {
+		return
 	}
 
 	configBlob, layerBlobs, err := mkBlobs(ref.Path(), ref.Tag(), manifest.DirName, layers, opts)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	manifest.Config = configBlob
@@ -94,31 +97,40 @@ func CreateManifest(
 	return manifest, nil
 }
 
-func extractTarBall(tarFH io.Reader, manifest *distribution.ImageManifest) (err error) {
-	tarfile := manifest.DirName + ".tar"
-
+func extractTarBall(r io.Reader, manifest *distribution.ImageManifest) (err error) {
 	if err = os.MkdirAll(manifest.DirName, 0700); err != nil {
 		return errors.Wrapf(err, "could not create: %s", manifest.DirName)
 	}
 
-	outFH, err := os.Create(tarfile)
-	if err != nil {
-		return errors.Wrapf(err, "could not create: %s", tarfile)
-	}
-	defer func() { err = utils.CheckedClose(outFH, err) }()
+	tarReader := tar.NewReader(r)
 
-	if _, err = io.Copy(outFH, tarFH); err != nil {
-		return errors.Wrapf(err, "could not extract to %s", tarfile)
-	}
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
 
-	if err = outFH.Sync(); err != nil {
-		return errors.Wrapf(err, "could not sync file: %s", tarfile)
-	}
+		path := filepath.Join(manifest.DirName, header.Name)
+		info := header.FileInfo()
+		if info.IsDir() {
+			if err = os.MkdirAll(path, info.Mode()); err != nil {
+				return errors.WithStack(err)
+			}
+			continue
+		}
 
-	if err = tarinator.UnTarinate(manifest.DirName, tarfile); err != nil {
-		return err
+		file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
+		if err != nil {
+			return err
+		}
+		defer func() { err = file.Close() }()
+		_, err = io.Copy(file, tarReader)
+		if err != nil {
+			return err
+		}
 	}
-
 	return nil
 }
 
@@ -142,13 +154,14 @@ func mkBlobs(
 	manifestfile := filepath.Join(path, "manifest.json")
 	manifestFH, err := os.Open(manifestfile)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "could not open file: %s", manifestfile)
+		err = errors.Wrapf(err, "could not open file: %s", manifestfile)
+		return
 	}
 	defer func() { err = utils.CheckedClose(manifestFH, err) }()
 
 	image, err := mkArchiveStruct(path, manifestFH)
 	if err != nil {
-		return nil, nil, err
+		return
 	}
 
 	switch opts.EncType {
