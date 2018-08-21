@@ -26,6 +26,7 @@ import (
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
+	"github.com/Senetas/crypto-cli/utils"
 	"github.com/google/uuid"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -40,15 +41,6 @@ var (
 		Compat:  false,
 	}
 )
-
-type ConstReader byte
-
-func (r ConstReader) Read(b []byte) (int, error) {
-	for i := range b {
-		b[i] = byte(r)
-	}
-	return len(b), nil
-}
 
 func TestCrypto(t *testing.T) {
 	opts.SetPassphrase(passphrase)
@@ -207,7 +199,7 @@ func mkConstFile(t *testing.T, dir string) (_ int64, _ digest.Digest, _ string, 
 	digester := digest.Canonical.Digester()
 	mw := io.MultiWriter(digester.Hash(), fh)
 
-	z := ConstReader(0)
+	z := utils.ConstReader(0)
 
 	n, err := io.CopyN(mw, z, 1024)
 	if err != nil {

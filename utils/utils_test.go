@@ -19,9 +19,11 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/Senetas/crypto-cli/utils"
@@ -118,4 +120,36 @@ func TestNoNewlineWriter(t *testing.T) {
 
 	assert.Equal(len(correct), cw.Count)
 	assert.Equal(correct, out.Bytes())
+}
+
+func TestResetReader(t *testing.T) {
+	assert := assert.New(t)
+
+	correct := []byte("01234567890")
+	r := bytes.NewReader(correct)
+	trr := utils.NewResetReader(r, func() { t.Log("Hello") })
+	out := &bytes.Buffer{}
+	n, err := io.Copy(out, trr)
+	assert.Nil(err)
+
+	assert.Equal(len(correct), int(n))
+	assert.Equal(correct, out.Bytes())
+}
+
+func TestLargeResetReader(t *testing.T) {
+	assert := assert.New(t)
+
+	dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
+	defer os.RemoveAll(dir)
+	zr := utils.ConstReader(1)
+	trr := utils.NewResetReader(zr, func() { t.Log("Hello") })
+
+	fh, err := os.Create(dir)
+	assert.Nil(err)
+
+	N := 1024*1024 + 120
+	n, err := io.CopyN(fh, trr, int64(N))
+	assert.Nil(err)
+
+	assert.Equal(N, int(n))
 }

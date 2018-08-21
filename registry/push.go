@@ -15,12 +15,13 @@
 package registry
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
+	"time"
 
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/v2"
@@ -248,34 +249,61 @@ func uploadBlob(
 	if err != nil {
 		return errors.Wrapf(err, "could not open: %s", blob.GetFilename())
 	}
-	// file will be closed by the http client
+	defer func() { err = utils.CheckedClose(blobFH, err) }()
 
+	// timeout
+	ctx, cancel := context.WithCancel(context.Background())
+	timer := time.AfterFunc(10*time.Second, cancel)
 	bar := pb.New(int(blob.GetSize())).SetUnits(pb.U_BYTES)
-	bar.Start()
-
 	pr := bar.NewProxyReader(blobFH)
+	trr := utils.NewResetReader(pr, func() { timer.Reset(20 * time.Second) })
 
-	req, err := http.NewRequest("PUT", u.String(), pr)
+	errCh := make(chan error)
+	defer close(errCh)
+
+	req, err := http.NewRequest("PUT", u.String(), trr)
 	if err != nil {
 		return errors.Wrapf(err, "could not make req = %v", req)
 	}
 
-	req.Header.Add("Content-Length", strconv.FormatInt(blob.GetSize(), 10))
-	req.Header.Add("Content-Type", "application/octect-stream")
+	req = req.WithContext(ctx)
+	req.ContentLength = blob.GetSize()
+	req.Header.Set("Content-Type", "application/octect-stream")
 	auth.AddToReqest(token, req)
 
-	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, false, true)
+	go upload(req, bar, blob, errCh)
+
+	select {
+	case <-ctx.Done():
+		return errors.New("request timed out")
+	default:
+	}
+
+	return <-errCh
+}
+
+func upload(
+	req *http.Request,
+	bar *pb.ProgressBar,
+	blob distribution.Blob,
+	errCh chan<- error,
+) {
+	bar.Start()
+
+	resp, err := httpclient.DoRequest(http.DefaultClient, req, false, true)
 	if resp != nil {
 		defer func() { err = utils.CheckedClose(resp.Body, err) }()
 	}
 	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode != http.StatusCreated {
-		return errors.Errorf("upload of blob %s failed", blob.GetFilename())
+		errCh <- err
+		return
 	}
 
 	bar.Finish()
-	return nil
+
+	if resp.StatusCode != http.StatusCreated {
+		errCh <- errors.Errorf("upload of blob %s failed with status %s", blob.GetFilename(), resp.Status)
+	}
+
+	errCh <- nil
 }

@@ -15,6 +15,7 @@
 package utils
 
 import (
+	"bytes"
 	"io"
 
 	"golang.org/x/text/runes"
@@ -41,4 +42,39 @@ func (cw *CounterWriter) Write(p []byte) (n int, err error) {
 func NewNoNewlineWriter(w io.Writer) io.Writer {
 	t := runes.Remove(runes.In(rangetable.New('\n')))
 	return transform.NewWriter(w, t)
+}
+
+// ResetReader is an io.Reader that reads from r and calls
+// resetfn every time Read() is called
+type ResetReader struct {
+	reader  io.Reader
+	resetfn func()
+}
+
+// NewResetReader creates a new ResetReader that reads from r and calls
+// resetfn every time Read() is called
+func NewResetReader(r io.Reader, f func()) *ResetReader {
+	return &ResetReader{
+		reader:  r,
+		resetfn: f,
+	}
+}
+
+func (trr *ResetReader) Read(p []byte) (n int, err error) {
+	b := &bytes.Buffer{}
+	m, err := io.CopyN(b, trr.reader, int64(len(p)))
+	copy(p, b.Bytes())
+	n += int(m)
+	trr.resetfn()
+	return
+}
+
+// ConstReader is a stream of a constant byte
+type ConstReader byte
+
+func (r ConstReader) Read(b []byte) (int, error) {
+	for i := range b {
+		b[i] = byte(r)
+	}
+	return len(b), nil
 }
