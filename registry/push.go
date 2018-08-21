@@ -15,13 +15,12 @@
 package registry
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
-	"time"
+	"strconv"
 
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/v2"
@@ -251,64 +250,32 @@ func uploadBlob(
 	}
 	// file will be closed by the http client
 
-	// timeout
-	ctx, cancel := context.WithCancel(context.Background())
-	timer := time.AfterFunc(10*time.Second, cancel)
 	bar := pb.New(int(blob.GetSize())).SetUnits(pb.U_BYTES)
+	bar.Start()
+
 	pr := bar.NewProxyReader(blobFH)
-	trr := utils.NewResetReader(pr, 512, func() { timer.Reset(2 * time.Second) })
 
-	errCh := make(chan error)
-	defer close(errCh)
-
-	go upload(ctx, u, token, trr, blob, bar, errCh)
-
-	return <-errCh
-}
-
-func upload(
-	ctx context.Context,
-	u dauth.Scope,
-	token dauth.Scope,
-	reader io.Reader,
-	blob distribution.Blob,
-	bar *pb.ProgressBar,
-	errCh chan<- error,
-) {
-	req, err := http.NewRequest("PUT", u.String(), reader)
+	req, err := http.NewRequest("PUT", u.String(), pr)
 	if err != nil {
-		errCh <- errors.Wrapf(err, "could not make req = %v", req)
-		return
+		return errors.Wrapf(err, "could not make req = %v", req)
 	}
 
-	req.ContentLength = blob.GetSize()
-	req.Header.Set("Content-Type", "application/octect-stream")
+	req.Header.Add("Content-Length", strconv.FormatInt(blob.GetSize(), 10))
+	req.Header.Add("Content-Type", "application/octect-stream")
 	auth.AddToReqest(token, req)
-
-	bar.Start()
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, false, true)
 	if resp != nil {
 		defer func() { err = utils.CheckedClose(resp.Body, err) }()
 	}
 	if err != nil {
-		errCh <- err
-		return
-	}
-
-	bar.Finish()
-
-	// detect if we timed out
-	select {
-	case <-ctx.Done():
-		errCh <- errors.New("request timed out")
-		return
-	default:
+		return err
 	}
 
 	if resp.StatusCode != http.StatusCreated {
-		errCh <- errors.Errorf("upload of blob %s failed with status %s", blob.GetFilename(), resp.Status)
+		return errors.Errorf("upload of blob %s failed", blob.GetFilename())
 	}
 
-	errCh <- nil
+	bar.Finish()
+	return nil
 }

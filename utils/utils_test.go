@@ -119,36 +119,3 @@ func TestNoNewlineWriter(t *testing.T) {
 	assert.Equal(len(correct), cw.Count)
 	assert.Equal(correct, out.Bytes())
 }
-
-func TestResetReader(t *testing.T) {
-	assert := assert.New(t)
-
-	correct := []byte("01234567890")
-	r := bytes.NewReader(correct)
-	trr := utils.NewResetReader(r, 2, func() { t.Log("Hello") })
-	out := &bytes.Buffer{}
-	n, err := io.Copy(out, trr)
-	assert.Nil(err)
-
-	assert.Equal(len(correct), int(n))
-	assert.Equal(correct, out.Bytes())
-}
-
-func TestLargeResetReader(t *testing.T) {
-	assert := assert.New(t)
-
-	source := []byte("01234567890")
-	var correct []byte
-	for i := 0; i < 64001; i++ {
-		correct = append(correct, source...)
-	}
-
-	r := bytes.NewReader(correct)
-	trr := utils.NewResetReader(r, 2, func() { t.Log("Hello") })
-	out := &bytes.Buffer{}
-	n, err := io.Copy(out, trr)
-	assert.Nil(err)
-
-	assert.Equal(len(correct), int(n))
-	assert.Equal(correct, out.Bytes())
-}
