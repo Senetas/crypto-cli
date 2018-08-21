@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -174,8 +173,6 @@ func PullFromDigest(
 	ctx, cancel := context.WithCancel(context.Background())
 	req = req.WithContext(ctx)
 
-	nameCh := make(chan string)
-	defer close(nameCh)
 	errChan := make(chan error)
 	defer close(errChan)
 
@@ -224,6 +221,7 @@ func download(
 		return
 	}
 
+	// detect if we are timing out
 	select {
 	case <-ctx.Done():
 		errChan <- errors.New("request timed out")
@@ -253,19 +251,13 @@ func respond(
 	fh io.WriteCloser,
 	timer *time.Timer,
 ) (err error) {
-	size, err := strconv.Atoi(resp.Header.Get("Content-Length"))
-	if err != nil {
-		err = errors.WithStack(err)
-		return
-	}
-
-	bar := pb.New(size).SetUnits(pb.U_BYTES)
+	bar := pb.New(int(resp.ContentLength)).SetUnits(pb.U_BYTES)
 	vw := d.Verifier()
 	mw := io.MultiWriter(vw, fh, bar)
 
 	bar.Start()
 
-	// reset timeout evertime there is new data
+	// reset timeout everetime there is new data
 	for {
 		timer.Reset(2 * time.Second)
 		_, err = io.CopyN(mw, resp.Body, 512)
