@@ -15,6 +15,7 @@
 package utils
 
 import (
+	"bytes"
 	"io"
 
 	"golang.org/x/text/runes"
@@ -41,4 +42,54 @@ func (cw *CounterWriter) Write(p []byte) (n int, err error) {
 func NewNoNewlineWriter(w io.Writer) io.Writer {
 	t := runes.Remove(runes.In(rangetable.New('\n')))
 	return transform.NewWriter(w, t)
+}
+
+// ResetReader is a reader that resets a timer every time it reads some
+// number of bytes
+type ResetReader struct {
+	reader        io.Reader
+	resetfn       func()
+	copied, reset int
+}
+
+// NewResetReader creates a new TimerResetReader that reads from r and
+// resets the timer t after every "resetEvery" bytes read
+func NewResetReader(r io.Reader, reset int, f func()) *ResetReader {
+	return &ResetReader{
+		reader:  r,
+		reset:   reset,
+		resetfn: f,
+	}
+}
+
+func (trr *ResetReader) Read(p []byte) (n int, err error) {
+	var i, m int64
+	b := &bytes.Buffer{}
+
+	// copy reset bytes at a time, reseting the timer each time
+	for ; i < int64(len(p)-trr.reset); i = i + m {
+		m, err = io.CopyN(b, trr.reader, int64(trr.reset))
+		n += copy(p[i:i+m], b.Bytes())
+		if err != nil {
+			return
+		}
+
+		trr.copied = (trr.copied + int(m)) % trr.reset
+		trr.resetfn()
+		b.Reset()
+	}
+
+	// take care of left overs, reset if we cross a multiple of reset
+	m, err = io.CopyN(b, trr.reader, int64(len(p)%trr.reset))
+	n += copy(p[i:i+m], b.Bytes())
+	if err != nil {
+		return
+	}
+	trr.copied += int(m)
+	if trr.copied >= trr.reset {
+		trr.copied %= trr.reset
+		trr.resetfn()
+	}
+
+	return n, nil
 }
