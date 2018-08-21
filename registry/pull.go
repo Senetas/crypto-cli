@@ -15,14 +15,13 @@
 package registry
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
+	"strconv"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/distribution/reference"
@@ -154,7 +153,6 @@ func PullFromDigest(
 ) (fn string, err error) {
 	sep := names.SeperateRepository(ref)
 	can := names.AppendDigest(sep, d)
-	fn = filepath.Join(dir, d.Encoded())
 
 	urlStr, err := bldr.BuildBlobURL(can)
 	if err != nil {
@@ -170,103 +168,38 @@ func PullFromDigest(
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	auth.AddToReqest(token, req)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	req = req.WithContext(ctx)
-
-	errChan := make(chan error)
-	defer close(errChan)
-
-	// timeout
-	timer := time.AfterFunc(10*time.Second, cancel)
-
-	go download(ctx, req, timer, dir, fn, d, errChan)
-
-	err = <-errChan
-	return
-}
-
-func quitUnVerified(fn string, fh io.Closer, err error) error {
-	if err2 := os.Remove(fn); err != nil {
-		return errors.Wrapf(
-			utils.Errors{err, err2},
-			"unverified data was NOT deleted. To clean manaually delete: %s",
-			fn,
-		)
-	}
-
-	if err2 := fh.Close(); err2 != nil {
-		return errors.Wrap(
-			utils.Errors{err, err2},
-			"digest verification failed, failed to close, but unverified data was deleted",
-		)
-	}
-
-	return errors.Wrapf(err, "digest verification failed, unverified data deleted")
-}
-
-func download(
-	ctx context.Context,
-	req *http.Request,
-	timer *time.Timer,
-	dir, fn string,
-	d digest.Digest,
-	errChan chan<- error,
-) {
-	resp, err := httpclient.DoRequest(&http.Client{}, req, true, false)
+	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, false)
 	if resp != nil {
 		defer func() { err = utils.CheckedClose(resp.Body, err) }()
 	}
 	if err != nil {
-		errChan <- err
-		return
-	}
-
-	// detect if we are timing out
-	select {
-	case <-ctx.Done():
-		errChan <- errors.New("request timed out")
-		return
-	default:
+		return "", err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		errChan <- errors.Errorf("Failed to download blob %s", fn)
-		return
+		return "", errors.Errorf("Failed to download blob %s", d)
 	}
 
+	fn = filepath.Join(dir, d.Encoded())
 	fh, err := os.Create(fn)
 	if err != nil {
-		errChan <- errors.Wrapf(err, "filename = %s", fn)
-		return
+		return "", errors.Wrapf(err, "filename = %s", fn)
 	}
 	defer func() { err = utils.CheckedClose(fh, err) }()
 
-	errChan <- respond(resp, d, fn, fh, timer)
-}
+	size, err := strconv.Atoi(resp.Header.Get("Content-Length"))
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
 
-func respond(
-	resp *http.Response,
-	d digest.Digest,
-	fn string,
-	fh io.WriteCloser,
-	timer *time.Timer,
-) (err error) {
-	bar := pb.New(int(resp.ContentLength)).SetUnits(pb.U_BYTES)
+	bar := pb.New(size).SetUnits(pb.U_BYTES)
+	bar.Start()
+
 	vw := d.Verifier()
 	mw := io.MultiWriter(vw, fh, bar)
 
-	bar.Start()
-
-	// reset timeout everetime there is new data
-	for {
-		timer.Reset(2 * time.Second)
-		_, err = io.CopyN(mw, resp.Body, 512)
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			err = errors.Wrapf(err, "filename = %s", fn)
-			return
-		}
+	if _, err = io.Copy(mw, resp.Body); err != nil {
+		return "", errors.Wrapf(err, "filename = %s", fn)
 	}
 
 	bar.Finish()
@@ -275,5 +208,26 @@ func respond(
 		return quitUnVerified(fn, fh, err)
 	}
 
-	return nil
+	return fn, nil
+}
+
+func quitUnVerified(fn string, fh io.Closer, err error) (string, error) {
+	if err2 := os.Remove(fn); err != nil {
+		return "",
+			errors.Wrapf(
+				utils.Errors{err, err2},
+				"unverified data was NOT deleted. To clean manaually delete: %s",
+				fn,
+			)
+	}
+
+	if err2 := fh.Close(); err2 != nil {
+		return "",
+			errors.Wrap(
+				utils.Errors{err, err2},
+				"digest verification failed, failed to close, but unverified data was deleted",
+			)
+	}
+
+	return "", errors.Wrapf(err, "digest verification failed, unverified data deleted")
 }
