@@ -179,32 +179,21 @@ func PullFromDigest(
 	// timeout
 	timer := time.AfterFunc(10*time.Second, cancel)
 
-	go download(req, timer, dir, fn, d, errChan)
+	go download(ctx, req, timer, dir, fn, d, errChan)
+
+	select {
+	case <-ctx.Done():
+		err = errors.New("request timed out")
+		return
+	default:
+	}
 
 	err = <-errChan
 	return
 }
 
-func quitUnVerified(fn string, fh io.Closer, err error) error {
-	if err2 := os.Remove(fn); err != nil {
-		return errors.Wrapf(
-			utils.Errors{err, err2},
-			"unverified data was NOT deleted. To clean manaually delete: %s",
-			fn,
-		)
-	}
-
-	if err2 := fh.Close(); err2 != nil {
-		return errors.Wrap(
-			utils.Errors{err, err2},
-			"digest verification failed, failed to close, but unverified data was deleted",
-		)
-	}
-
-	return errors.Wrapf(err, "digest verification failed, unverified data deleted")
-}
-
 func download(
+	ctx context.Context,
 	req *http.Request,
 	timer *time.Timer,
 	dir, fn string,
@@ -232,10 +221,10 @@ func download(
 	}
 	defer func() { err = utils.CheckedClose(fh, err) }()
 
-	errChan <- respond(resp, d, fn, fh, timer)
+	errChan <- processResp(resp, d, fn, fh, timer)
 }
 
-func respond(
+func processResp(
 	resp *http.Response,
 	d digest.Digest,
 	fn string,
@@ -251,7 +240,7 @@ func respond(
 	// reset timeout everetime there is new data
 	for {
 		timer.Reset(2 * time.Second)
-		_, err = io.CopyN(mw, resp.Body, 512)
+		_, err = io.CopyN(mw, resp.Body, 1024)
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -267,4 +256,23 @@ func respond(
 	}
 
 	return nil
+}
+
+func quitUnVerified(fn string, fh io.Closer, err error) error {
+	if err2 := os.Remove(fn); err != nil {
+		return errors.Wrapf(
+			utils.Errors{err, err2},
+			"unverified data was NOT deleted. To clean manaually delete: %s",
+			fn,
+		)
+	}
+
+	if err2 := fh.Close(); err2 != nil {
+		return errors.Wrap(
+			utils.Errors{err, err2},
+			"digest verification failed, failed to close, but unverified data was deleted",
+		)
+	}
+
+	return errors.Wrapf(err, "digest verification failed, unverified data deleted")
 }

@@ -127,7 +127,7 @@ func TestResetReader(t *testing.T) {
 
 	correct := []byte("01234567890")
 	r := bytes.NewReader(correct)
-	trr := utils.NewResetReader(r, 2, func() { t.Log("Hello") })
+	trr := utils.NewResetReader(r, func() { t.Log("Hello") })
 	out := &bytes.Buffer{}
 	n, err := io.Copy(out, trr)
 	assert.Nil(err)
@@ -142,7 +142,7 @@ func TestLargeResetReader(t *testing.T) {
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
 	defer os.RemoveAll(dir)
 	zr := utils.ConstReader(1)
-	trr := utils.NewResetReader(zr, 1023, func() { t.Log("Hello") })
+	trr := utils.NewResetReader(zr, func() { t.Log("Hello") })
 
 	fh, err := os.Create(dir)
 	assert.Nil(err)

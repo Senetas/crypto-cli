@@ -44,55 +44,28 @@ func NewNoNewlineWriter(w io.Writer) io.Writer {
 	return transform.NewWriter(w, t)
 }
 
-// ResetReader is a reader that resets a timer every time it reads some
-// number of bytes
+// ResetReader is an io.Reader that reads from r and calls
+// resetfn every time Read() is called
 type ResetReader struct {
-	reader        io.Reader
-	resetfn       func()
-	copied, reset int
+	reader  io.Reader
+	resetfn func()
 }
 
-// NewResetReader creates a new TimerResetReader that reads from r and
-// resets the timer t after every "resetEvery" bytes read
-func NewResetReader(r io.Reader, reset int, f func()) *ResetReader {
+// NewResetReader creates a new ResetReader that reads from r and calls
+// resetfn every time Read() is called
+func NewResetReader(r io.Reader, f func()) *ResetReader {
 	return &ResetReader{
 		reader:  r,
-		reset:   reset,
 		resetfn: f,
 	}
 }
 
 func (trr *ResetReader) Read(p []byte) (n int, err error) {
-	var i, m int64
 	b := &bytes.Buffer{}
-
-	// copy reset bytes at a time, reseting the timer each time
-	for ; i < int64(len(p)-trr.reset+1); i = i + m {
-		m, err = io.CopyN(b, trr.reader, int64(trr.reset))
-		n += copy(p[i:i+m], b.Bytes())
-		if err != nil {
-			return
-		}
-
-		trr.copied = (trr.copied + int(m)) % trr.reset
-		trr.resetfn()
-		b.Reset()
-	}
-
-	if i < int64(len(p)) {
-		// take care of left overs, reset if we cross a multiple of reset
-		m, err = io.CopyN(b, trr.reader, int64(len(p)%trr.reset))
-		n += copy(p[i:i+m], b.Bytes())
-		if err != nil {
-			return
-		}
-		trr.copied += int(m)
-		if trr.copied >= trr.reset {
-			trr.copied %= trr.reset
-			trr.resetfn()
-		}
-	}
-
+	m, err := io.CopyN(b, trr.reader, int64(len(p)))
+	copy(p, b.Bytes())
+	n += int(m)
+	trr.resetfn()
 	return
 }
 

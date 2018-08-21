@@ -249,36 +249,21 @@ func uploadBlob(
 	if err != nil {
 		return errors.Wrapf(err, "could not open: %s", blob.GetFilename())
 	}
-	// file will be closed by the http client
+	defer func() { err = utils.CheckedClose(blobFH, err) }()
 
 	// timeout
 	ctx, cancel := context.WithCancel(context.Background())
 	timer := time.AfterFunc(10*time.Second, cancel)
 	bar := pb.New(int(blob.GetSize())).SetUnits(pb.U_BYTES)
 	pr := bar.NewProxyReader(blobFH)
-	trr := utils.NewResetReader(pr, 512, func() { timer.Reset(2 * time.Second) })
+	trr := utils.NewResetReader(pr, func() { timer.Reset(20 * time.Second) })
 
 	errCh := make(chan error)
 	defer close(errCh)
 
-	go upload(ctx, u, token, trr, blob, bar, errCh)
-
-	return <-errCh
-}
-
-func upload(
-	ctx context.Context,
-	u dauth.Scope,
-	token dauth.Scope,
-	reader io.Reader,
-	blob distribution.Blob,
-	bar *pb.ProgressBar,
-	errCh chan<- error,
-) {
-	req, err := http.NewRequest("PUT", u.String(), reader)
+	req, err := http.NewRequest("PUT", u.String(), trr)
 	if err != nil {
-		errCh <- errors.Wrapf(err, "could not make req = %v", req)
-		return
+		return errors.Wrapf(err, "could not make req = %v", req)
 	}
 
 	req = req.WithContext(ctx)
@@ -286,6 +271,23 @@ func upload(
 	req.Header.Set("Content-Type", "application/octect-stream")
 	auth.AddToReqest(token, req)
 
+	go upload(req, bar, blob, errCh)
+
+	select {
+	case <-ctx.Done():
+		return errors.New("request timed out")
+	default:
+	}
+
+	return <-errCh
+}
+
+func upload(
+	req *http.Request,
+	bar *pb.ProgressBar,
+	blob distribution.Blob,
+	errCh chan<- error,
+) {
 	bar.Start()
 
 	resp, err := httpclient.DoRequest(http.DefaultClient, req, false, true)
