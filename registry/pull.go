@@ -179,7 +179,7 @@ func PullFromDigest(
 	// timeout
 	timer := time.AfterFunc(10*time.Second, cancel)
 
-	go download(ctx, req, timer, dir, fn, d, errChan)
+	go download(req, timer, dir, fn, d, errChan)
 
 	err = <-errChan
 	return
@@ -205,7 +205,6 @@ func quitUnVerified(fn string, fh io.Closer, err error) error {
 }
 
 func download(
-	ctx context.Context,
 	req *http.Request,
 	timer *time.Timer,
 	dir, fn string,
@@ -219,14 +218,6 @@ func download(
 	if err != nil {
 		errChan <- err
 		return
-	}
-
-	// detect if we are timing out
-	select {
-	case <-ctx.Done():
-		errChan <- errors.New("request timed out")
-		return
-	default:
 	}
 
 	if resp.StatusCode != http.StatusOK {

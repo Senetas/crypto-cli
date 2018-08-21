@@ -67,7 +67,7 @@ func (trr *ResetReader) Read(p []byte) (n int, err error) {
 	b := &bytes.Buffer{}
 
 	// copy reset bytes at a time, reseting the timer each time
-	for ; i < int64(len(p)-trr.reset); i = i + m {
+	for ; i < int64(len(p)-trr.reset+1); i = i + m {
 		m, err = io.CopyN(b, trr.reader, int64(trr.reset))
 		n += copy(p[i:i+m], b.Bytes())
 		if err != nil {
@@ -79,17 +79,29 @@ func (trr *ResetReader) Read(p []byte) (n int, err error) {
 		b.Reset()
 	}
 
-	// take care of left overs, reset if we cross a multiple of reset
-	m, err = io.CopyN(b, trr.reader, int64(len(p)%trr.reset))
-	n += copy(p[i:i+m], b.Bytes())
-	if err != nil {
-		return
-	}
-	trr.copied += int(m)
-	if trr.copied >= trr.reset {
-		trr.copied %= trr.reset
-		trr.resetfn()
+	if i < int64(len(p)) {
+		// take care of left overs, reset if we cross a multiple of reset
+		m, err = io.CopyN(b, trr.reader, int64(len(p)%trr.reset))
+		n += copy(p[i:i+m], b.Bytes())
+		if err != nil {
+			return
+		}
+		trr.copied += int(m)
+		if trr.copied >= trr.reset {
+			trr.copied %= trr.reset
+			trr.resetfn()
+		}
 	}
 
-	return n, nil
+	return
+}
+
+// ConstReader is a stream of a constant byte
+type ConstReader byte
+
+func (r ConstReader) Read(b []byte) (int, error) {
+	for i := range b {
+		b[i] = byte(r)
+	}
+	return len(b), nil
 }

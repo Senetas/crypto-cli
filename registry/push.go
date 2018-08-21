@@ -281,13 +281,14 @@ func upload(
 		return
 	}
 
+	req = req.WithContext(ctx)
 	req.ContentLength = blob.GetSize()
 	req.Header.Set("Content-Type", "application/octect-stream")
 	auth.AddToReqest(token, req)
 
 	bar.Start()
 
-	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, false, true)
+	resp, err := httpclient.DoRequest(http.DefaultClient, req, false, true)
 	if resp != nil {
 		defer func() { err = utils.CheckedClose(resp.Body, err) }()
 	}
@@ -297,14 +298,6 @@ func upload(
 	}
 
 	bar.Finish()
-
-	// detect if we timed out
-	select {
-	case <-ctx.Done():
-		errCh <- errors.New("request timed out")
-		return
-	default:
-	}
 
 	if resp.StatusCode != http.StatusCreated {
 		errCh <- errors.Errorf("upload of blob %s failed with status %s", blob.GetFilename(), resp.Status)
