@@ -100,14 +100,15 @@ func CreateManifest(
 
 func extractTarBall(r io.Reader, size int64, manifest *distribution.ImageManifest) (err error) {
 	if err = os.MkdirAll(manifest.DirName, 0700); err != nil {
-		return errors.Wrapf(err, "could not create: %s", manifest.DirName)
+		err = errors.Wrapf(err, "could not create: %s", manifest.DirName)
+		return
 	}
 
 	log.Info().Msg("Extracting image.")
 	bar := pb.New64(0).SetUnits(pb.U_BYTES)
 	tr := tar.NewReader(r)
-
 	br := bar.NewProxyReader(tr)
+
 	bar.Start()
 
 	for {
@@ -121,36 +122,26 @@ func extractTarBall(r io.Reader, size int64, manifest *distribution.ImageManifes
 		path := filepath.Join(manifest.DirName, header.Name)
 		info := header.FileInfo()
 
-		if info.IsDir() {
+		switch {
+		case info.IsDir():
 			if err = os.MkdirAll(path, info.Mode()); err != nil {
-				return errors.WithStack(err)
+				return err
 			}
-			continue
-		}
-
-		switch info.Name() {
-		case "json":
 			fallthrough
-		case "VERSION":
-			fallthrough
-		case "repositories":
+		case dontExtract(info.Name()):
 			continue
-		default:
 		}
 
 		fh, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
 		if err != nil {
-			return errors.WithStack(err)
+			err = errors.WithStack(utils.CheckedClose(fh, err))
+			return err
 		}
 
 		bar.SetTotal64(bar.Total + header.Size)
 
 		_, err = io.Copy(fh, br)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-
-		if err = fh.Close(); err != nil {
+		if err = utils.CheckedClose(fh, err); err != nil {
 			return err
 		}
 	}
@@ -158,6 +149,10 @@ func extractTarBall(r io.Reader, size int64, manifest *distribution.ImageManifes
 	bar.Finish()
 
 	return nil
+}
+
+func dontExtract(name string) bool {
+	return name == "json" || name == "VERSION" || name == "repositories"
 }
 
 // TODO: find a way to do this by interfacing with the daemon directly
@@ -179,11 +174,11 @@ func mkBlobs(
 	// read the archive manifest
 	manifestfile := filepath.Join(path, "manifest.json")
 	manifestFH, err := os.Open(manifestfile)
+	defer func() { err = utils.CheckedClose(manifestFH, err) }()
 	if err != nil {
 		err = errors.Wrapf(err, "could not open file: %s", manifestfile)
 		return
 	}
-	defer func() { err = utils.CheckedClose(manifestFH, err) }()
 
 	image, err := mkArchiveStruct(path, manifestFH)
 	if err != nil {
@@ -262,11 +257,10 @@ func pbkdf2Aes256GcmEncrypt(
 
 func fileDigest(filename string) (d digest.Digest, err error) {
 	fh, err := os.Open(filename)
+	defer func() { err = utils.CheckedClose(fh, err) }()
 	if err != nil {
 		return
 	}
-	defer func() { err = utils.CheckedClose(fh, err) }()
-
 	return digest.Canonical.FromReader(fh)
 }
 
@@ -335,15 +329,17 @@ type archiveStruct struct {
 	Layers []string
 }
 
-func mkArchiveStruct(path string, manifestFH io.Reader) (*archiveStruct, error) {
+func mkArchiveStruct(path string, manifestFH io.Reader) (a *archiveStruct, err error) {
 	var images []*archiveStruct
 	dec := json.NewDecoder(manifestFH)
-	if err := dec.Decode(&images); err != nil {
-		return nil, errors.Wrapf(err, "error unmarshalling manifest")
+	if err = dec.Decode(&images); err != nil {
+		err = errors.Wrapf(err, "error unmarshalling manifest")
+		return
 	}
 
 	if len(images) < 1 {
-		return nil, errors.New("no image data was found")
+		err = errors.New("no image data was found")
+		return
 	}
 
 	return images[0], nil

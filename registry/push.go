@@ -84,6 +84,7 @@ func PushManifest(
 	pr, pw := io.Pipe()
 	errChan := make(chan error, 1)
 	defer close(errChan)
+
 	go func() {
 		defer func() { errChan <- pw.Close() }()
 		enc := json.NewEncoder(pw)

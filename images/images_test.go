@@ -74,10 +74,6 @@ func testEncDecImage(t *testing.T, opts *crypto.Opts) {
 
 	t.Log(spew.Sdump(manifest))
 
-	if _, err = images.Manifest2Tar(manifest, ref, opts); err != nil {
-		t.Fatalf("%+v", err)
-	}
-
 	equal, err := equalfile.CompareFile(manifest.Config.GetFilename(), decManifest.Config.GetFilename())
 	if err != nil {
 		t.Error(err)
