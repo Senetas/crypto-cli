@@ -254,7 +254,7 @@ func uploadBlob(
 	// timeout
 	ctx, cancel := context.WithCancel(context.Background())
 	timer := time.AfterFunc(10*time.Second, cancel)
-	bar := pb.New(int(blob.GetSize())).SetUnits(pb.U_BYTES)
+	bar := pb.New64(blob.GetSize()).SetUnits(pb.U_BYTES)
 	pr := bar.NewProxyReader(blobFH)
 	trr := utils.NewResetReader(pr, func() { timer.Reset(20 * time.Second) })
 

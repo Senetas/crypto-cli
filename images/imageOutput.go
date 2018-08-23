@@ -30,6 +30,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	pb "gopkg.in/cheggaaa/pb.v1"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
@@ -82,7 +83,7 @@ func CreateManifest(
 	}
 
 	// extract image
-	if err = extractTarBall(imageTar, manifest); err != nil {
+	if err = extractTarBall(imageTar, inspt.Size, manifest); err != nil {
 		return
 	}
 
@@ -97,23 +98,29 @@ func CreateManifest(
 	return manifest, nil
 }
 
-func extractTarBall(r io.Reader, manifest *distribution.ImageManifest) (err error) {
+func extractTarBall(r io.Reader, size int64, manifest *distribution.ImageManifest) (err error) {
 	if err = os.MkdirAll(manifest.DirName, 0700); err != nil {
 		return errors.Wrapf(err, "could not create: %s", manifest.DirName)
 	}
 
-	tarReader := tar.NewReader(r)
+	log.Info().Msg("Extracting image.")
+	bar := pb.New64(0).SetUnits(pb.U_BYTES)
+	tr := tar.NewReader(r)
+
+	br := bar.NewProxyReader(tr)
+	bar.Start()
 
 	for {
-		header, err := tarReader.Next()
+		header, err := tr.Next()
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		path := filepath.Join(manifest.DirName, header.Name)
 		info := header.FileInfo()
+
 		if info.IsDir() {
 			if err = os.MkdirAll(path, info.Mode()); err != nil {
 				return errors.WithStack(err)
@@ -121,16 +128,35 @@ func extractTarBall(r io.Reader, manifest *distribution.ImageManifest) (err erro
 			continue
 		}
 
-		file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
-		if err != nil {
-			return err
+		switch info.Name() {
+		case "json":
+			fallthrough
+		case "VERSION":
+			fallthrough
+		case "repositories":
+			continue
+		default:
 		}
-		defer func() { err = file.Close() }()
-		_, err = io.Copy(file, tarReader)
+
+		fh, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
 		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		bar.SetTotal64(bar.Total + header.Size)
+
+		_, err = io.Copy(fh, br)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		if err = fh.Close(); err != nil {
 			return err
 		}
 	}
+
+	bar.Finish()
+
 	return nil
 }
 
