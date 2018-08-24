@@ -28,7 +28,6 @@ import (
 	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/registry"
 	"github.com/Senetas/crypto-cli/registry/names"
-	"github.com/Senetas/crypto-cli/utils"
 )
 
 // PullImage pulls an image from the registry
@@ -51,8 +50,7 @@ func PullImage(ref reference.Named, opts *crypto.Opts) (err error) {
 		return
 	}
 
-	ir, err := constructImageArchive(manifest, nTRep, opts)
-	defer func() { err = utils.CheckedClose(ir, err) }()
+	_, err = constructImageArchive(manifest, nTRep, opts)
 	if err != nil {
 		return
 	}

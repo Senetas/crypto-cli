@@ -41,10 +41,7 @@ func constructImageArchive(
 	manifest *distribution.ImageManifest,
 	ref auth.Scope,
 	opts *crypto.Opts,
-) (
-	pr io.ReadCloser,
-	err error,
-) {
+) (err error) {
 	newDir := filepath.Join(manifest.DirName, "new")
 	if err = os.MkdirAll(newDir, 0700); err != nil {
 		err = errors.Wrapf(err, "dir name = %s", newDir)
@@ -58,8 +55,9 @@ func constructImageArchive(
 		Layers:   make([]string, len(manifest.Layers)),
 	}
 
-	if err = os.Rename(manifest.Config.GetFilename(), filepath.Join(newDir, newConfig)); err != nil {
-		err = errors.WithStack(err)
+	src, dst := manifest.Config.GetFilename(), filepath.Join(newDir, newConfig)
+	if err = os.Rename(src, dst); err != nil {
+		err = errors.Wrapf(err, "src = %s, dst = %s", src, dst)
 		return
 	}
 
@@ -69,15 +67,13 @@ func constructImageArchive(
 		archiveManifest.Layers[i] = filepath.Join(base, "layer.tar")
 
 		if err = os.MkdirAll(layerDir, 0700); err != nil {
-			err = errors.WithStack(err)
+			err = errors.Wrapf(err, "dir name = %s", layerDir)
 			return
 		}
 
-		if err = os.Rename(
-			l.GetFilename(),
-			filepath.Join(newDir, archiveManifest.Layers[i]),
-		); err != nil {
-			err = errors.WithStack(err)
+		src, dst := l.GetFilename(), filepath.Join(newDir, archiveManifest.Layers[i])
+		if err = os.Rename(src, dst); err != nil {
+			err = errors.Wrapf(err, "src = %s, dst = %s", src, dst)
 			return
 		}
 	}
@@ -85,9 +81,8 @@ func constructImageArchive(
 	manifestfile := filepath.Join(newDir, "manifest.json")
 
 	amFH, err := os.Create(manifestfile)
-	defer func() { err = utils.CheckedClose(amFH, err) }()
 	if err != nil {
-		err = errors.Wrapf(err, "filename = %s", manifestfile)
+		err = utils.CheckedClose(amFH, errors.Wrapf(err, "filename = %s", manifestfile))
 		return
 	}
 
@@ -97,36 +92,25 @@ func constructImageArchive(
 		return
 	}
 
+	if err = amFH.Close(); err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+
 	pr, pw := io.Pipe()
-	errCh := make(chan error, 1)
+	errCh := make(chan error, 3)
 	defer close(errCh)
 
-	go tarit(newDir, pw, errCh)
+	go mkTar(newDir, pw, errCh)
 
-	fh, err := os.Create(filepath.Join(manifest.DirName, "new.tar"))
-	if err != nil {
-		err = errors.WithStack(err)
+	if err = loadArchive(pr); err != nil {
 		return
 	}
 
-	go func() {
-		_, _ = io.Copy(fh, pr)
-		//errCh <- err
-	}()
+	return utils.ConcatErrChan(errCh, 3)
+}
 
-	for i := 0; i < 2; i++ {
-		err = <-errCh
-		if err != nil {
-			return
-		}
-	}
-
-	fh2, err := os.Open(filepath.Join(manifest.DirName, "new.tar"))
-	if err != nil {
-		err = errors.WithStack(err)
-		return
-	}
-
+func loadArchive(pr io.Reader) (err error) {
 	// TODO: stop hardcoding version
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
 	if err != nil {
@@ -134,7 +118,7 @@ func constructImageArchive(
 		return
 	}
 
-	resp, err := cli.ImageLoad(context.Background(), fh2, false)
+	resp, err := cli.ImageLoad(context.Background(), pr, false)
 	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 	if err != nil {
 		err = errors.WithStack(err)
@@ -143,6 +127,7 @@ func constructImageArchive(
 
 	var b bytes.Buffer
 	if _, err = io.Copy(&b, resp.Body); err != nil {
+		err = errors.WithStack(err)
 		return
 	}
 
@@ -151,12 +136,15 @@ func constructImageArchive(
 	return
 }
 
-func tarit(source string, w io.Writer, errCh chan<- error) {
+func mkTar(source string, w io.WriteCloser, errCh chan<- error) {
+	defer func() { errCh <- w.Close() }()
 	tarball := tar.NewWriter(w)
 	defer func() { errCh <- tarball.Close() }()
 
 	errCh <- filepath.Walk(source,
 		func(path string, info os.FileInfo, err error) error {
+			defer func() { log.Debug().Msg("done") }()
+
 			if err != nil {
 				return err
 			}
