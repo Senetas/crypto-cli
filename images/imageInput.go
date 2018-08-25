@@ -22,7 +22,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/docker/distribution/registry/client/auth"
 	"github.com/docker/docker/client"
@@ -42,58 +41,26 @@ func constructImageArchive(
 	ref auth.Scope,
 	opts *crypto.Opts,
 ) (err error) {
-	newDir := filepath.Join(manifest.DirName, "new")
-	if err = os.MkdirAll(newDir, 0700); err != nil {
-		err = errors.Wrapf(err, "dir name = %s", newDir)
-		return
-	}
+	contents := make([]string, len(manifest.Layers)+2)
+	contents[0] = "manifest.json"
 
-	newConfig := utils.FilePathSansExt(filepath.Base(manifest.Config.GetFilename())) + ".json"
+	manifestfile := filepath.Join(manifest.DirName, contents[0])
+
 	archiveManifest := &distribution.ArchiveManifest{
 		RepoTags: []string{ref.String()},
-		Config:   newConfig,
+		Config:   filepath.Base(manifest.Config.GetFilename()),
 		Layers:   make([]string, len(manifest.Layers)),
 	}
 
-	src, dst := manifest.Config.GetFilename(), filepath.Join(newDir, newConfig)
-	if err = os.Rename(src, dst); err != nil {
-		err = errors.Wrapf(err, "src = %s, dst = %s", src, dst)
-		return
-	}
+	contents[1] = archiveManifest.Config
 
 	for i, l := range manifest.Layers {
-		base := utils.FilePathSansExt(filepath.Base(l.GetFilename()))
-		layerDir := filepath.Join(newDir, base)
-		archiveManifest.Layers[i] = filepath.Join(base, "layer.tar")
-
-		if err = os.MkdirAll(layerDir, 0700); err != nil {
-			err = errors.Wrapf(err, "dir name = %s", layerDir)
-			return
-		}
-
-		src, dst := l.GetFilename(), filepath.Join(newDir, archiveManifest.Layers[i])
-		if err = os.Rename(src, dst); err != nil {
-			err = errors.Wrapf(err, "src = %s, dst = %s", src, dst)
-			return
-		}
+		archiveManifest.Layers[i] = filepath.Base(l.GetFilename())
 	}
 
-	manifestfile := filepath.Join(newDir, "manifest.json")
+	copy(contents[2:], archiveManifest.Layers)
 
-	amFH, err := os.Create(manifestfile)
-	if err != nil {
-		err = utils.CheckedClose(amFH, errors.Wrapf(err, "filename = %s", manifestfile))
-		return
-	}
-
-	enc := json.NewEncoder(amFH)
-	if err = enc.Encode(&[]*distribution.ArchiveManifest{archiveManifest}); err != nil {
-		err = errors.Wrapf(err, "%#v", archiveManifest)
-		return
-	}
-
-	if err = amFH.Close(); err != nil {
-		err = errors.WithStack(err)
+	if err = writeArchiveManifestFile(manifestfile, archiveManifest); err != nil {
 		return
 	}
 
@@ -101,7 +68,7 @@ func constructImageArchive(
 	errCh := make(chan error, 3)
 	defer close(errCh)
 
-	go mkTar(newDir, pw, errCh)
+	go mkTar(manifest.DirName, contents, pw, errCh)
 
 	if err = loadArchive(pr); err != nil {
 		return
@@ -110,7 +77,24 @@ func constructImageArchive(
 	return utils.ConcatErrChan(errCh, 3)
 }
 
-func loadArchive(pr io.Reader) (err error) {
+func writeArchiveManifestFile(manifestfile string, archiveManifest *distribution.ArchiveManifest) (err error) {
+	amFH, err := os.Create(manifestfile)
+	if err != nil {
+		err = utils.CheckedClose(amFH, errors.Wrapf(err, "filename = %s", manifestfile))
+		return
+	}
+	defer func() { err = utils.CheckedClose(amFH, err) }()
+
+	enc := json.NewEncoder(amFH)
+	if err = enc.Encode(&[]*distribution.ArchiveManifest{archiveManifest}); err != nil {
+		err = errors.Wrapf(err, "%#v", archiveManifest)
+		return
+	}
+
+	return
+}
+
+func loadArchive(pr io.ReadCloser) (err error) {
 	// TODO: stop hardcoding version
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
 	if err != nil {
@@ -136,43 +120,43 @@ func loadArchive(pr io.Reader) (err error) {
 	return
 }
 
-func mkTar(source string, w io.WriteCloser, errCh chan<- error) {
+func mkTar(dir string, contents []string, w io.WriteCloser, errCh chan<- error) {
 	defer func() { errCh <- w.Close() }()
 	tarball := tar.NewWriter(w)
 	defer func() { errCh <- tarball.Close() }()
 
-	errCh <- filepath.Walk(source,
-		func(path string, info os.FileInfo, err error) error {
-			defer func() { log.Debug().Msg("done") }()
+	var err error
+	for _, src := range contents {
+		fullpath := filepath.Join(dir, src)
 
-			if err != nil {
-				return err
-			}
+		info, err := os.Stat(fullpath)
+		if err != nil {
+			break
+		}
 
-			header, err := tar.FileInfoHeader(info, info.Name())
-			if err != nil {
-				return err
-			}
+		header, err := tar.FileInfoHeader(info, info.Name())
+		if err != nil {
+			break
+		}
 
-			header.Name = strings.TrimPrefix(path, source)
+		if err = tarball.WriteHeader(header); err != nil {
+			break
+		}
 
-			if err = tarball.WriteHeader(header); err != nil {
-				return err
-			}
+		file, err := os.Open(fullpath)
+		if err != nil {
+			break
+		}
 
-			if info.IsDir() {
-				return nil
-			}
+		_, err = io.Copy(tarball, file)
+		if err != nil {
+			break
+		}
 
-			file, err := os.Open(path)
-			if err != nil {
-				return err
-			}
-			defer func() { err = utils.CheckedClose(file, err) }()
+		if err = file.Close(); err != nil {
+			break
+		}
+	}
 
-			_, err = io.Copy(tarball, file)
-
-			return err
-		},
-	)
+	errCh <- err
 }

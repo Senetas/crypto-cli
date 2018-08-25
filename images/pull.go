@@ -50,7 +50,7 @@ func PullImage(ref reference.Named, opts *crypto.Opts) (err error) {
 		return
 	}
 
-	_, err = constructImageArchive(manifest, nTRep, opts)
+	err = constructImageArchive(manifest, nTRep, opts)
 	if err != nil {
 		return
 	}
