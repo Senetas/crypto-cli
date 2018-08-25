@@ -24,13 +24,14 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/Senetas/crypto-cli/crypto"
-	"github.com/Senetas/crypto-cli/distribution"
-	"github.com/Senetas/crypto-cli/utils"
 	"github.com/google/uuid"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/udhos/equalfile"
+
+	"github.com/Senetas/crypto-cli/crypto"
+	"github.com/Senetas/crypto-cli/distribution"
+	"github.com/Senetas/crypto-cli/utils"
 )
 
 var (
