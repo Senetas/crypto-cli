@@ -16,12 +16,12 @@ package images
 
 import (
 	"archive/tar"
-	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/docker/distribution/registry/client/auth"
 	"github.com/docker/docker/client"
@@ -94,7 +94,7 @@ func writeArchiveManifestFile(manifestfile string, archiveManifest *distribution
 	return
 }
 
-func loadArchive(pr io.ReadCloser) (err error) {
+func loadArchive(pr io.Reader) (err error) {
 	// TODO: stop hardcoding version
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
 	if err != nil {
@@ -109,15 +109,32 @@ func loadArchive(pr io.ReadCloser) (err error) {
 		return
 	}
 
-	var b bytes.Buffer
-	if _, err = io.Copy(&b, resp.Body); err != nil {
-		err = errors.WithStack(err)
-		return
+	if resp.Body != nil && resp.JSON {
+		dec := json.NewDecoder(resp.Body)
+
+		message := make(map[string]interface{})
+		for dec.More() {
+			err = dec.Decode(&message)
+			if err != nil {
+				err = errors.WithStack(err)
+				return
+			}
+		}
+
+		msg, ok := message["stream"]
+		if ok {
+			msgStr, ok := msg.(string)
+			if ok {
+				log.Info().Msg(strings.TrimSpace(msgStr))
+				return
+			}
+		}
+
+		return errors.New("image load failed for unknown reasons")
 	}
 
-	log.Debug().Msg(b.String())
-
-	return
+	_, err = io.Copy(os.Stderr, resp.Body)
+	return utils.Errors{errors.New("filed to import image"), err}
 }
 
 func mkTar(dir string, contents []string, w io.WriteCloser, errCh chan<- error) {
@@ -129,31 +146,37 @@ func mkTar(dir string, contents []string, w io.WriteCloser, errCh chan<- error) 
 	for _, src := range contents {
 		fullpath := filepath.Join(dir, src)
 
-		info, err := os.Stat(fullpath)
-		if err != nil {
+		info, err2 := os.Stat(fullpath)
+		if err2 != nil {
+			err = errors.WithStack(err2)
 			break
 		}
 
-		header, err := tar.FileInfoHeader(info, info.Name())
-		if err != nil {
+		header, err2 := tar.FileInfoHeader(info, info.Name())
+		if err2 != nil {
+			err = errors.WithStack(err2)
 			break
 		}
 
 		if err = tarball.WriteHeader(header); err != nil {
+			err = errors.WithStack(err)
 			break
 		}
 
-		file, err := os.Open(fullpath)
-		if err != nil {
+		file, err2 := os.Open(fullpath)
+		if err2 != nil {
+			err = errors.WithStack(err2)
 			break
 		}
 
 		_, err = io.Copy(tarball, file)
 		if err != nil {
+			err = errors.WithStack(err)
 			break
 		}
 
 		if err = file.Close(); err != nil {
+			err = errors.WithStack(err)
 			break
 		}
 	}
