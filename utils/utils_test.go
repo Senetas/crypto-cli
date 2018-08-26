@@ -25,6 +25,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/Senetas/crypto-cli/utils"
 )
@@ -143,10 +144,7 @@ func TestNoNewlineWriter(t *testing.T) {
 
 	// io.Copy does not return the right number of written bytes
 	_, err := io.Copy(w, r)
-	assert.Nil(err)
-
-	assert.Equal(len(correct), cw.Count)
-	assert.Equal(correct, out.Bytes())
+	_ = assert.Nil(err) && assert.Equal(len(correct), cw.Count) && assert.Equal(correct, out.Bytes())
 }
 
 func TestResetReader(t *testing.T) {
@@ -157,14 +155,11 @@ func TestResetReader(t *testing.T) {
 	trr := utils.NewResetReader(r, func() { t.Log("Hello") })
 	out := &bytes.Buffer{}
 	n, err := io.Copy(out, trr)
-	assert.Nil(err)
-
-	assert.Equal(len(correct), int(n))
-	assert.Equal(correct, out.Bytes())
+	_ = assert.Nil(err) && assert.Equal(len(correct), int(n)) && assert.Equal(correct, out.Bytes())
 }
 
 func TestLargeResetReader(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
 	defer os.RemoveAll(dir)
@@ -172,11 +167,11 @@ func TestLargeResetReader(t *testing.T) {
 	trr := utils.NewResetReader(zr, func() { t.Log("Hello") })
 
 	fh, err := os.Create(dir)
-	assert.Nil(err)
+	require.Nil(err)
 
 	N := 1024*1024 + 120
 	n, err := io.CopyN(fh, trr, int64(N))
-	assert.Nil(err)
+	require.Nil(err)
 
-	assert.Equal(N, int(n))
+	require.Equal(N, int(n))
 }
