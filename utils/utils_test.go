@@ -89,19 +89,46 @@ func TestFilePathTrailingJoin(t *testing.T) {
 	)
 }
 
+type mockBuffer interface {
+	Bytes() []byte
+	Write(p []byte) (int, error)
+}
+
+type errWriter byte
+
+func newErrWriter() (e *errWriter) {
+	return
+}
+
+func (*errWriter) Write(p []byte) (int, error) {
+	return 0, errors.New("mock write error")
+}
+
+func (*errWriter) Bytes() []byte {
+	return []byte{}
+}
+
 func TestCounterWriter(t *testing.T) {
 	assert := assert.New(t)
 
-	in := []byte("0123456789")
-	r := bytes.NewReader(in)
-	out := bytes.Buffer{}
-	w := &utils.CounterWriter{Writer: &out}
+	tests := []struct {
+		in  []byte
+		out mockBuffer
+	}{
+		{[]byte("0123456789"), &bytes.Buffer{}},
+		{[]byte("0123456789"), newErrWriter()},
+	}
 
-	_, err := io.Copy(w, r)
-	assert.Nil(err)
-
-	assert.Equal(in, out.Bytes())
-	assert.Equal(w.Count, len(in))
+	for _, test := range tests {
+		r := bytes.NewReader(test.in)
+		w := &utils.CounterWriter{Writer: test.out}
+		_, err := io.Copy(w, r)
+		if err != nil {
+			assert.EqualError(err, "mock write error")
+			continue
+		}
+		_ = assert.Equal(test.in, test.out.Bytes()) && assert.Equal(w.Count, len(test.in))
+	}
 }
 
 func TestNoNewlineWriter(t *testing.T) {
