@@ -30,29 +30,29 @@ type EnCrypto struct {
 }
 
 // DecryptKey is the inverse function of EncryptKey (up to error)
-func DecryptKey(e EnCrypto, opts *crypto.Opts) (DeCrypto, error) {
+func DecryptKey(e EnCrypto, opts *crypto.Opts) (d DeCrypto, err error) {
 	if e.Algos != opts.EncType {
 		return DeCrypto{}, utils.NewError("encryption type does not match decryption type", false)
 	}
 
-	d := DeCrypto{Algos: e.Algos}
-
 	decoded, err := base64.URLEncoding.DecodeString(e.EncKey)
 	if err != nil {
-		return DeCrypto{}, errors.WithStack(utils.ErrDecrypt)
+		err = errors.WithStack(utils.ErrDecrypt)
+		return
 	}
 
-	passphrase, err := opts.GetPassphrase()
+	passphrase, err := opts.GetPassphrase(crypto.StdinPassReader)
 	if err != nil {
-		return DeCrypto{}, err
+		return
 	}
 
+	d = DeCrypto{Algos: e.Algos}
 	d.DecKey, err = crypto.Deckey(decoded, passphrase, opts.Salt)
 	if err != nil {
-		return DeCrypto{}, errors.WithStack(utils.ErrDecrypt)
+		return
 	}
 
-	return d, nil
+	return
 }
 
 // DeCrypto is a decrypted key with the algotithms used to encrypt it and the data
@@ -74,20 +74,20 @@ func NewDecrypto(opts *crypto.Opts) (*DeCrypto, error) {
 }
 
 // EncryptKey encrypts a plaintext key with a passphrase and salt
-func EncryptKey(d DeCrypto, opts *crypto.Opts) (EnCrypto, error) {
-	e := EnCrypto{Algos: d.Algos}
-
-	passphrase, err := opts.GetPassphrase()
+func EncryptKey(d DeCrypto, opts *crypto.Opts) (e EnCrypto, err error) {
+	passphrase, err := opts.GetPassphrase(crypto.StdinPassReader)
 	if err != nil {
-		return EnCrypto{}, err
+		return
 	}
 
 	ciphertextKey, err := crypto.Enckey(d.DecKey, passphrase, opts.Salt)
 	if err != nil {
-		return EnCrypto{}, errors.WithStack(utils.ErrEncrypt)
+		err = errors.WithStack(utils.ErrEncrypt)
+		return
 	}
 
+	e = EnCrypto{Algos: d.Algos}
 	e.EncKey = base64.URLEncoding.EncodeToString(ciphertextKey)
 
-	return e, nil
+	return
 }
