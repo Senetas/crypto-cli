@@ -21,6 +21,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+var defaultConfig = sio.Config{
+	MinVersion:   sio.Version20,
+	MaxVersion:   sio.Version20,
+	CipherSuites: []byte{sio.AES_256_GCM},
+}
+
 // EncBlobWriter returns an io.WriteCloser that encrypts written data with
 // the supplied key
 func EncBlobWriter(in io.Writer, key []byte) (io.WriteCloser, error) {
@@ -28,19 +34,10 @@ func EncBlobWriter(in io.Writer, key []byte) (io.WriteCloser, error) {
 		return nil, errors.New("key was of the wrong length")
 	}
 
-	cfg := sio.Config{
-		MinVersion:   sio.Version20,
-		MaxVersion:   sio.Version20,
-		CipherSuites: []byte{sio.AES_256_GCM},
-		Key:          key,
-	}
+	cfg := defaultConfig
+	cfg.Key = key
 
-	out, err := sio.EncryptWriter(in, cfg)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	return out, nil
+	return sio.EncryptWriter(in, cfg)
 }
 
 // DecBlobReader returns an io.Reader that decrypts reads with the supplied key
@@ -49,17 +46,8 @@ func DecBlobReader(in io.Reader, key []byte) (io.Reader, error) {
 		return nil, errors.New("key was of the wrong length")
 	}
 
-	cfg := sio.Config{
-		MinVersion:   sio.Version20,
-		MaxVersion:   sio.Version20,
-		CipherSuites: []byte{sio.AES_256_GCM},
-		Key:          key,
-	}
+	cfg := defaultConfig
+	cfg.Key = key
 
-	out, err := sio.DecryptReader(in, cfg)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	return out, nil
+	return sio.DecryptReader(in, cfg)
 }
