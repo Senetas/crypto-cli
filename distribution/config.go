@@ -20,7 +20,6 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/image"
-	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
@@ -66,10 +65,6 @@ type decConfig struct {
 
 // NewDecConfig creates a new DecConfig
 func NewDecConfig() DecConfig { return &decConfig{} }
-
-func (c *decConfig) Equal(o *decConfig) bool {
-	return cmp.Equal(c.secretFields, o.secretFields) && cmp.Equal(c.clearFields, o.clearFields)
-}
 
 // Sort the keys when marshalling
 func (c *decConfig) MarshalJSON() ([]byte, error) {
