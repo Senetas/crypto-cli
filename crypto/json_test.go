@@ -18,7 +18,6 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/Senetas/crypto-cli/crypto"
@@ -66,7 +65,7 @@ func TestJSONEncDec(t *testing.T) {
 		t.Fatalf("%+v", err)
 	}
 
-	if !cmp.Equal(o, o1) {
+	if !assert.Equal(o, o1) {
 		t.Fatalf("Decryption did not invert Encryption\no = %#v, o1 = %#v", o, o1)
 	}
 }
