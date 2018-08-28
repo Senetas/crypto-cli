@@ -454,14 +454,6 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:cc1452c86faa994969862a5b72d4c4361bc0e832816f0d912c87b1ed65741dc0"
-  name = "github.com/verybluebot/tarinator-go"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "bd5444528f086b8f35e29a42c900bbc87e0e957b"
-
-[[projects]]
-  branch = "master"
   digest = "1:83b51a2d387c8a45d0af63708574cf1a175699cfa8a47ff9bba21f905dd152f3"
   name = "golang.org/x/crypto"
   packages = [
@@ -558,7 +550,6 @@
     "github.com/spf13/pflag",
     "github.com/stretchr/testify/assert",
     "github.com/udhos/equalfile",
-    "github.com/verybluebot/tarinator-go",
     "golang.org/x/crypto/pbkdf2",
     "golang.org/x/crypto/ssh/terminal",
     "golang.org/x/text/runes",

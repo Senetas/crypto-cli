@@ -23,7 +23,6 @@ import (
 	dregistry "github.com/docker/docker/registry"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
@@ -35,36 +34,28 @@ import (
 func PullImage(ref reference.Named, opts *crypto.Opts) (err error) {
 	token, nTRep, endpoint, err := authProcedure(ref)
 	if err != nil {
-		return err
+		return
 	}
 
 	dir := filepath.Join(tempRoot, uuid.New().String())
-	if err = os.MkdirAll(dir, 0700); err != nil {
+
+	err = os.MkdirAll(dir, 0700)
+	defer func() { err = cleanup(dir, err) }()
+	if err != nil {
 		return errors.Wrapf(err, "dir = %s", dir)
 	}
-	defer func() { err = cleanup(dir, err) }()
 
 	manifest, err := pullAndDecrypt(nTRep, token, endpoint, dir, opts)
 	if err != nil {
-		return err
+		return
 	}
 
-	tarball, err := Manifest2Tar(manifest, nTRep, opts)
+	err = constructImageArchive(manifest, nTRep, opts)
 	if err != nil {
-		return err
+		return
 	}
 
-	if err = importImage(tarball); err != nil {
-		return err
-	}
-
-	log.Info().Msg("Image pulled successfully.")
-
-	if err = os.RemoveAll(dir); err != nil {
-		return errors.Wrapf(err, "could not remove temp files in: %s", dir)
-	}
-
-	return nil
+	return
 }
 
 func pullAndDecrypt(
@@ -74,12 +65,12 @@ func pullAndDecrypt(
 	dir string,
 	opts *crypto.Opts,
 ) (
-	*distribution.ImageManifest,
-	error,
+	manifest *distribution.ImageManifest,
+	err error,
 ) {
-	manifest, err := registry.PullImage(token, nTRep, endpoint, opts, dir)
+	manifest, err = registry.PullImage(token, nTRep, endpoint, opts, dir)
 	if err != nil {
-		return nil, err
+		return
 	}
 	return distribution.DecryptManifest(opts, nTRep, manifest)
 }

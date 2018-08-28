@@ -96,3 +96,6 @@ crypto-cli
 
 ### git ###
 *.orig
+
+### trash ###
+.Trash-*

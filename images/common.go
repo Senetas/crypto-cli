@@ -24,6 +24,7 @@ import (
 	"github.com/docker/distribution/registry/api/v2"
 	dregistry "github.com/docker/docker/registry"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/registry"
 	"github.com/Senetas/crypto-cli/registry/auth"
@@ -137,6 +138,8 @@ func authProcedure(ref reference.Named) (
 	if err != nil {
 		return nil, nil, nil, err
 	}
+
+	log.Info().Msg("Authentication successful.")
 
 	return token, nTRep, &endpoint, nil
 }

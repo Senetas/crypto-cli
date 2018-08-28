@@ -177,7 +177,7 @@ func PullFromDigest(
 	defer close(errChan)
 
 	// timeout
-	timer := time.AfterFunc(10*time.Second, cancel)
+	timer := time.AfterFunc(100*time.Second, cancel)
 
 	go download(ctx, req, timer, dir, fn, d, errChan)
 
@@ -239,7 +239,7 @@ func processResp(
 
 	// reset timeout everetime there is new data
 	for {
-		timer.Reset(2 * time.Second)
+		timer.Reset(100 * time.Second)
 		_, err = io.CopyN(mw, resp.Body, 1024)
 		if err == io.EOF {
 			break
