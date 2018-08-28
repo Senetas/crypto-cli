@@ -31,18 +31,19 @@ import (
 )
 
 // PullImage pulls an image from the registry
-func PullImage(ref reference.Named, opts *crypto.Opts) (err error) {
+func PullImage(ref reference.Named, opts *crypto.Opts, tempDir string) (err error) {
 	token, nTRep, endpoint, err := authProcedure(ref)
 	if err != nil {
 		return
 	}
 
-	dir := filepath.Join(tempRoot, uuid.New().String())
+	dir := filepath.Join(tempDir, uuid.New().String())
 
 	err = os.MkdirAll(dir, 0700)
 	defer func() { err = cleanup(dir, err) }()
 	if err != nil {
-		return errors.Wrapf(err, "dir = %s", dir)
+		err = errors.Wrapf(err, "dir = %s", dir)
+		return
 	}
 
 	manifest, err := pullAndDecrypt(nTRep, token, endpoint, dir, opts)
