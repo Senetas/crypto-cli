@@ -48,12 +48,12 @@ func checkFlagsPush(f *pflag.Flag) {
 		if opts.EncType != crypto.None {
 			if !f.Changed {
 				var err error
-				passphrase, err = crypto.GetPassSTDIN("Enter passphrase: ")
+				passphrase, err = crypto.GetPassSTDIN("Enter passphrase: ", crypto.StdinPassReader)
 				if err != nil {
 					log.Fatal().Err(err).Msgf("Could not obtain passphrase")
 				}
 
-				passphrase1, err := crypto.GetPassSTDIN("Re-enter passphrase: ")
+				passphrase1, err := crypto.GetPassSTDIN("Re-enter passphrase: ", crypto.StdinPassReader)
 				if err != nil {
 					log.Fatal().Err(err).Msgf("Could not obtain passphrase")
 				}

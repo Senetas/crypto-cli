@@ -18,12 +18,15 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/Senetas/crypto-cli/crypto"
+	"github.com/Senetas/crypto-cli/utils"
 )
 
 func TestJSONEncDec(t *testing.T) {
+	assert := assert.New(t)
+
 	type test2 struct {
 		B1, B2 int
 	}
@@ -49,6 +52,7 @@ func TestJSONEncDec(t *testing.T) {
 
 	str, err := crypto.EncryptJSON(o, key[:], []byte("hello"))
 	if err != nil {
+		assert.Equal(err, utils.ErrEncrypt)
 		t.Fatalf("%+v", err)
 	}
 
@@ -57,10 +61,11 @@ func TestJSONEncDec(t *testing.T) {
 	o1 := test{}
 
 	if err = crypto.DecryptJSON(str, key[:], []byte("hello"), &o1); err != nil {
+		assert.Equal(err, utils.ErrDecrypt)
 		t.Fatalf("%+v", err)
 	}
 
-	if !cmp.Equal(o, o1) {
+	if !assert.Equal(o, o1) {
 		t.Fatalf("Decryption did not invert Encryption\no = %#v, o1 = %#v", o, o1)
 	}
 }

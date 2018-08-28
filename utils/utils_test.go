@@ -25,6 +25,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/Senetas/crypto-cli/utils"
 )
@@ -89,19 +90,46 @@ func TestFilePathTrailingJoin(t *testing.T) {
 	)
 }
 
+type mockBuffer interface {
+	Bytes() []byte
+	Write(p []byte) (int, error)
+}
+
+type errWriter byte
+
+func newErrWriter() (e *errWriter) {
+	return
+}
+
+func (*errWriter) Write(p []byte) (int, error) {
+	return 0, errors.New("mock write error")
+}
+
+func (*errWriter) Bytes() []byte {
+	return []byte{}
+}
+
 func TestCounterWriter(t *testing.T) {
 	assert := assert.New(t)
 
-	in := []byte("0123456789")
-	r := bytes.NewReader(in)
-	out := bytes.Buffer{}
-	w := &utils.CounterWriter{Writer: &out}
+	tests := []struct {
+		in  []byte
+		out mockBuffer
+	}{
+		{[]byte("0123456789"), &bytes.Buffer{}},
+		{[]byte("0123456789"), newErrWriter()},
+	}
 
-	_, err := io.Copy(w, r)
-	assert.Nil(err)
-
-	assert.Equal(in, out.Bytes())
-	assert.Equal(w.Count, len(in))
+	for _, test := range tests {
+		r := bytes.NewReader(test.in)
+		w := &utils.CounterWriter{Writer: test.out}
+		_, err := io.Copy(w, r)
+		if err != nil {
+			assert.EqualError(err, "mock write error")
+			continue
+		}
+		_ = assert.Equal(test.in, test.out.Bytes()) && assert.Equal(w.Count, len(test.in))
+	}
 }
 
 func TestNoNewlineWriter(t *testing.T) {
@@ -116,10 +144,7 @@ func TestNoNewlineWriter(t *testing.T) {
 
 	// io.Copy does not return the right number of written bytes
 	_, err := io.Copy(w, r)
-	assert.Nil(err)
-
-	assert.Equal(len(correct), cw.Count)
-	assert.Equal(correct, out.Bytes())
+	_ = assert.Nil(err) && assert.Equal(len(correct), cw.Count) && assert.Equal(correct, out.Bytes())
 }
 
 func TestResetReader(t *testing.T) {
@@ -130,14 +155,11 @@ func TestResetReader(t *testing.T) {
 	trr := utils.NewResetReader(r, func() { t.Log("Hello") })
 	out := &bytes.Buffer{}
 	n, err := io.Copy(out, trr)
-	assert.Nil(err)
-
-	assert.Equal(len(correct), int(n))
-	assert.Equal(correct, out.Bytes())
+	_ = assert.Nil(err) && assert.Equal(len(correct), int(n)) && assert.Equal(correct, out.Bytes())
 }
 
 func TestLargeResetReader(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
 	defer os.RemoveAll(dir)
@@ -145,11 +167,11 @@ func TestLargeResetReader(t *testing.T) {
 	trr := utils.NewResetReader(zr, func() { t.Log("Hello") })
 
 	fh, err := os.Create(dir)
-	assert.Nil(err)
+	require.Nil(err)
 
 	N := 1024*1024 + 120
 	n, err := io.CopyN(fh, trr, int64(N))
-	assert.Nil(err)
+	require.Nil(err)
 
-	assert.Equal(N, int(n))
+	require.Equal(N, int(n))
 }

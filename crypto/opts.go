@@ -22,6 +22,9 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
+// StdinPassReader reads a password from stdin
+var StdinPassReader = func() ([]byte, error) { return terminal.ReadPassword(syscall.Stdin) }
+
 // Opts stores data necessary for encryption
 type Opts struct {
 	// whether the encryption data should be stored in a v2.2 compatible manifest or not
@@ -39,11 +42,11 @@ func (o *Opts) SetPassphrase(passphrase string) {
 }
 
 // GetPassphrase prompt the user to enter a passphrase to decrypt
-func (o *Opts) GetPassphrase() (_ string, err error) {
+func (o *Opts) GetPassphrase(passReader func() ([]byte, error)) (_ string, err error) {
 	if !o.passphraseSet {
-		o.passphrase, err = GetPassSTDIN("Enter passphrase: ")
+		o.passphrase, err = GetPassSTDIN("Enter passphrase: ", passReader)
 		if err != nil {
-			return "", err
+			return
 		}
 		o.passphraseSet = true
 	}
@@ -51,11 +54,11 @@ func (o *Opts) GetPassphrase() (_ string, err error) {
 }
 
 // GetPassSTDIN prompte the user for a passphrase
-func GetPassSTDIN(prompt string) (_ string, err error) {
+func GetPassSTDIN(prompt string, passReader func() ([]byte, error)) (_ string, err error) {
 	fmt.Print(prompt)
 	passphrase := []byte{}
 	for len(passphrase) == 0 {
-		passphrase, err = terminal.ReadPassword(syscall.Stdin)
+		passphrase, err = passReader()
 		if err != nil {
 			return "", errors.WithStack(err)
 		}
