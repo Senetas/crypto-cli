@@ -3,7 +3,7 @@
 A command line utility to push and pull encrypted docker images. This is in the pre-alpha proof of concept stage and is not indented for any use other than to prove that Docker Hub may be used to distribute encrypted docker images. Finally, DO NOT use this with your main Docker Hub account for reasons disclosed in the privacy section below.
 
 ## Prerequisites
-Ensure that `docker`, `go` and `dep` are installed and that `$GOPATH` has been set and that `$GOPATH/bin` is in the `$PATH`.
+Ensure that `docker`, `go` are installed and that `$GOPATH` has been set and that `$GOPATH/bin` is in the `$PATH`.
 The following sections provide guidance on how to install these on Ubuntu 18.04 Desktop.
 
 ### Docker
@@ -38,6 +38,25 @@ cd crypto-cli
 go install
 ```
 Note: you may need to use `git@github.com:Senetas/crypto-cli.git` if using ssh keys for authentication.
+
+### Optional: RancherOS
+You may run your docker installation on a virtual machine.
+The following instructions show how to do with with RancherOS, and still use `crypto-cli`.
+
+Install the RancherOS by your preferred method. The one with the least infrastructure requirements is with `docker-machine` and `virtualbox`.
+```
+docker-machine create -d virtualbox \
+    --virtualbox-boot2docker-url https://releases.rancher.com/os/latest/rancheros.iso \
+    --virtualbox-memory 2048 <MACHINE-NAME>
+```
+where `<MACHINE-NAME>` is user generated.
+
+```
+cd $GOPATH/src/github.com/Senetas/crypto-cli
+go build
+docker-machine scp crypto-cli <MACHINE-NAME>:/home/docker
+docker-machine ssh <MACHINE-NAME> sudo mv /home/docker/crypto-cli /usr/bin
+```
 
 ## Usage
 For now the syntax is limited to:
