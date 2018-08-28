@@ -18,7 +18,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/v2"
@@ -34,8 +33,6 @@ import (
 )
 
 const labelString = "LABEL com.senetas.crypto.enabled"
-
-var tempRoot = filepath.Join(os.TempDir(), "com.senetas.crypto")
 
 // useTLS determines whether the registry requires TLS
 func useTLS(

@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -27,11 +28,11 @@ import (
 )
 
 var (
-	ctstr      string
+	typeStr    string
+	tempDir    string
 	passphrase string
 	debug      bool
 	opts       = crypto.Opts{
-		Salt:    "",
 		EncType: crypto.Pbkdf2Aes256Gcm,
 		Compat:  false,
 	}
@@ -55,9 +56,6 @@ downloading them.`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	// use a prettier logger, <nil> timestamp
-	log.Logger = zerolog.New(ConsoleWriter{Out: os.Stderr}).With().Logger()
-
 	if err := rootCmd.Execute(); err != nil {
 		c, ok := errors.Cause(err).(utils.Error)
 		if debug && (!ok || c.HasStack) {
@@ -68,6 +66,9 @@ func Execute() {
 }
 
 func init() {
+	// use a prettier logger, <nil> timestamp
+	log.Logger = zerolog.New(ConsoleWriter{Out: os.Stderr}).With().Logger()
+
 	cobra.OnInitialize(initLogging)
 
 	rootCmd.PersistentFlags().StringVarP(
@@ -85,6 +86,13 @@ If absent, a prompt will be presented.`,
 		"v",
 		false,
 		"Set the log level to debug",
+	)
+
+	rootCmd.PersistentFlags().StringVar(
+		&tempDir,
+		"temp",
+		filepath.Join(os.TempDir(), "com.senetas.crypto"),
+		`Specifies the directory to store temporary files.`,
 	)
 }
 

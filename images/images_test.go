@@ -16,6 +16,7 @@ package images_test
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -27,6 +28,8 @@ import (
 	"github.com/Senetas/crypto-cli/images"
 	"github.com/Senetas/crypto-cli/registry/names"
 )
+
+var tempDir = filepath.Join(os.TempDir(), "com.senetas.crypto")
 
 func createManifest(t *testing.T, opts *crypto.Opts) (
 	*distribution.ImageManifest,
@@ -42,7 +45,7 @@ func createManifest(t *testing.T, opts *crypto.Opts) (
 		t.Fatalf("%+v", err)
 	}
 
-	manifest, err := images.CreateManifest(ref2, opts)
+	manifest, err := images.CreateManifest(ref2, opts, tempDir)
 	if err != nil {
 		t.Fatalf("%+v", err)
 	}

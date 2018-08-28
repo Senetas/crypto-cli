@@ -42,6 +42,7 @@ import (
 func CreateManifest(
 	ref names.NamedTaggedRepository,
 	opts *crypto.Opts,
+	tempDir string,
 ) (
 	manifest *distribution.ImageManifest,
 	err error,
@@ -79,7 +80,7 @@ func CreateManifest(
 	manifest = &distribution.ImageManifest{
 		SchemaVersion: 2,
 		MediaType:     distribution.MediaTypeManifest,
-		DirName:       filepath.Join(tempRoot, uuid.New().String()),
+		DirName:       filepath.Join(tempDir, uuid.New().String()),
 	}
 
 	// extract image
