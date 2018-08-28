@@ -15,6 +15,7 @@
 package distribution_test
 
 import (
+	"bytes"
 	"crypto/rand"
 	"fmt"
 	"io"
@@ -41,6 +42,11 @@ var (
 		EncType: crypto.Pbkdf2Aes256Gcm,
 		Compat:  false,
 	}
+	optsNone = &crypto.Opts{
+		Salt:    "MgSO4(H2O)x",
+		EncType: crypto.None,
+		Compat:  false,
+	}
 	optsCompat = &crypto.Opts{
 		Salt:    "MgSO4(H2O)x",
 		EncType: crypto.Pbkdf2Aes256Gcm,
@@ -56,6 +62,7 @@ func TestCrypto(t *testing.T) {
 		passphrase string
 	}{
 		{opts, passphrase},
+		{optsNone, passphrase},
 		{optsCompat, passphrase},
 	}
 
@@ -77,10 +84,7 @@ func TestCrypto(t *testing.T) {
 			continue
 		}
 
-		if !assert.Equal(*c, d) {
-			t.Fatalf("inversion failed, c = %s, d = %s", c, d)
-		}
-
+		assert.Equal(*c, d)
 	}
 }
 
@@ -90,84 +94,89 @@ func TestCryptoBlobs(t *testing.T) {
 	tests := []struct {
 		opts       *crypto.Opts
 		passphrase string
+		mkFile     func(*testing.T, string) (int64, digest.Digest, string, error)
+		newBlob    func(string, digest.Digest, int64, *distribution.DeCrypto) distribution.DecryptedBlob
 	}{
-		{opts, passphrase},
-		{optsCompat, passphrase},
+		{opts, passphrase, mkRandFile, distribution.NewLayer},
+		{optsNone, "", mkRandFile, distribution.NewLayer},
+		{optsCompat, passphrase, mkRandFile, distribution.NewLayer},
+		{opts, passphrase, mkConfigFile, distribution.NewConfig},
+		{optsNone, "", mkConfigFile, distribution.NewConfig},
+		{optsCompat, passphrase, mkConfigFile, distribution.NewConfig},
 	}
 
 	for _, test := range tests {
 		test.opts.SetPassphrase(test.passphrase)
 
+		c, err := distribution.NewDecrypto(test.opts)
+		if !assert.Nil(err) {
+			continue
+		}
+
 		dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
-		size, d, fn, err := mkRandFile(t, dir)
+		encpath := filepath.Join(dir, "enc")
+		decpath := filepath.Join(dir, "dec")
+
+		size, d, fn, err := test.mkFile(t, dir)
 		defer func() {
 			if err = os.RemoveAll(dir); err != nil {
-				t.Logf(err.Error())
+				t.Error(err)
 			}
 		}()
 		if !assert.Nil(err) {
 			continue
 		}
 
-		encpath := filepath.Join(dir, "enc")
-		decpath := filepath.Join(dir, "dec")
+		blob := test.newBlob(fn, d, size, c)
 
-		c, err := distribution.NewDecrypto(opts)
+		enc, err := blob.EncryptBlob(test.opts, encpath)
 		if !assert.Nil(err) {
 			continue
 		}
 
-		blob := distribution.NewLayer(fn, d, size, c)
-
-		enc, err := blob.EncryptBlob(opts, encpath)
+		dec, err := enc.DecryptBlob(test.opts, decpath)
 		if !assert.Nil(err) {
 			continue
 		}
 
-		dec, err := enc.DecryptBlob(opts, decpath)
+		err = blobTest(t, dir, fn, encpath, decpath, blob, enc, dec)
 		if !assert.Nil(err) {
 			continue
-		}
-
-		if err = blobTest(t, dir, fn, encpath, decpath, blob, enc, dec); err != nil {
-			t.Error(err)
 		}
 	}
 }
 
 func TestCompressBlobs(t *testing.T) {
+	assert := assert.New(t)
+
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
 	size, d, fn, err := mkConstFile(t, dir)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	compath := filepath.Join(dir, "enc.gz")
-	decpath := filepath.Join(dir, "dec")
-
 	defer func() {
 		if err = os.RemoveAll(dir); err != nil {
 			t.Logf(err.Error())
 		}
 	}()
+	if !assert.NoError(err) {
+		return
+	}
+
+	compath := filepath.Join(dir, "enc.gz")
+	decpath := filepath.Join(dir, "dec")
 
 	blob := distribution.NewPlainLayer(fn, d, size)
 
 	comp, err := blob.Compress(compath)
-	if err != nil {
-		t.Error(err)
+	if !assert.NoError(err) {
 		return
 	}
 
 	dec, err := comp.Decompress(decpath)
-	if err != nil {
-		t.Error(err)
+	if !assert.NoError(err) {
 		return
 	}
 
-	if err = blobTest(t, dir, fn, compath, decpath, blob, comp, dec); err != nil {
-		t.Error(err)
-	}
+	err = blobTest(t, dir, fn, compath, decpath, blob, comp, dec)
+	assert.NoError(err)
 }
 
 func blobTest(
@@ -245,14 +254,14 @@ func mkRandFile(t *testing.T, dir string) (_ int64, _ digest.Digest, _ string, e
 
 	fn := filepath.Join(dir, "plain")
 	fh, err := os.Create(fn)
-	if err != nil {
-		return
-	}
 	defer func() {
 		if err = fh.Close(); err != nil {
 			t.Log(err)
 		}
 	}()
+	if err != nil {
+		return
+	}
 
 	digester := digest.Canonical.Digester()
 	mw := io.MultiWriter(digester.Hash(), fh)
@@ -260,6 +269,35 @@ func mkRandFile(t *testing.T, dir string) (_ int64, _ digest.Digest, _ string, e
 	r := rand.Reader
 
 	n, err := io.CopyN(mw, r, 1024)
+	if err != nil {
+		return
+	}
+
+	return n, digester.Digest(), fn, nil
+}
+
+func mkConfigFile(t *testing.T, dir string) (_ int64, _ digest.Digest, _ string, err error) {
+	if err = os.MkdirAll(dir, 0700); err != nil {
+		return
+	}
+
+	fn := filepath.Join(dir, "config")
+	fh, err := os.Create(fn)
+	defer func() {
+		if err = fh.Close(); err != nil {
+			t.Log(err)
+		}
+	}()
+	if err != nil {
+		return
+	}
+
+	digester := digest.Canonical.Digester()
+	mw := io.MultiWriter(digester.Hash(), fh)
+
+	b := bytes.NewReader(config)
+
+	n, err := io.Copy(mw, b)
 	if err != nil {
 		return
 	}
