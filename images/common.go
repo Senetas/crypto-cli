@@ -18,12 +18,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/v2"
 	dregistry "github.com/docker/docker/registry"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/registry"
 	"github.com/Senetas/crypto-cli/registry/auth"
@@ -33,8 +33,6 @@ import (
 )
 
 const labelString = "LABEL com.senetas.crypto.enabled"
-
-var tempRoot = filepath.Join(os.TempDir(), "com.senetas.crypto")
 
 // useTLS determines whether the registry requires TLS
 func useTLS(
@@ -137,6 +135,8 @@ func authProcedure(ref reference.Named) (
 	if err != nil {
 		return nil, nil, nil, err
 	}
+
+	log.Info().Msg("Authentication successful.")
 
 	return token, nTRep, &endpoint, nil
 }

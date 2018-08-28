@@ -18,6 +18,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 )
 
 // PathTrailingJoin is like path.Join but ensures there is a trailing seprator
@@ -28,4 +29,9 @@ func PathTrailingJoin(s ...string) string {
 // FilePathTrailingJoin is like filepath.Join but ensures there is a trailing seprator
 func FilePathTrailingJoin(s ...string) string {
 	return filepath.Join(s...) + string(os.PathSeparator)
+}
+
+// FilePathSansExt trims the extension from a file path
+func FilePathSansExt(path string) string {
+	return strings.TrimSuffix(path, filepath.Ext(path))
 }

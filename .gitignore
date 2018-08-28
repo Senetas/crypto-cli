@@ -99,3 +99,6 @@ crypto-cli
 
 ### test coverage report ###
 cover.html
+
+### trash ###
+.Trash-*

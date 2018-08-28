@@ -55,7 +55,7 @@ func runPull(remote string, opts *crypto.Opts) error {
 		return errors.Wrapf(err, "remote = ", remote)
 	}
 	log.Info().Msgf("Obtaining manifest for image: %s", ref)
-	return images.PullImage(ref, opts)
+	return images.PullImage(ref, opts, tempDir)
 }
 
 func init() {

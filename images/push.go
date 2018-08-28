@@ -22,13 +22,13 @@ import (
 )
 
 // PushImage encrypts then pushes an image
-func PushImage(ref reference.Named, opts *crypto.Opts) (err error) {
+func PushImage(ref reference.Named, opts *crypto.Opts, tempDir string) (err error) {
 	token, nTRep, endpoint, err := authProcedure(ref)
 	if err != nil {
 		return err
 	}
 
-	manifest, err := CreateManifest(nTRep, opts)
+	manifest, err := CreateManifest(nTRep, opts, tempDir)
 	if err != nil {
 		return err
 	}

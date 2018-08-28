@@ -32,9 +32,9 @@ var (
 	}
 	defaultTransport = &http.Transport{
 		Dial: (&net.Dialer{
-			Timeout: 5 * time.Second,
+			Timeout: 20 * time.Second,
 		}).Dial,
-		TLSHandshakeTimeout: 5 * time.Second,
+		TLSHandshakeTimeout: 20 * time.Second,
 	}
 )
 

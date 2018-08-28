@@ -30,6 +30,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	pb "gopkg.in/cheggaaa/pb.v1"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
@@ -41,6 +42,7 @@ import (
 func CreateManifest(
 	ref names.NamedTaggedRepository,
 	opts *crypto.Opts,
+	tempDir string,
 ) (
 	manifest *distribution.ImageManifest,
 	err error,
@@ -78,11 +80,11 @@ func CreateManifest(
 	manifest = &distribution.ImageManifest{
 		SchemaVersion: 2,
 		MediaType:     distribution.MediaTypeManifest,
-		DirName:       filepath.Join(tempRoot, uuid.New().String()),
+		DirName:       filepath.Join(tempDir, uuid.New().String()),
 	}
 
 	// extract image
-	if err = extractTarBall(imageTar, manifest); err != nil {
+	if err = extractTarBall(imageTar, inspt.Size, manifest); err != nil {
 		return
 	}
 
@@ -97,41 +99,61 @@ func CreateManifest(
 	return manifest, nil
 }
 
-func extractTarBall(r io.Reader, manifest *distribution.ImageManifest) (err error) {
+func extractTarBall(r io.Reader, size int64, manifest *distribution.ImageManifest) (err error) {
 	if err = os.MkdirAll(manifest.DirName, 0700); err != nil {
-		return errors.Wrapf(err, "could not create: %s", manifest.DirName)
+		err = errors.Wrapf(err, "could not create: %s", manifest.DirName)
+		return
 	}
 
-	tarReader := tar.NewReader(r)
+	log.Info().Msg("Extracting image.")
+	bar := pb.New64(0).SetUnits(pb.U_BYTES)
+	tr := tar.NewReader(r)
+	br := bar.NewProxyReader(tr)
+
+	bar.Start()
 
 	for {
-		header, err := tarReader.Next()
+		header, err := tr.Next()
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		path := filepath.Join(manifest.DirName, header.Name)
 		info := header.FileInfo()
-		if info.IsDir() {
+
+		switch {
+		case info.IsDir():
 			if err = os.MkdirAll(path, info.Mode()); err != nil {
-				return errors.WithStack(err)
+				return err
 			}
+			fallthrough
+		case dontExtract(info.Name()):
 			continue
 		}
 
-		file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
+		fh, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
 		if err != nil {
+			err = errors.WithStack(utils.CheckedClose(fh, err))
 			return err
 		}
-		defer func() { err = file.Close() }()
-		_, err = io.Copy(file, tarReader)
-		if err != nil {
+
+		bar.SetTotal64(bar.Total + header.Size)
+
+		_, err = io.Copy(fh, br)
+		if err = utils.CheckedClose(fh, err); err != nil {
 			return err
 		}
 	}
+
+	bar.Finish()
+
 	return nil
+}
+
+func dontExtract(name string) bool {
+	return name == "json" || name == "VERSION" || name == "repositories"
 }
 
 // TODO: find a way to do this by interfacing with the daemon directly
@@ -153,11 +175,11 @@ func mkBlobs(
 	// read the archive manifest
 	manifestfile := filepath.Join(path, "manifest.json")
 	manifestFH, err := os.Open(manifestfile)
+	defer func() { err = utils.CheckedClose(manifestFH, err) }()
 	if err != nil {
 		err = errors.Wrapf(err, "could not open file: %s", manifestfile)
 		return
 	}
-	defer func() { err = utils.CheckedClose(manifestFH, err) }()
 
 	image, err := mkArchiveStruct(path, manifestFH)
 	if err != nil {
@@ -236,11 +258,10 @@ func pbkdf2Aes256GcmEncrypt(
 
 func fileDigest(filename string) (d digest.Digest, err error) {
 	fh, err := os.Open(filename)
+	defer func() { err = utils.CheckedClose(fh, err) }()
 	if err != nil {
 		return
 	}
-	defer func() { err = utils.CheckedClose(fh, err) }()
-
 	return digest.Canonical.FromReader(fh)
 }
 
@@ -309,15 +330,17 @@ type archiveStruct struct {
 	Layers []string
 }
 
-func mkArchiveStruct(path string, manifestFH io.Reader) (*archiveStruct, error) {
+func mkArchiveStruct(path string, manifestFH io.Reader) (a *archiveStruct, err error) {
 	var images []*archiveStruct
 	dec := json.NewDecoder(manifestFH)
-	if err := dec.Decode(&images); err != nil {
-		return nil, errors.Wrapf(err, "error unmarshalling manifest")
+	if err = dec.Decode(&images); err != nil {
+		err = errors.Wrapf(err, "error unmarshalling manifest")
+		return
 	}
 
 	if len(images) < 1 {
-		return nil, errors.New("no image data was found")
+		err = errors.New("no image data was found")
+		return
 	}
 
 	return images[0], nil

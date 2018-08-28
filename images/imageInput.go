@@ -15,88 +15,171 @@
 package images
 
 import (
+	"archive/tar"
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/docker/distribution/registry/client/auth"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
-	tarinator "github.com/verybluebot/tarinator-go"
+	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
+	"github.com/Senetas/crypto-cli/utils"
 )
 
-// Manifest2Tar takes a manifest and a target label for the images and creates a tarball that may
-// be loaded with docker load. It downloads and decrypts the config and layers if necessary
-func Manifest2Tar(
+// constructImageArchive takes a manifest and creates a tarball that may be loaded with docker load.
+// It downloads and decrypts the config and layers if necessary. In fact, only a reader of a tarball
+// is return, with an error changed containing errors from writing the tar
+func constructImageArchive(
 	manifest *distribution.ImageManifest,
 	ref auth.Scope,
 	opts *crypto.Opts,
-) (tarball string, err error) {
-	dir := manifest.DirName
+) (err error) {
+	contents := make([]string, len(manifest.Layers)+2)
+	contents[0] = "manifest.json"
 
-	newDir := filepath.Join(dir, "new")
-	if err = os.MkdirAll(newDir, 0700); err != nil {
-		return "", errors.Wrapf(err, "dir name = %s", newDir)
-	}
+	manifestfile := filepath.Join(manifest.DirName, contents[0])
 
 	archiveManifest := &distribution.ArchiveManifest{
-		Config:   filepath.Base(manifest.Config.GetFilename()),
 		RepoTags: []string{ref.String()},
+		Config:   filepath.Base(manifest.Config.GetFilename()),
 		Layers:   make([]string, len(manifest.Layers)),
 	}
+
+	contents[1] = archiveManifest.Config
 
 	for i, l := range manifest.Layers {
 		archiveManifest.Layers[i] = filepath.Base(l.GetFilename())
 	}
 
-	manifestfile := filepath.Join(newDir, "manifest.json")
+	copy(contents[2:], archiveManifest.Layers)
+
+	if err = writeArchiveManifestFile(manifestfile, archiveManifest); err != nil {
+		return
+	}
+
+	pr, pw := io.Pipe()
+	errCh := make(chan error, 3)
+	defer close(errCh)
+
+	go mkTar(manifest.DirName, contents, pw, errCh)
+
+	if err = loadArchive(pr); err != nil {
+		return
+	}
+
+	return utils.ConcatErrChan(errCh, 3)
+}
+
+func writeArchiveManifestFile(manifestfile string, archiveManifest *distribution.ArchiveManifest) (err error) {
 	amFH, err := os.Create(manifestfile)
 	if err != nil {
-		return "", errors.Wrapf(err, "filename = %s", manifestfile)
+		err = utils.CheckedClose(amFH, errors.Wrapf(err, "filename = %s", manifestfile))
+		return
 	}
+	defer func() { err = utils.CheckedClose(amFH, err) }()
 
 	enc := json.NewEncoder(amFH)
 	if err = enc.Encode(&[]*distribution.ArchiveManifest{archiveManifest}); err != nil {
-		return "", errors.Wrapf(err, "%#v", archiveManifest)
+		err = errors.Wrapf(err, "%#v", archiveManifest)
+		return
 	}
 
-	path := filepath.Join(newDir, "*")
-	files, err := filepath.Glob(path)
-	if err != nil {
-		return "", errors.Wrapf(err, "path = %s", path)
-	}
-
-	tarball = filepath.Join(dir, "new.tar")
-	if err = tarinator.Tarinate(files, tarball); err != nil {
-		return "", err
-	}
-
-	return tarball, nil
+	return
 }
 
-func importImage(tarball string) error {
-	// TODO: fix hardcoded version/ check if necessary
+func loadArchive(pr io.Reader) (err error) {
+	// TODO: stop hardcoding version
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
 	if err != nil {
-		return errors.Wrapf(err, "could not load client: %v", client.FromEnv)
+		err = errors.Wrapf(err, "could not load client: %v", client.FromEnv)
+		return
 	}
 
-	fh, err := os.Open(tarball)
+	resp, err := cli.ImageLoad(context.Background(), pr, false)
+	defer func() { err = utils.CheckedClose(resp.Body, err) }()
 	if err != nil {
-		return errors.Wrapf(err, "error opening file: %s", tarball)
+		err = errors.WithStack(err)
+		return
 	}
 
-	resp, err := cli.ImageLoad(context.Background(), fh, false)
-	if err != nil {
-		return errors.Wrapf(err, "error loading image tarball: %s", tarball)
-	}
-	if err = resp.Body.Close(); err != nil {
-		return errors.Wrapf(err, "error closing response body: %v", resp)
+	if resp.Body != nil && resp.JSON {
+		dec := json.NewDecoder(resp.Body)
+
+		message := make(map[string]interface{})
+		for dec.More() {
+			err = dec.Decode(&message)
+			if err != nil {
+				err = errors.WithStack(err)
+				return
+			}
+		}
+
+		msg, ok := message["stream"]
+		if ok {
+			msgStr, ok := msg.(string)
+			if ok {
+				log.Info().Msg(strings.TrimSpace(msgStr))
+				return
+			}
+		}
+
+		return errors.New("image load failed for unknown reasons")
 	}
 
-	return nil
+	_, err = io.Copy(os.Stderr, resp.Body)
+	return utils.Errors{errors.New("filed to import image"), err}
+}
+
+func mkTar(dir string, contents []string, w io.WriteCloser, errCh chan<- error) {
+	defer func() { errCh <- w.Close() }()
+	tarball := tar.NewWriter(w)
+	defer func() { errCh <- tarball.Close() }()
+
+	var err error
+	for _, src := range contents {
+		fullpath := filepath.Join(dir, src)
+
+		info, err2 := os.Stat(fullpath)
+		if err2 != nil {
+			err = errors.WithStack(err2)
+			break
+		}
+
+		header, err2 := tar.FileInfoHeader(info, info.Name())
+		if err2 != nil {
+			err = errors.WithStack(err2)
+			break
+		}
+
+		if err = tarball.WriteHeader(header); err != nil {
+			err = errors.WithStack(err)
+			break
+		}
+
+		file, err2 := os.Open(fullpath)
+		if err2 != nil {
+			err = errors.WithStack(err2)
+			break
+		}
+
+		_, err = io.Copy(tarball, file)
+		if err != nil {
+			err = errors.WithStack(err)
+			break
+		}
+
+		if err = file.Close(); err != nil {
+			err = errors.WithStack(err)
+			break
+		}
+	}
+
+	errCh <- err
 }
