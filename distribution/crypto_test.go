@@ -70,17 +70,17 @@ func TestCrypto(t *testing.T) {
 		test.opts.SetPassphrase(test.passphrase)
 
 		c, err := distribution.NewDecrypto(test.opts)
-		if !assert.Nil(err) {
+		if !assert.NoError(err) {
 			continue
 		}
 
 		e, err := distribution.EncryptKey(*c, test.opts)
-		if !assert.Nil(err) {
+		if !assert.NoError(err) {
 			continue
 		}
 
 		d, err := distribution.DecryptKey(e, test.opts)
-		if !assert.Nil(err) {
+		if !assert.NoError(err) {
 			continue
 		}
 
@@ -88,61 +88,143 @@ func TestCrypto(t *testing.T) {
 	}
 }
 
-func TestCryptoBlobs(t *testing.T) {
-	assert := assert.New(t)
+var tests = []struct {
+	opts       *crypto.Opts
+	passphrase string
+	mkFile     func(*testing.T, string) (int64, digest.Digest, string, error)
+	newBlob    func(string, digest.Digest, int64, *distribution.DeCrypto) distribution.DecryptedBlob
+}{
+	{opts, passphrase, mkRandFile, distribution.NewLayer},
+	{optsNone, "", mkRandFile, distribution.NewLayer},
+	{optsCompat, passphrase, mkRandFile, distribution.NewLayer},
+	{opts, passphrase, mkConfigFile, distribution.NewConfig},
+	{optsNone, "", mkConfigFile, distribution.NewConfig},
+	{optsCompat, passphrase, mkConfigFile, distribution.NewConfig},
+}
 
-	tests := []struct {
-		opts       *crypto.Opts
-		passphrase string
-		mkFile     func(*testing.T, string) (int64, digest.Digest, string, error)
-		newBlob    func(string, digest.Digest, int64, *distribution.DeCrypto) distribution.DecryptedBlob
-	}{
-		{opts, passphrase, mkRandFile, distribution.NewLayer},
-		{optsNone, "", mkRandFile, distribution.NewLayer},
-		{optsCompat, passphrase, mkRandFile, distribution.NewLayer},
-		{opts, passphrase, mkConfigFile, distribution.NewConfig},
-		{optsNone, "", mkConfigFile, distribution.NewConfig},
-		{optsCompat, passphrase, mkConfigFile, distribution.NewConfig},
-	}
+func TestCryptoBlobsEncDec(t *testing.T) {
+	assert := assert.New(t)
 
 	for _, test := range tests {
 		test.opts.SetPassphrase(test.passphrase)
 
 		c, err := distribution.NewDecrypto(test.opts)
-		if !assert.Nil(err) {
+		if !assert.NoError(err) {
 			continue
 		}
 
 		dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
+		defer func() { assert.NoError((utils.CleanUp(dir, nil))) }()
 		encpath := filepath.Join(dir, "enc")
 		decpath := filepath.Join(dir, "dec")
 
 		size, d, fn, err := test.mkFile(t, dir)
-		defer func() {
-			if err = os.RemoveAll(dir); err != nil {
-				t.Error(err)
-			}
-		}()
-		if !assert.Nil(err) {
+		if !assert.NoError(err) {
 			continue
 		}
 
 		blob := test.newBlob(fn, d, size, c)
 
 		enc, err := blob.EncryptBlob(test.opts, encpath)
-		if !assert.Nil(err) {
+		if !assert.NoError(err) {
 			continue
 		}
 
 		dec, err := enc.DecryptBlob(test.opts, decpath)
-		if !assert.Nil(err) {
+		if !assert.NoError(err) {
 			continue
 		}
 
-		err = blobTest(t, dir, fn, encpath, decpath, blob, enc, dec)
-		if !assert.Nil(err) {
+		assert.NoError(blobTest(t, dir, fn, encpath, decpath, blob, enc, dec))
+	}
+}
+
+func TestCryptoBlobsEncDecDec(t *testing.T) {
+	assert := assert.New(t)
+
+	for _, test := range tests {
+		test.opts.SetPassphrase(test.passphrase)
+
+		c, err := distribution.NewDecrypto(test.opts)
+		if !assert.NoError(err) {
 			continue
 		}
+
+		dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
+		defer func() { assert.NoError((utils.CleanUp(dir, nil))) }()
+		encpath := filepath.Join(dir, "enc")
+		decpath := filepath.Join(dir, "dec")
+
+		size, d, fn, err := test.mkFile(t, dir)
+		if !assert.NoError(err) {
+			continue
+		}
+
+		blob := test.newBlob(fn, d, size, c)
+
+		enc, err := blob.EncryptBlob(test.opts, encpath)
+		if !assert.NoError(err) {
+			continue
+		}
+
+		kdec, err := enc.DecryptKey(test.opts)
+		if !assert.NoError(err) {
+			continue
+		}
+
+		dec, err := kdec.DecryptFile(test.opts, decpath)
+		if !assert.NoError(err) {
+			continue
+		}
+
+		assert.NoError(blobTest(t, dir, fn, encpath, decpath, blob, enc, dec))
+	}
+}
+
+func TestCryptoBlobsEncDecEncDec(t *testing.T) {
+	assert := assert.New(t)
+
+	for _, test := range tests {
+		test.opts.SetPassphrase(test.passphrase)
+
+		c, err := distribution.NewDecrypto(test.opts)
+		if !assert.NoError(err) {
+			continue
+		}
+
+		dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
+		defer func() { assert.NoError((utils.CleanUp(dir, nil))) }()
+		encpath := filepath.Join(dir, "enc")
+		decpath := filepath.Join(dir, "dec")
+
+		size, d, fn, err := test.mkFile(t, dir)
+		if !assert.NoError(err) {
+			continue
+		}
+
+		blob := test.newBlob(fn, d, size, c)
+
+		enc, err := blob.EncryptBlob(test.opts, encpath)
+		if !assert.NoError(err) {
+			continue
+		}
+
+		kdec, err := enc.DecryptKey(test.opts)
+		if !assert.NoError(err) {
+			continue
+		}
+
+		enc2, err := kdec.EncryptKey(test.opts)
+		if !assert.NoError(err) {
+			continue
+		}
+
+		dec, err := enc2.DecryptBlob(test.opts, decpath)
+		if !assert.NoError(err) {
+			continue
+		}
+
+		assert.NoError(blobTest(t, dir, fn, encpath, decpath, blob, enc, dec))
 	}
 }
 
@@ -150,12 +232,8 @@ func TestCompressBlobs(t *testing.T) {
 	assert := assert.New(t)
 
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
+	defer func() { assert.NoError((utils.CleanUp(dir, nil))) }()
 	size, d, fn, err := mkConstFile(t, dir)
-	defer func() {
-		if err = os.RemoveAll(dir); err != nil {
-			t.Logf(err.Error())
-		}
-	}()
 	if !assert.NoError(err) {
 		return
 	}
@@ -175,8 +253,7 @@ func TestCompressBlobs(t *testing.T) {
 		return
 	}
 
-	err = blobTest(t, dir, fn, compath, decpath, blob, comp, dec)
-	assert.NoError(err)
+	assert.NoError(blobTest(t, dir, fn, compath, decpath, blob, comp, dec))
 }
 
 func blobTest(

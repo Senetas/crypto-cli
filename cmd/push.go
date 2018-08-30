@@ -29,8 +29,8 @@ var pushCmd = &cobra.Command{
 	Use:   "push [OPTIONS] NAME[:TAG]",
 	Short: "Encrypt an image and then pushed it to a remote repository.",
 	Long: `push will encrypt a docker images and upload it
-to a remote repositories. It maybe used to distribute docker images
-confidentially. It does not sign images so cannot garuntee identities.`,
+to a remote repository. It may be used to distribute docker images
+confidentially. It does not sign images so cannot guarantee identities.`,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		opts.EncType, err = crypto.ValidateAlgos(typeStr)
 		if err != nil {

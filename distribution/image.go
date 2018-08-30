@@ -15,21 +15,37 @@
 package distribution
 
 import (
+	"archive/tar"
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"regexp"
 
-	"github.com/Senetas/crypto-cli/crypto"
-	"github.com/Senetas/crypto-cli/registry/names"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/client"
+	"github.com/google/uuid"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	pb "gopkg.in/cheggaaa/pb.v1"
+
+	"github.com/Senetas/crypto-cli/crypto"
+	"github.com/Senetas/crypto-cli/registry/names"
+	"github.com/Senetas/crypto-cli/utils"
 )
 
 const (
-	saltBase   = "com.senetas.crypto/%s/%s"
-	configSalt = saltBase + "/config"
-	layerSalt  = saltBase + "/layer%d"
+	saltBase    = "com.senetas.crypto/%s/%s"
+	configSalt  = saltBase + "/config"
+	layerSalt   = saltBase + "/layer%d"
+	labelString = "LABEL com.senetas.crypto.enabled"
 )
+
+var createdRE = `#\(nop\)\s+` + labelString + `=(true|false)|(#\(nop\))`
 
 // ImageManifest represents a docker image manifest schema v2.2
 type ImageManifest struct {
@@ -40,15 +56,324 @@ type ImageManifest struct {
 	DirName       string `json:"-"`
 }
 
-func unencryptedConfig(blob *NoncryptedBlob) (Blob, error) {
-	digester := digest.Canonical.Digester()
-	r, err := blob.ReadCloser()
+// NewManifest creates an unencrypted manifest (with the data necessary for encryption)
+func NewManifest(
+	ref names.NamedTaggedRepository,
+	opts *crypto.Opts,
+	tempDir string,
+) (
+	manifest *ImageManifest,
+	err error,
+) {
+	ctx := context.Background()
+
+	// TODO: fix hardcoded version if necessary
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
+	if err != nil {
+		err = utils.StripTrace(errors.Wrap(err, "could not create client for docker daemon"))
+		return
+	}
+
+	inspt, _, err := cli.ImageInspectWithRaw(ctx, ref.String())
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+
+	imageTar, err := cli.ImageSave(ctx, []string{inspt.ID})
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+	defer func() { err = utils.CheckedClose(imageTar, err) }()
+
+	layers, err := layersToEncrypt(ctx, cli, inspt)
+	if err != nil {
+		return
+	}
+
+	log.Debug().Msgf("The following layers are to be encrypted: %v", layers)
+
+	// output manifest
+	manifest = &ImageManifest{
+		SchemaVersion: 2,
+		MediaType:     MediaTypeManifest,
+		DirName:       filepath.Join(tempDir, uuid.New().String()),
+	}
+
+	// extract image
+	if err = extractTarBall(imageTar, inspt.Size, manifest); err != nil {
+		return
+	}
+
+	configBlob, layerBlobs, err := mkBlobs(ref.Path(), ref.Tag(), manifest.DirName, layers, opts)
+	if err != nil {
+		return
+	}
+
+	manifest.Config = configBlob
+	manifest.Layers = layerBlobs
+
+	return manifest, nil
+}
+
+func extractTarBall(r io.Reader, size int64, manifest *ImageManifest) (err error) {
+	if err = os.MkdirAll(manifest.DirName, 0700); err != nil {
+		err = errors.Wrapf(err, "could not create: %s", manifest.DirName)
+		return
+	}
+
+	log.Info().Msg("Extracting image.")
+	bar := pb.New64(0).SetUnits(pb.U_BYTES)
+	tr := tar.NewReader(r)
+	br := bar.NewProxyReader(tr)
+
+	bar.Start()
+
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return errors.WithStack(err)
+		}
+
+		path := filepath.Join(manifest.DirName, header.Name)
+		info := header.FileInfo()
+
+		switch {
+		case info.IsDir():
+			if err = os.MkdirAll(path, info.Mode()); err != nil {
+				return err
+			}
+			fallthrough
+		case dontExtract(info.Name()):
+			continue
+		}
+
+		fh, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
+		if err != nil {
+			err = errors.WithStack(utils.CheckedClose(fh, err))
+			return err
+		}
+
+		bar.SetTotal64(bar.Total + header.Size)
+
+		_, err = io.Copy(fh, br)
+		if err = utils.CheckedClose(fh, err); err != nil {
+			return err
+		}
+	}
+
+	bar.Finish()
+
+	return nil
+}
+
+func dontExtract(name string) bool {
+	return name == "json" || name == "VERSION" || name == "repositories"
+}
+
+// TODO: find a way to do this by interfacing with the daemon directly
+func mkBlobs(
+	repo, tag, path string,
+	layers []string,
+	opts *crypto.Opts,
+) (
+	configBlob Blob,
+	layerBlobs []Blob,
+	err error,
+) {
+	// assemble layers
+	layerSet := make(map[string]bool)
+	for _, x := range layers {
+		layerSet[x] = true
+	}
+
+	// read the archive manifest
+	manifestfile := filepath.Join(path, "manifest.json")
+	manifestFH, err := os.Open(manifestfile)
+	defer func() { err = utils.CheckedClose(manifestFH, err) }()
+	if err != nil {
+		err = errors.Wrapf(err, "could not open file: %s", manifestfile)
+		return
+	}
+
+	image, err := mkArchiveStruct(path, manifestFH)
+	if err != nil {
+		return
+	}
+
+	switch opts.EncType {
+	case crypto.Pbkdf2Aes256Gcm:
+		return pbkdf2Aes256GcmEncrypt(path, layerSet, image, opts)
+	case crypto.None:
+		return noneEncrypt(path, layerSet, image, opts)
+	default:
+	}
+	return nil, nil, errors.Errorf("%v is not a valid encryption type", opts.EncType)
+}
+
+func noneEncrypt(
+	path string,
+	layerSet map[string]bool,
+	image *archiveStruct,
+	opts *crypto.Opts,
+) (
+	Blob,
+	[]Blob,
+	error,
+) {
+	layerBlobs := make([]Blob, len(image.Layers))
+	configBlob := NewPlainConfig(filepath.Join(path, image.Config), "", 0)
+	for i, f := range image.Layers {
+		layerBlobs[i] = NewPlainLayer(filepath.Join(path, f), "", 0)
+	}
+	return configBlob, layerBlobs, nil
+}
+
+func pbkdf2Aes256GcmEncrypt(
+	path string,
+	layerSet map[string]bool,
+	image *archiveStruct,
+	opts *crypto.Opts,
+) (
+	_ Blob,
+	_ []Blob,
+	err error,
+) {
+	// make the config
+	dec, err := NewDecrypto(opts)
+	if err != nil {
+		return nil, nil, err
+	}
+	configBlob := NewConfig(filepath.Join(path, image.Config), "", 0, dec)
+
+	layerBlobs := make([]Blob, len(image.Layers))
+	for i, f := range image.Layers {
+		basename := filepath.Join(path, f)
+
+		dec, err := NewDecrypto(opts)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		d, err := fileDigest(basename)
+		if err != nil {
+			return nil, nil, errors.WithStack(err)
+		}
+
+		log.Debug().Msgf("preparing %s", d)
+		if layerSet[d.String()] {
+			layerBlobs[i] = NewLayer(filepath.Join(path, f), d, 0, dec)
+		} else {
+			layerBlobs[i] = NewPlainLayer(filepath.Join(path, f), d, 0)
+		}
+	}
+
+	return configBlob, layerBlobs, nil
+}
+
+func fileDigest(filename string) (d digest.Digest, err error) {
+	fh, err := os.Open(filename)
+	defer func() { err = utils.CheckedClose(fh, err) }()
+	if err != nil {
+		return
+	}
+	return digest.Canonical.FromReader(fh)
+}
+
+func layersToEncrypt(ctx context.Context, cli *client.Client, inspt types.ImageInspect) ([]string, error) {
+	// get the history
+	hist, err := cli.ImageHistory(ctx, inspt.ID)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
+
+	// the positions of the layers to encrypt
+	eps, err := encryptPositions(hist)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debug().Msgf("%v", eps)
+	log.Debug().Msgf("%v", inspt.RootFS.Layers)
+
+	// the total number of layers
+	diffIDsToEncrypt := make([]string, len(eps))
+	for i, n := range eps {
+		diffIDsToEncrypt[i] = inspt.RootFS.Layers[n]
+	}
+
+	log.Debug().Msgf("%v", diffIDsToEncrypt)
+
+	// the last n entries in this array are the diffIDs of the layers to encrypt
+	return diffIDsToEncrypt, nil
+}
+
+func encryptPositions(hist []image.HistoryResponseItem) (encryptPos []int, err error) {
+	n := 0
+	toEncrypt := false
+	re := regexp.MustCompile(createdRE)
+
+	for i := len(hist) - 1; i >= 0; i-- {
+		matches := re.FindSubmatch([]byte(hist[i].CreatedBy))
+
+		if hist[i].Size != 0 || len(matches) == 0 {
+			if toEncrypt {
+				encryptPos = append(encryptPos, n)
+			}
+			n++
+		} else {
+			switch string(matches[1]) {
+			case "true":
+				toEncrypt = true
+			case "false":
+				toEncrypt = false
+			default:
+			}
+		}
+	}
+
+	if len(encryptPos) == 0 {
+		return nil, utils.NewError("this image was not built with the correct LABEL", false)
+	}
+
+	return encryptPos, nil
+}
+
+type archiveStruct struct {
+	Config string
+	Layers []string
+}
+
+func mkArchiveStruct(path string, manifestFH io.Reader) (a *archiveStruct, err error) {
+	var images []*archiveStruct
+	dec := json.NewDecoder(manifestFH)
+	if err = dec.Decode(&images); err != nil {
+		err = errors.Wrapf(err, "error unmarshalling manifest")
+		return
+	}
+
+	if len(images) < 1 {
+		err = errors.New("no image data was found")
+		return
+	}
+
+	return images[0], nil
+}
+
+func unencryptedConfig(blob *NoncryptedBlob) (_ Blob, err error) {
+	digester := digest.Canonical.Digester()
+	r, err := blob.ReadCloser()
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
 	size, err := io.Copy(digester.Hash(), r)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		err = errors.WithStack(err)
+		return
 	}
 	d := digester.Digest()
 	return NewPlainConfig(blob.GetFilename(), d, size), nil
@@ -63,7 +388,6 @@ func prepareConfig(config Blob, opts *crypto.Opts, ref names.NamedTaggedReposito
 	case *NoncryptedBlob:
 		log.Debug().Msgf("preparing config")
 		return unencryptedConfig(blob)
-	default:
 	}
 	return nil, errors.New("config is of wrong type")
 }
@@ -140,48 +464,62 @@ func (m *ImageManifest) DecryptKeys(
 	return nil
 }
 
-// DecryptManifest attempts to decrypt a manifest
-// sending to manOut. It will call cancel on error.
-func DecryptManifest(
-	opts *crypto.Opts,
+// Decrypt attempts to decrypt a manifest
+func (m *ImageManifest) Decrypt(
 	ref names.NamedTaggedRepository,
-	manifest *ImageManifest,
-) (_ *ImageManifest, err error) {
-	var config Blob
-	switch blob := manifest.Config.(type) {
+	opts *crypto.Opts,
+) (out *ImageManifest, err error) {
+	out = &ImageManifest{
+		SchemaVersion: m.SchemaVersion,
+		MediaType:     m.MediaType,
+		Layers:        make([]Blob, len(m.Layers)),
+		DirName:       m.DirName,
+	}
+
+	switch blob := m.Config.(type) {
+	case EncryptedBlob:
+		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
+		out.Config, err = blob.DecryptBlob(opts, blob.GetFilename()+".dec")
 	case KeyDecryptedBlob:
 		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
-		config, err = blob.DecryptFile(opts, blob.GetFilename()+".dec")
+		out.Config, err = blob.DecryptFile(opts, blob.GetFilename()+".dec")
 	case *NoncryptedBlob:
-		config = blob
+		out.Config = blob
 	default:
-		err = errors.Errorf("manifest is not decryptable: %#v", blob)
+		err = errors.Errorf("manifest is not decryptable: %T", m.Config)
 	}
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	// decrypt keys and files for layers
-	layers := make([]Blob, len(manifest.Layers))
-	for i, l := range manifest.Layers {
-		switch blob := l.(type) {
-		case KeyDecryptedBlob:
-			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
-			layers[i], err = blob.DecryptFile(opts, blob.GetFilename()+".dec")
-		case CompressedBlob:
-			layers[i], err = blob.Decompress(blob.GetFilename() + ".dec")
-		default:
-		}
+	for i, l := range m.Layers {
+		out.Layers[i], err = decryptLayer(ref, opts, l, i)
 		if err != nil {
-			return nil, err
+			return
 		}
 	}
 
-	return &ImageManifest{
-		SchemaVersion: manifest.SchemaVersion,
-		MediaType:     manifest.MediaType,
-		Config:        config,
-		Layers:        layers,
-		DirName:       manifest.DirName,
-	}, nil
+	return
+}
+
+func decryptLayer(
+	ref names.NamedTaggedRepository,
+	opts *crypto.Opts,
+	l Blob,
+	i int,
+) (layer Blob, err error) {
+	switch blob := l.(type) {
+	case EncryptedBlob:
+		opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
+		layer, err = blob.DecryptBlob(opts, blob.GetFilename()+".dec")
+	case KeyDecryptedBlob:
+		opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
+		layer, err = blob.DecryptFile(opts, blob.GetFilename()+".dec")
+	case CompressedBlob:
+		layer, err = blob.Decompress(blob.GetFilename() + ".dec")
+	case *NoncryptedBlob:
+		layer = l
+	}
+	return
 }
