@@ -3,61 +3,12 @@
 A command line utility to push and pull encrypted docker images. This is in the pre-alpha proof of concept stage and is not indented for any use other than to prove that Docker Hub may be used to distribute encrypted docker images. Finally, DO NOT use this with your main Docker Hub account for reasons disclosed in the privacy section below.
 
 ## Prerequisites
-Ensure that `docker`, `go` are installed and that `$GOPATH` has been set and that `$GOPATH/bin` is in the `$PATH`.
-The following sections provide guidance on how to install these on Ubuntu 18.04 Desktop.
-
-### Docker
-Follow these instructions: <https://docs.docker.com/install/linux/docker-ce/ubuntu/> to install `docker`.
-It is more convenient to run `docker` as a non-privileged user, and these instructions assume that you are able to.
-Follow these instructions to enable this: <https://docs.docker.com/install/linux/linux-postinstall/> and note the warnings.
-
-### Go
-```console
-sudo apt-get install golang
-```
-
-### \$GOPATH, etc
-Add the lines
-```
-export GOPATH=$HOME/go
-export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
-```
-to the file `~/.bashrc`. A relogin may be necessary to complete the process.
+Ensure that `docker` and `go` are installed and that `$GOPATH` has been set and that `$GOPATH/bin` is in the `$PATH`.
 
 ## Installation
 ```console
 go get github.com/Senetas/crypto-cli
 ```
-
-If this command fails, it is likely because the github repository is private.
-The following sequence of commands should rectify the error, provided you have enough permissions.
-```console
-cd $GOPATH/src/github.com/Senetas
-git clone https://github.com/Senetas/crypto-cli.git
-cd crypto-cli
-go install
-```
-Note: you may need to use `git@github.com:Senetas/crypto-cli.git` if using ssh keys for authentication.
-
-### Optional: RancherOS
-You may run your docker installation on a virtual machine.
-The following instructions show how to do with with RancherOS, and still use `crypto-cli`.
-
-Install the RancherOS by your preferred method. The one with the least infrastructure requirements is with `docker-machine` and `virtualbox`.
-```
-docker-machine create -d virtualbox \
-    --virtualbox-boot2docker-url https://releases.rancher.com/os/latest/rancheros.iso \
-    --virtualbox-memory 2048 <MACHINE-NAME>
-```
-where `<MACHINE-NAME>` is user generated.
-
-```
-cd $GOPATH/src/github.com/Senetas/crypto-cli
-go build
-docker-machine scp crypto-cli <MACHINE-NAME>:/home/docker
-docker-machine ssh <MACHINE-NAME> sudo mv /home/docker/crypto-cli /usr/bin
-```
-
 ## Usage
 For now the syntax is limited to:
 ```console
