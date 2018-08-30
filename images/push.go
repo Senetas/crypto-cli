@@ -16,6 +16,7 @@ package images
 
 import (
 	"github.com/docker/distribution/reference"
+	"github.com/janeczku/go-spinner"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/registry"
@@ -34,14 +35,12 @@ func PushImage(ref reference.Named, opts *crypto.Opts, tempDir string) (err erro
 	}
 	defer func() { err = cleanup(manifest.DirName, err) }()
 
+	s := spinner.StartNew("Encrypting...")
 	encManifest, err := manifest.Encrypt(nTRep, opts)
 	if err != nil {
 		return err
 	}
+	s.Stop()
 
-	if err = registry.PushImage(token, nTRep, encManifest, endpoint); err != nil {
-		return err
-	}
-
-	return nil
+	return registry.PushImage(token, nTRep, encManifest, endpoint)
 }

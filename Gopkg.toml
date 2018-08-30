@@ -49,10 +49,6 @@
   version = "1.1.1"
 
 [[constraint]]
-  name = "github.com/google/go-cmp"
-  version = "0.2.0"
-
-[[constraint]]
   name = "github.com/google/uuid"
   version = "0.2.0"
 
@@ -95,3 +91,7 @@
 [prune]
   go-tests = true
   unused-packages = true
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/janeczku/go-spinner"
