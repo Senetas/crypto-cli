@@ -37,10 +37,10 @@ func PushImage(ref reference.Named, opts *crypto.Opts, tempDir string) (err erro
 
 	s := spinner.StartNew("Encrypting...")
 	encManifest, err := manifest.Encrypt(nTRep, opts)
+	s.Stop()
 	if err != nil {
 		return err
 	}
-	s.Stop()
 
 	return registry.PushImage(token, nTRep, encManifest, endpoint)
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/docker/distribution/registry/client/auth"
 	dregistry "github.com/docker/docker/registry"
 	"github.com/google/uuid"
+	spinner "github.com/janeczku/go-spinner"
 	"github.com/pkg/errors"
 
 	"github.com/Senetas/crypto-cli/crypto"
@@ -51,12 +52,7 @@ func PullImage(ref reference.Named, opts *crypto.Opts, tempDir string) (err erro
 		return
 	}
 
-	err = constructImageArchive(manifest, nTRep, opts)
-	if err != nil {
-		return
-	}
-
-	return
+	return constructImageArchive(manifest, nTRep, opts)
 }
 
 func pullAndDecrypt(
@@ -73,5 +69,10 @@ func pullAndDecrypt(
 	if err != nil {
 		return
 	}
-	return distribution.DecryptManifest(opts, nTRep, manifest)
+
+	s := spinner.StartNew("Decrypting...")
+	manifest, err = distribution.DecryptManifest(opts, nTRep, manifest)
+	s.Stop()
+
+	return
 }
