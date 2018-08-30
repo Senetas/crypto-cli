@@ -242,6 +242,14 @@
   version = "v1.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:d4a4f1fcdb90a63e2d2d5b2c0dac717c6c26f29b1cdced17a156a561c2cf9f5a"
+  name = "github.com/janeczku/go-spinner"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "cf8ef1d64394bf465addbb71bbe1c121f8b0f2e3"
+
+[[projects]]
   digest = "1:cdb899c199f907ac9fb50495ec71212c95cb5b0e0a8ee0800da0238036091033"
   name = "github.com/mattn/go-runewidth"
   packages = ["."]
@@ -530,6 +538,7 @@
     "github.com/docker/docker/registry",
     "github.com/golang/mock/gomock",
     "github.com/google/uuid",
+    "github.com/janeczku/go-spinner",
     "github.com/minio/sio",
     "github.com/opencontainers/go-digest",
     "github.com/pkg/errors",
