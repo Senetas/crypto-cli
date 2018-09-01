@@ -22,29 +22,34 @@ import (
 	"encoding/json"
 
 	"github.com/Senetas/crypto-cli/utils"
+	"github.com/pkg/errors"
 )
 
 // EncryptJSON encrypts a JSON object and base64 (URL) encodes the ciphertext
-func EncryptJSON(val interface{}, key, ad []byte) (string, error) {
+func EncryptJSON(val interface{}, key, ad []byte) (_ string, err error) {
 	plaintext, err := json.Marshal(val)
 	if err != nil {
-		return "", utils.ErrEncrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return "", utils.ErrEncrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	// create random nonce
 	nonce := make([]byte, 12)
 	if _, err = rand.Read(nonce); err != nil {
-		return "", utils.ErrEncrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", utils.ErrEncrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	ciphertext := aesgcm.Seal(nil, nonce, plaintext, ad)
@@ -53,10 +58,11 @@ func EncryptJSON(val interface{}, key, ad []byte) (string, error) {
 }
 
 // DecryptJSON decrypts a string that is the base64 (URL) encoded ciphertext of a json object
-func DecryptJSON(ciphertext string, key, ad []byte, val interface{}) error {
+func DecryptJSON(ciphertext string, key, ad []byte, val interface{}) (err error) {
 	decoded, err := base64.URLEncoding.DecodeString(ciphertext)
 	if err != nil {
-		return utils.ErrDecrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	nonce := decoded[:12]
@@ -64,22 +70,26 @@ func DecryptJSON(ciphertext string, key, ad []byte, val interface{}) error {
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return utils.ErrDecrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return utils.ErrDecrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	plaintext, err := aesgcm.Open(nil, nonce, cjstr, ad)
 	if err != nil {
-		return utils.ErrDecrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	if err = json.Unmarshal(plaintext, val); err != nil {
-		return utils.ErrDecrypt
+		err = errors.WithStack(err)
+		return
 	}
 
-	return nil
+	return
 }

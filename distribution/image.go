@@ -336,7 +336,8 @@ func encryptPositions(hist []image.HistoryResponseItem) (encryptPos []int, err e
 	}
 
 	if len(encryptPos) == 0 {
-		return nil, utils.NewError("this image was not built with the correct LABEL", false)
+		err = utils.NewError("this image was not built with the correct LABEL", false)
+		return
 	}
 
 	return encryptPos, nil

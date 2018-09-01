@@ -256,6 +256,61 @@ func TestCompressBlobs(t *testing.T) {
 	assert.NoError(blobTest(t, dir, fn, compath, decpath, blob, comp, dec))
 }
 
+func TestEncDecCrypto(t *testing.T) {
+	assert := assert.New(t)
+
+	tests := []struct {
+		opts    *crypto.Opts
+		optsEnc *crypto.Opts
+		optsDec *crypto.Opts
+		errEnc  error
+		errDec  error
+	}{
+		{
+			opts,
+			opts,
+			opts,
+			nil,
+			nil,
+		},
+		{
+			opts,
+			optsNone,
+			nil,
+			utils.NewError("encryption type does not match decryption type", false),
+			nil,
+		},
+		{
+			opts,
+			opts,
+			optsNone,
+			nil,
+			utils.NewError("encryption type does not match decryption type", false),
+		},
+	}
+
+	for _, test := range tests {
+		d, err := distribution.NewDecrypto(test.opts)
+		if !assert.NoError(err) {
+			continue
+		}
+
+		e, err := distribution.EncryptKey(*d, test.optsEnc)
+		if err != nil {
+			assert.Equal(test.errEnc, err)
+			continue
+		}
+
+		c, err := distribution.DecryptKey(e, test.optsDec)
+		if err != nil {
+			assert.Equal(test.errDec, err)
+			continue
+		}
+
+		assert.Equal(d, &c)
+	}
+}
+
 func blobTest(
 	t *testing.T,
 	dir, filename, convpath, deconvpath string,

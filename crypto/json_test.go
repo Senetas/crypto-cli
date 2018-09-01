@@ -21,7 +21,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/Senetas/crypto-cli/crypto"
-	"github.com/Senetas/crypto-cli/utils"
 )
 
 func TestJSONEncDec(t *testing.T) {
@@ -51,18 +50,16 @@ func TestJSONEncDec(t *testing.T) {
 	}
 
 	str, err := crypto.EncryptJSON(o, key[:], []byte("hello"))
-	if err != nil {
-		assert.Equal(err, utils.ErrEncrypt)
-		t.Fatalf("%+v", err)
+	if !assert.NoError(err) {
+		return
 	}
 
 	t.Log(str)
 
 	o1 := test{}
 
-	if err = crypto.DecryptJSON(str, key[:], []byte("hello"), &o1); err != nil {
-		assert.Equal(err, utils.ErrDecrypt)
-		t.Fatalf("%+v", err)
+	if err = crypto.DecryptJSON(str, key[:], []byte("hello"), &o1); !assert.NoError(err) {
+		return
 	}
 
 	if !assert.Equal(o, o1) {

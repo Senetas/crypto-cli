@@ -20,28 +20,33 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 
-	"github.com/Senetas/crypto-cli/utils"
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/pbkdf2"
+
+	"github.com/Senetas/crypto-cli/utils"
 )
 
 // Enckey encrypts the ciphertext = key with the given passphrase and salt
-func Enckey(plaintext []byte, pass, salt string) ([]byte, error) {
+func Enckey(plaintext []byte, pass, salt string) (_ []byte, err error) {
 	bsalt := []byte(salt)
 	key := passSalt2Key(pass, bsalt)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, utils.ErrEncrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	nonce := make([]byte, 12)
 	if _, err = rand.Read(nonce); err != nil {
-		return nil, utils.ErrEncrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, utils.ErrEncrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	ciphertext := aesgcm.Seal(nil, nonce, plaintext, bsalt)
@@ -50,7 +55,7 @@ func Enckey(plaintext []byte, pass, salt string) ([]byte, error) {
 }
 
 // Deckey decrypts the ciphertext = key with the given passphrase and salt
-func Deckey(ciphertext []byte, pass, salt string) ([]byte, error) {
+func Deckey(ciphertext []byte, pass, salt string) (plaintext []byte, err error) {
 	nonce := ciphertext[:12]
 	ckey := ciphertext[12:]
 	bsalt := []byte(salt)
@@ -58,20 +63,23 @@ func Deckey(ciphertext []byte, pass, salt string) ([]byte, error) {
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, utils.ErrDecrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, utils.ErrDecrypt
+		err = errors.WithStack(err)
+		return
 	}
 
-	plaintext, err := aesgcm.Open(nil, nonce, ckey, bsalt)
+	plaintext, err = aesgcm.Open(nil, nonce, ckey, bsalt)
 	if err != nil {
-		return nil, utils.ErrDecrypt
+		err = errors.WithStack(err)
+		return
 	}
 
-	return plaintext, nil
+	return
 }
 
 // passSalt2Key deterministically returns a 32 byte encryption key given a passphrase and a salt

@@ -16,13 +16,6 @@ package utils
 
 import "bytes"
 
-var (
-	// ErrDecrypt return this when any error occurs in the decryption process
-	ErrDecrypt = NewError("could not decrypt", false)
-	// ErrEncrypt return this when any error occurs in the encryption process
-	ErrEncrypt = NewError("could not encrypt", false)
-)
-
 // Error is an error type that may be used to turn off the stack trace
 type Error struct {
 	errtext  string
