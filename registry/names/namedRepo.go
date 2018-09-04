@@ -15,8 +15,6 @@
 package names
 
 import (
-	"bytes"
-
 	"github.com/docker/distribution/reference"
 )
 
@@ -33,20 +31,12 @@ type repository struct {
 	path   string
 }
 
-func (r *repository) String() string {
-	var b bytes.Buffer
+func (r *repository) String() (w string) {
 	if r.domain != "" {
-		if _, err := b.WriteString(r.domain); err != nil {
-			return b.String()
-		}
-		if _, err := b.WriteString("/"); err != nil {
-			return b.String()
-		}
+		w = r.domain + "/"
 	}
-	if _, err := b.WriteString(r.path); err != nil {
-		return b.String()
-	}
-	return b.String()
+	w = w + r.path
+	return
 }
 
 func (r *repository) Name() string {

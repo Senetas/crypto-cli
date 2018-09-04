@@ -15,8 +15,6 @@
 package names
 
 import (
-	"bytes"
-
 	"github.com/docker/distribution/reference"
 )
 
@@ -34,28 +32,14 @@ type taggedRepository struct {
 	path   string
 }
 
-func (r *taggedRepository) String() string {
-	var b bytes.Buffer
+func (r *taggedRepository) String() (w string) {
 	if r.domain != "" {
-		if _, err := b.WriteString(r.domain); err != nil {
-			return b.String()
-		}
-		if _, err := b.WriteString("/"); err != nil {
-			return b.String()
-		}
-	}
-	if _, err := b.WriteString(r.path); err != nil {
-		return b.String()
+		w = r.domain + "/"
 	}
 	if r.path != "" {
-		if _, err := b.WriteString(":"); err != nil {
-			return b.String()
-		}
-		if _, err := b.WriteString(r.tag); err != nil {
-			return b.String()
-		}
+		w = w + r.path + ":" + r.tag
 	}
-	return b.String()
+	return w
 }
 
 func (r *taggedRepository) Name() string {

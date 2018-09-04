@@ -49,10 +49,10 @@ func PullImage(
 	endpoint *registry.APIEndpoint,
 	opts *crypto.Opts,
 	downloadDir string,
-) (_ *distribution.ImageManifest, err error) {
+) (manifest *distribution.ImageManifest, err error) {
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
-	manifest, err := PullManifest(token, ref, bldr, downloadDir)
+	manifest, err = PullManifest(token, ref, bldr, downloadDir)
 	if err != nil {
 		return nil, err
 	}
