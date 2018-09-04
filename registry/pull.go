@@ -49,7 +49,7 @@ func PullImage(
 	endpoint *registry.APIEndpoint,
 	opts *crypto.Opts,
 	downloadDir string,
-) (*distribution.ImageManifest, error) {
+) (_ *distribution.ImageManifest, err error) {
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
 	manifest, err := PullManifest(token, ref, bldr, downloadDir)
@@ -59,7 +59,12 @@ func PullImage(
 	log.Info().Msg("Mainfest obtained.")
 
 	if err = manifest.DecryptKeys(opts, ref); err != nil {
-		return nil, err
+		return
+	}
+
+	// validate manifest to prevent local file injections
+	if err = manifest.Config.GetDigest().Validate(); err != nil {
+		return
 	}
 
 	log.Info().Msgf("Downloading config: %s.", manifest.Config.GetDigest())
@@ -71,14 +76,19 @@ func PullImage(
 		downloadDir,
 	)
 	if err != nil {
-		return nil, err
+		return
 	}
 	manifest.Config.SetFilename(filename)
 
 	log.Info().Msg("Downloading layers:")
 	for _, l := range manifest.Layers {
+		// validate manifest to prevent local file injections
+		if err = l.GetDigest().Validate(); err != nil {
+			return
+		}
+
 		log.Info().Msgf("Downloading: %s.", l.GetDigest())
-		filename, err := PullFromDigest(
+		filename, err = PullFromDigest(
 			token,
 			ref,
 			l.GetDigest(),
@@ -86,12 +96,12 @@ func PullImage(
 			downloadDir,
 		)
 		if err != nil {
-			return nil, err
+			return
 		}
 		l.SetFilename(filename)
 	}
 
-	return manifest, nil
+	return
 }
 
 // PullManifest pulls a manifest from the registry and parses it
@@ -144,7 +154,9 @@ func PullManifest(
 }
 
 // PullFromDigest downloads a blob (refereced by its digest) from the registry to a temporay file.
-// It verifies that the downloaded matches its digest, deleting if if it does not
+// It verifies that the downloaded file matches its digest, deleting if it does not. While the
+// digest is used to name the file, it is first verified to be a valid digest, so this cannot lead
+// to a file inclusion vulrenability.
 func PullFromDigest(
 	token dauth.Scope,
 	ref reference.Named,

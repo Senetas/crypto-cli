@@ -12,29 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package crypto_test
+package utils
 
 import (
-	"testing"
+	"os"
 
-	"github.com/Senetas/crypto-cli/crypto"
-	"github.com/stretchr/testify/require"
+	"github.com/pkg/errors"
 )
 
-func TestKey(t *testing.T) {
-	require := require.New(t)
-
-	plaintext := []byte("Hello")
-	salt := []byte("0123456789012345")
-
-	ciphertext, err := crypto.Enckey([]byte(plaintext), salt, "hunter2")
-	require.NoError(err)
-
-	require.Equal(salt, ciphertext[:16])
-
-	plaintext1, salt1, err := crypto.Deckey(ciphertext, "hunter2")
-	require.NoError(err)
-
-	require.Equal(salt, salt1)
-	require.Equal(plaintext, plaintext1)
+// CleanUp temporary files
+func CleanUp(dir string, err error) error {
+	if dir == "" {
+		return err
+	}
+	if err2 := os.RemoveAll(dir); err2 != nil {
+		err2 = errors.Wrapf(err, "could not clean up temp files in: %s", dir)
+		if err == nil {
+			return err2
+		}
+		return Errors{err, err2}
+	}
+	return err
 }

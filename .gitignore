@@ -98,7 +98,7 @@ crypto-cli
 *.orig
 
 ### test coverage report ###
-cover.html
+*.html
 
 ### trash ###
 .Trash-*

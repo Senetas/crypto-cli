@@ -37,13 +37,23 @@ type taggedRepository struct {
 func (r *taggedRepository) String() string {
 	var b bytes.Buffer
 	if r.domain != "" {
-		b.WriteString(r.domain)
-		b.WriteString("/")
+		if _, err := b.WriteString(r.domain); err != nil {
+			return b.String()
+		}
+		if _, err := b.WriteString("/"); err != nil {
+			return b.String()
+		}
 	}
-	b.WriteString(r.path)
+	if _, err := b.WriteString(r.path); err != nil {
+		return b.String()
+	}
 	if r.path != "" {
-		b.WriteString(":")
-		b.WriteString(r.tag)
+		if _, err := b.WriteString(":"); err != nil {
+			return b.String()
+		}
+		if _, err := b.WriteString(r.tag); err != nil {
+			return b.String()
+		}
 	}
 	return b.String()
 }

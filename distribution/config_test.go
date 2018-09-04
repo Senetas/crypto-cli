@@ -33,10 +33,10 @@ func TestUnMarshalling(t *testing.T) {
 
 	val := distribution.NewDecConfig()
 	err := json.Unmarshal(config, val)
-	require.Nil(err)
+	require.NoError(err)
 
 	config2, err := json.Marshal(val)
-	require.Nil(err)
+	require.NoError(err)
 
 	require.Equal(config, config2)
 
@@ -44,25 +44,26 @@ func TestUnMarshalling(t *testing.T) {
 
 	val2 := distribution.NewDecConfig()
 	err = json.Unmarshal(config2, val2)
-	require.Nil(err)
+	require.NoError(err)
 
 	require.Equal(val, val2)
 
 	key := make([]byte, 32)
 	_, err = rand.Read(key[:])
-	require.Nil(err)
+	require.NoError(err)
 
 	opts := &crypto.Opts{
-		Salt:    "Hello",
 		EncType: crypto.Pbkdf2Aes256Gcm,
 	}
 	opts.SetPassphrase("hunter2")
 
-	ec, err := val.Encrypt(key, opts)
-	require.Nil(err)
+	salt := []byte("0123456789012345")
+
+	ec, err := val.Encrypt(key, salt)
+	require.NoError(err)
 
 	dc, err := ec.Decrypt(key, opts)
-	require.Nil(err)
+	require.NoError(err)
 
 	require.Equal(val, dc)
 }

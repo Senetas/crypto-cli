@@ -19,7 +19,9 @@ import (
 	"github.com/janeczku/go-spinner"
 
 	"github.com/Senetas/crypto-cli/crypto"
+	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/registry"
+	"github.com/Senetas/crypto-cli/utils"
 )
 
 // PushImage encrypts then pushes an image
@@ -29,11 +31,11 @@ func PushImage(ref reference.Named, opts *crypto.Opts, tempDir string) (err erro
 		return err
 	}
 
-	manifest, err := CreateManifest(nTRep, opts, tempDir)
+	manifest, err := distribution.NewManifest(nTRep, opts, tempDir)
 	if err != nil {
 		return err
 	}
-	defer func() { err = cleanup(manifest.DirName, err) }()
+	defer func() { err = utils.CleanUp(manifest.DirName, err) }()
 
 	s := spinner.StartNew("Encrypting...")
 	encManifest, err := manifest.Encrypt(nTRep, opts)

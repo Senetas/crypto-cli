@@ -17,7 +17,6 @@ package images
 import (
 	"net/http"
 	"net/url"
-	"os"
 
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/v2"
@@ -31,8 +30,6 @@ import (
 	"github.com/Senetas/crypto-cli/registry/names"
 	"github.com/Senetas/crypto-cli/utils"
 )
-
-const labelString = "LABEL com.senetas.crypto.enabled"
 
 // useTLS determines whether the registry requires TLS
 func useTLS(
@@ -139,19 +136,4 @@ func authProcedure(ref reference.Named) (
 	log.Info().Msg("Authentication successful.")
 
 	return token, nTRep, &endpoint, nil
-}
-
-// cleanup temporary files
-func cleanup(dir string, err error) error {
-	if dir == "" {
-		return err
-	}
-	if err2 := os.RemoveAll(dir); err2 != nil {
-		err2 = errors.Wrapf(err, "could not clean up temp files in: %s", dir)
-		if err == nil {
-			return err2
-		}
-		return utils.Errors{err, err2}
-	}
-	return err
 }
