@@ -3,7 +3,10 @@
 A command line utility to push and pull encrypted docker images. This is in the pre-alpha proof of concept stage and is not indented for any use other than to prove that Docker Hub may be used to distribute encrypted docker images. Currently, it only runs on Linux with Linux images. See also the privacy section below.
 
 ## Warning
-This application is not suitable for use in a production environment. There are no guarantees for the security of these implementations. Use at your own risk.
+This application is not suitable for use in a production environment. There are no guarantees as to the security of these implementations. Use at your own risk.
+
+## License
+Apache 2.0
 
 ## Prerequisites
 Ensure that `docker` and `go` are installed and that `$GOPATH` has been set and that `$GOPATH/bin` is in the `$PATH`.
@@ -78,7 +81,7 @@ docker login
 See also the privacy note below.
 
 ## Privacy
-The user MUST be logged into a docker hub account. Because `docker login` stores an encoded username and password, the clear text password is exposed to this utility. While the password is not transmitted anywhere other then the repository in either a clear, encoded or encrypted form, it may be logged to `STDOUT` in certain situations. Thus, it is recommended to set up an alternate Docker Hub account while this is under development.
+The user MUST be logged into a docker hub account. Because `docker login` stores an encoded username and password, the clear text password is exposed to this utility. While the password is not transmitted anywhere other then the repository, it may be logged to `STDOUT` in certain situations. Thus, it is recommended to set up an alternate Docker Hub account while this is under development.
 
 ## Cryptography
 The layer archives are (if specified) encrypted using AES-GCM, with a 256-bit key that is randomly generated.
