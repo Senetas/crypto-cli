@@ -19,16 +19,13 @@ import (
 	"path/filepath"
 
 	"github.com/docker/distribution/reference"
-	"github.com/docker/distribution/registry/client/auth"
-	dregistry "github.com/docker/docker/registry"
 	"github.com/google/uuid"
 	spinner "github.com/janeczku/go-spinner"
 	"github.com/pkg/errors"
 
 	"github.com/Senetas/crypto-cli/crypto"
-	"github.com/Senetas/crypto-cli/distribution"
 	"github.com/Senetas/crypto-cli/registry"
-	"github.com/Senetas/crypto-cli/registry/names"
+	"github.com/Senetas/crypto-cli/utils"
 )
 
 // PullImage pulls an image from the registry
@@ -41,38 +38,20 @@ func PullImage(ref reference.Named, opts *crypto.Opts, tempDir string) (err erro
 	dir := filepath.Join(tempDir, uuid.New().String())
 
 	err = os.MkdirAll(dir, 0700)
-	defer func() { err = cleanup(dir, err) }()
+	defer func() { err = utils.CleanUp(dir, err) }()
 	if err != nil {
 		err = errors.Wrapf(err, "dir = %s", dir)
 		return
 	}
 
-	manifest, err := pullAndDecrypt(nTRep, token, endpoint, dir, opts)
-	if err != nil {
-		return
-	}
-
-	return constructImageArchive(manifest, nTRep, opts)
-}
-
-func pullAndDecrypt(
-	nTRep names.NamedTaggedRepository,
-	token auth.Scope,
-	endpoint *dregistry.APIEndpoint,
-	dir string,
-	opts *crypto.Opts,
-) (
-	manifest *distribution.ImageManifest,
-	err error,
-) {
-	manifest, err = registry.PullImage(token, nTRep, endpoint, opts, dir)
+	emanifest, err := registry.PullImage(token, nTRep, endpoint, opts, dir)
 	if err != nil {
 		return
 	}
 
 	s := spinner.StartNew("Decrypting...")
-	manifest, err = distribution.DecryptManifest(opts, nTRep, manifest)
+	manifest, err := emanifest.Decrypt(nTRep, opts)
 	s.Stop()
 
-	return
+	return constructImageArchive(manifest, nTRep, opts)
 }

@@ -17,6 +17,7 @@ package distribution
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"net/url"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/utils"
@@ -30,10 +31,40 @@ type EnCrypto struct {
 	Salt   []byte       `json:"-"`
 }
 
+// NewEncryptoCompat create a new Encrypto struct from some URLs
+func NewEncryptoCompat(urls []string, opts *crypto.Opts) (_ *EnCrypto, err error) {
+	if len(urls) == 0 {
+		err = errors.New("missing encryption key")
+		return
+	}
+
+	u, err := url.Parse(urls[0])
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+
+	algos, err := crypto.ValidateAlgos(u.Query().Get(AlgosKey))
+	if err != nil {
+		return
+	}
+
+	if algos != opts.EncType {
+		err = utils.NewError("encryption type does not match decryption type", false)
+		return
+	}
+
+	return &EnCrypto{
+		Algos:  algos,
+		EncKey: u.Query().Get(KeyKey),
+	}, nil
+}
+
 // DecryptKey is the inverse function of EncryptKey (up to error)
 func DecryptKey(e EnCrypto, opts *crypto.Opts) (d DeCrypto, err error) {
 	if e.Algos != opts.EncType {
-		return DeCrypto{}, utils.NewError("encryption type does not match decryption type", false)
+		err = utils.NewError("encryption type does not match decryption type", false)
+		return
 	}
 
 	decoded, err := base64.URLEncoding.DecodeString(e.EncKey)
@@ -84,6 +115,11 @@ func NewDecrypto(opts *crypto.Opts) (d *DeCrypto, err error) {
 
 // EncryptKey encrypts a plaintext key with a passphrase and salt
 func EncryptKey(d DeCrypto, opts *crypto.Opts) (e EnCrypto, err error) {
+	if d.Algos != opts.EncType {
+		err = utils.NewError("encryption type does not match decryption type", false)
+		return
+	}
+
 	e.Algos = d.Algos
 	e.Salt = d.Salt
 

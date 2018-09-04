@@ -94,5 +94,5 @@ func DecryptJSON(ciphertext string, key []byte, val interface{}) (err error) {
 		return
 	}
 
-	return nil
+	return
 }

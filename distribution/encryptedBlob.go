@@ -15,10 +15,9 @@
 package distribution
 
 import (
-	"net/url"
+	"github.com/pkg/errors"
 
 	"github.com/Senetas/crypto-cli/crypto"
-	"github.com/pkg/errors"
 )
 
 // EncryptedBlob is a blob that may be decrypted
@@ -39,18 +38,18 @@ type encryptedBlobNew struct {
 	*EnCrypto `json:"crypto"`
 }
 
-func (eb *encryptedBlobNew) DecryptBlob(opts *crypto.Opts, outname string) (DecryptedBlob, error) {
+func (eb *encryptedBlobNew) DecryptBlob(opts *crypto.Opts, outname string) (_ DecryptedBlob, err error) {
 	kb, err := eb.DecryptKey(opts)
 	if err != nil {
-		return nil, err
+		return
 	}
 	return kb.DecryptFile(opts, outname)
 }
 
-func (eb *encryptedBlobNew) DecryptKey(opts *crypto.Opts) (KeyDecryptedBlob, error) {
+func (eb *encryptedBlobNew) DecryptKey(opts *crypto.Opts) (_ KeyDecryptedBlob, err error) {
 	dk, err := DecryptKey(*eb.EnCrypto, opts)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return
 	}
 	return &keyDecryptedBlob{
 		NoncryptedBlob: eb.NoncryptedBlob,
@@ -64,10 +63,10 @@ type encryptedBlobCompat struct {
 	URLs []string `json:"urls"`
 }
 
-func (e *encryptedBlobCompat) DecryptBlob(opts *crypto.Opts, outname string) (DecryptedBlob, error) {
-	ek, err := newEncrypto(e.URLs)
+func (e *encryptedBlobCompat) DecryptBlob(opts *crypto.Opts, outname string) (_ DecryptedBlob, err error) {
+	ek, err := NewEncryptoCompat(e.URLs, opts)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	eb := &encryptedBlobNew{
@@ -78,15 +77,15 @@ func (e *encryptedBlobCompat) DecryptBlob(opts *crypto.Opts, outname string) (De
 	return eb.DecryptBlob(opts, outname)
 }
 
-func (e *encryptedBlobCompat) DecryptKey(opts *crypto.Opts) (KeyDecryptedBlob, error) {
-	ek, err := newEncrypto(e.URLs)
+func (e *encryptedBlobCompat) DecryptKey(opts *crypto.Opts) (_ KeyDecryptedBlob, err error) {
+	ek, err := NewEncryptoCompat(e.URLs, opts)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	dk, err := DecryptKey(*ek, opts)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return
 	}
 
 	return &keyDecryptedBlob{
@@ -95,44 +94,23 @@ func (e *encryptedBlobCompat) DecryptKey(opts *crypto.Opts) (KeyDecryptedBlob, e
 	}, nil
 }
 
-func newEncrypto(urls []string) (*EnCrypto, error) {
-	if len(urls) == 0 {
-		return nil, errors.New("missing encryption key")
-	}
-
-	u, err := url.Parse(urls[0])
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	algos, err := crypto.ValidateAlgos(u.Query().Get(AlgosKey))
-	if err != nil {
-		return nil, err
-	}
-
-	return &EnCrypto{
-		Algos:  algos,
-		EncKey: u.Query().Get(KeyKey),
-	}, nil
-}
-
 type encryptedConfigNew struct {
 	*NoncryptedBlob
 	*EnCrypto `json:"crypto"`
 }
 
-func (ec *encryptedConfigNew) DecryptBlob(opts *crypto.Opts, outname string) (DecryptedBlob, error) {
+func (ec *encryptedConfigNew) DecryptBlob(opts *crypto.Opts, outname string) (_ DecryptedBlob, err error) {
 	kc, err := ec.DecryptKey(opts)
 	if err != nil {
-		return nil, err
+		return
 	}
 	return kc.DecryptFile(opts, outname)
 }
 
-func (ec *encryptedConfigNew) DecryptKey(opts *crypto.Opts) (KeyDecryptedBlob, error) {
+func (ec *encryptedConfigNew) DecryptKey(opts *crypto.Opts) (_ KeyDecryptedBlob, err error) {
 	dk, err := DecryptKey(*ec.EnCrypto, opts)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return
 	}
 	return &keyDecryptedConfig{
 		NoncryptedBlob: ec.NoncryptedBlob,
@@ -145,10 +123,10 @@ type encryptedConfigCompat struct {
 	URLs []string `json:"urls"`
 }
 
-func (e *encryptedConfigCompat) DecryptBlob(opts *crypto.Opts, outname string) (DecryptedBlob, error) {
-	ek, err := newEncrypto(e.URLs)
+func (e *encryptedConfigCompat) DecryptBlob(opts *crypto.Opts, outname string) (_ DecryptedBlob, err error) {
+	ek, err := NewEncryptoCompat(e.URLs, opts)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	eb := &encryptedConfigNew{
@@ -159,15 +137,16 @@ func (e *encryptedConfigCompat) DecryptBlob(opts *crypto.Opts, outname string) (
 	return eb.DecryptBlob(opts, outname)
 }
 
-func (e *encryptedConfigCompat) DecryptKey(opts *crypto.Opts) (KeyDecryptedBlob, error) {
-	ek, err := newEncrypto(e.URLs)
+func (e *encryptedConfigCompat) DecryptKey(opts *crypto.Opts) (_ KeyDecryptedBlob, err error) {
+	ek, err := NewEncryptoCompat(e.URLs, opts)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	dk, err := DecryptKey(*ek, opts)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		err = errors.WithStack(err)
+		return
 	}
 
 	return &keyDecryptedConfig{

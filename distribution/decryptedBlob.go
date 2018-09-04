@@ -131,13 +131,15 @@ type decryptedConfig struct {
 func (db *decryptedConfig) EncryptBlob(opts *crypto.Opts, outname string) (_ EncryptedBlob, err error) {
 	r, err := db.ReadCloser()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		err = errors.WithStack(err)
+		return
 	}
 	defer func() { err = utils.CheckedClose(r, err) }()
 
 	out, err := os.Create(outname)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		err = errors.WithStack(err)
+		return
 	}
 	defer func() { err = utils.CheckedClose(out, err) }()
 
@@ -146,18 +148,20 @@ func (db *decryptedConfig) EncryptBlob(opts *crypto.Opts, outname string) (_ Enc
 
 	dc := &decConfig{}
 	if err = json.NewDecoder(r).Decode(dc); err != nil {
-		return nil, err
+		err = errors.WithStack(err)
+		return
 	}
 
 	ec, err := dc.Encrypt(db.DecKey, db.DeCrypto.Salt)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	cw := &utils.CounterWriter{Writer: mw}
 
 	if err = json.NewEncoder(cw).Encode(ec); err != nil {
-		return nil, err
+		err = errors.WithStack(err)
+		return
 	}
 
 	dgst := digester.Digest()
@@ -171,13 +175,16 @@ func (db *decryptedConfig) EncryptBlob(opts *crypto.Opts, outname string) (_ Enc
 
 	ek, err := EncryptKey(*db.DeCrypto, opts)
 	if err != nil {
-		return nil, err
+		err = errors.WithStack(err)
+		return
 	}
 
 	if opts.Compat {
-		u, err := url.Parse(BaseCryptoURL)
+		var u *url.URL
+		u, err = url.Parse(BaseCryptoURL)
 		if err != nil {
-			return nil, errors.WithStack(err)
+			err = errors.WithStack(err)
+			return
 		}
 
 		v := url.Values{}

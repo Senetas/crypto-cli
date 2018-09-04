@@ -17,11 +17,13 @@ package crypto
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/rand"
 	"crypto/sha256"
 
-	"github.com/Senetas/crypto-cli/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/pbkdf2"
+
+	"github.com/Senetas/crypto-cli/utils"
 )
 
 // Enckey encrypts the ciphertext = key with the given passphrase and salt
@@ -35,7 +37,7 @@ func Enckey(plaintext, salt []byte, pass string) (ciphertext []byte, err error) 
 	}
 
 	nonce := make([]byte, 12)
-	if err != nil {
+	if _, err = rand.Read(nonce); err != nil {
 		err = errors.WithStack(err)
 		return
 	}
