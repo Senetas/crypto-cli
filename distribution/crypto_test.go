@@ -38,17 +38,14 @@ import (
 var (
 	passphrase = "196884 = 196883 + 1"
 	opts       = &crypto.Opts{
-		Salt:    "MgSO4(H2O)x",
 		EncType: crypto.Pbkdf2Aes256Gcm,
 		Compat:  false,
 	}
 	optsNone = &crypto.Opts{
-		Salt:    "MgSO4(H2O)x",
 		EncType: crypto.None,
 		Compat:  false,
 	}
 	optsCompat = &crypto.Opts{
-		Salt:    "MgSO4(H2O)x",
 		EncType: crypto.Pbkdf2Aes256Gcm,
 		Compat:  true,
 	}
@@ -103,43 +100,6 @@ var tests = []struct {
 }
 
 func TestCryptoBlobsEncDec(t *testing.T) {
-	assert := assert.New(t)
-
-	for _, test := range tests {
-		test.opts.SetPassphrase(test.passphrase)
-
-		c, err := distribution.NewDecrypto(test.opts)
-		if !assert.NoError(err) {
-			continue
-		}
-
-		dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
-		defer func() { assert.NoError((utils.CleanUp(dir, nil))) }()
-		encpath := filepath.Join(dir, "enc")
-		decpath := filepath.Join(dir, "dec")
-
-		size, d, fn, err := test.mkFile(t, dir)
-		if !assert.NoError(err) {
-			continue
-		}
-
-		blob := test.newBlob(fn, d, size, c)
-
-		enc, err := blob.EncryptBlob(test.opts, encpath)
-		if !assert.NoError(err) {
-			continue
-		}
-
-		dec, err := enc.DecryptBlob(test.opts, decpath)
-		if !assert.NoError(err) {
-			continue
-		}
-
-		assert.NoError(blobTest(t, dir, fn, encpath, decpath, blob, enc, dec))
-	}
-}
-
-func TestCryptoBlobsEncDecDec(t *testing.T) {
 	assert := assert.New(t)
 
 	for _, test := range tests {
@@ -300,6 +260,9 @@ func TestEncDecCrypto(t *testing.T) {
 			assert.Equal(test.errEnc, err)
 			continue
 		}
+
+		assert.NotNil(test.optsDec)
+		assert.NotNil(e)
 
 		c, err := distribution.DecryptKey(e, test.optsDec)
 		if err != nil {
