@@ -52,7 +52,7 @@ func checkFlagsPull(f *pflag.Flag) {
 func runPull(remote string, opts *crypto.Opts) error {
 	ref, err := reference.ParseNormalizedNamed(remote)
 	if err != nil {
-		return errors.Wrapf(err, "remote = ", remote)
+		return errors.Wrapf(err, "remote = %s", remote)
 	}
 	log.Info().Msgf("Obtaining manifest for image: %s", ref)
 	return images.PullImage(ref, opts, tempDir)

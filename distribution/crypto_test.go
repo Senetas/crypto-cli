@@ -37,12 +37,10 @@ import (
 var (
 	passphrase = "196884 = 196883 + 1"
 	opts       = &crypto.Opts{
-		Salt:    "MgSO4(H2O)x",
 		EncType: crypto.Pbkdf2Aes256Gcm,
 		Compat:  false,
 	}
 	optsCompat = &crypto.Opts{
-		Salt:    "MgSO4(H2O)x",
 		EncType: crypto.Pbkdf2Aes256Gcm,
 		Compat:  true,
 	}
@@ -63,17 +61,17 @@ func TestCrypto(t *testing.T) {
 		test.opts.SetPassphrase(test.passphrase)
 
 		c, err := distribution.NewDecrypto(test.opts)
-		if !assert.Nil(err) {
+		if !assert.NoError(err) {
 			continue
 		}
 
 		e, err := distribution.EncryptKey(*c, test.opts)
-		if !assert.Nil(err) {
+		if !assert.NoError(err) {
 			continue
 		}
 
 		d, err := distribution.DecryptKey(e, test.opts)
-		if !assert.Nil(err) {
+		if !assert.NoError(err) {
 			continue
 		}
 
@@ -105,7 +103,7 @@ func TestCryptoBlobs(t *testing.T) {
 				t.Logf(err.Error())
 			}
 		}()
-		if !assert.Nil(err) {
+		if !assert.NoError(err) {
 			continue
 		}
 
@@ -113,19 +111,19 @@ func TestCryptoBlobs(t *testing.T) {
 		decpath := filepath.Join(dir, "dec")
 
 		c, err := distribution.NewDecrypto(opts)
-		if !assert.Nil(err) {
+		if !assert.NoError(err) {
 			continue
 		}
 
 		blob := distribution.NewLayer(fn, d, size, c)
 
 		enc, err := blob.EncryptBlob(opts, encpath)
-		if !assert.Nil(err) {
+		if !assert.NoError(err) {
 			continue
 		}
 
 		dec, err := enc.DecryptBlob(opts, decpath)
-		if !assert.Nil(err) {
+		if !assert.NoError(err) {
 			continue
 		}
 

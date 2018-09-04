@@ -98,7 +98,7 @@ func loadArchive(pr io.Reader) (err error) {
 	// TODO: stop hardcoding version
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
 	if err != nil {
-		err = errors.Wrapf(err, "could not load client: %v", client.FromEnv)
+		err = errors.WithStack(err)
 		return
 	}
 

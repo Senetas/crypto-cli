@@ -31,7 +31,7 @@ type Opts struct {
 	Compat        bool
 	passphraseSet bool
 	passphrase    string
-	Salt          string
+	Salt          []byte
 	EncType       Algos
 }
 

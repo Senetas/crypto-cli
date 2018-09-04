@@ -149,7 +149,7 @@ func (db *decryptedConfig) EncryptBlob(opts *crypto.Opts, outname string) (_ Enc
 		return nil, err
 	}
 
-	ec, err := dc.Encrypt(db.DecKey, opts)
+	ec, err := dc.Encrypt(db.DecKey, db.DeCrypto.Salt)
 	if err != nil {
 		return nil, err
 	}

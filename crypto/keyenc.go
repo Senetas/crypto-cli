@@ -17,61 +17,67 @@ package crypto
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/rand"
 	"crypto/sha256"
 
 	"github.com/Senetas/crypto-cli/utils"
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/pbkdf2"
 )
 
 // Enckey encrypts the ciphertext = key with the given passphrase and salt
-func Enckey(plaintext []byte, pass, salt string) ([]byte, error) {
-	bsalt := []byte(salt)
-	key := passSalt2Key(pass, bsalt)
+func Enckey(plaintext, salt []byte, pass string) (ciphertext []byte, err error) {
+	key := passSalt2Key(pass, salt)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, utils.ErrEncrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	nonce := make([]byte, 12)
-	if _, err = rand.Read(nonce); err != nil {
-		return nil, utils.ErrEncrypt
+	if err != nil {
+		err = errors.WithStack(err)
+		return
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, utils.ErrEncrypt
+		err = errors.WithStack(err)
+		return
 	}
 
-	ciphertext := aesgcm.Seal(nil, nonce, plaintext, bsalt)
+	cipherkey := aesgcm.Seal(nil, nonce, plaintext, salt)
 
-	return utils.Concat([][]byte{nonce, ciphertext}), nil
+	return utils.Concat([][]byte{salt, nonce, cipherkey}), nil
 }
 
 // Deckey decrypts the ciphertext = key with the given passphrase and salt
-func Deckey(ciphertext []byte, pass, salt string) ([]byte, error) {
-	nonce := ciphertext[:12]
-	ckey := ciphertext[12:]
-	bsalt := []byte(salt)
-	key := passSalt2Key(pass, bsalt)
+func Deckey(ciphertext []byte, pass string) (plaintext, salt []byte, err error) {
+	salt = ciphertext[:16]
+	nonce := ciphertext[16:28]
+	key := ciphertext[28:]
 
-	block, err := aes.NewCipher(key)
+	kek := passSalt2Key(pass, salt)
+
+	block, err := aes.NewCipher(kek)
 	if err != nil {
-		return nil, utils.ErrDecrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, utils.ErrDecrypt
+		err = errors.WithStack(err)
+		return
 	}
 
-	plaintext, err := aesgcm.Open(nil, nonce, ckey, bsalt)
+	plaintext, err = aesgcm.Open(nil, nonce, key, salt)
 	if err != nil {
-		return nil, utils.ErrDecrypt
+		err = errors.WithStack(err)
+		return
 	}
 
-	return plaintext, nil
+	return
 }
 
 // passSalt2Key deterministically returns a 32 byte encryption key given a passphrase and a salt

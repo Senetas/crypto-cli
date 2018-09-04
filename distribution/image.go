@@ -15,7 +15,6 @@
 package distribution
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/Senetas/crypto-cli/crypto"
@@ -54,18 +53,25 @@ func unencryptedConfig(blob *NoncryptedBlob) (Blob, error) {
 	return NewPlainConfig(blob.GetFilename(), d, size), nil
 }
 
-func prepareConfig(config Blob, opts *crypto.Opts, ref names.NamedTaggedRepository) (Blob, error) {
+func prepareConfig(
+	config Blob,
+	opts *crypto.Opts,
+	ref names.NamedTaggedRepository,
+) (
+	_ Blob,
+	err error,
+) {
 	switch blob := config.(type) {
 	case DecryptedBlob:
 		log.Debug().Msg("encrypting config")
-		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 		return blob.EncryptBlob(opts, blob.GetFilename()+".aes")
 	case *NoncryptedBlob:
 		log.Debug().Msgf("preparing config")
 		return unencryptedConfig(blob)
 	default:
 	}
-	return nil, errors.New("config is of wrong type")
+	err = errors.New("config is of wrong type")
+	return
 }
 
 // Encrypt an image, generating an image manifest suitable for upload to a repo
@@ -86,7 +92,6 @@ func (m *ImageManifest) Encrypt(
 		switch blob := l.(type) {
 		case DecryptedBlob:
 			log.Debug().Msgf("encrypting layer %d", i)
-			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
 			layerBlobs[i], err = blob.EncryptBlob(opts, blob.GetFilename()+".aes")
 		case *NoncryptedBlob:
 			log.Debug().Msgf("compressing layer %d", i)
@@ -114,7 +119,6 @@ func (m *ImageManifest) DecryptKeys(
 ) (err error) {
 	switch blob := m.Config.(type) {
 	case EncryptedBlob:
-		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 		m.Config, err = blob.DecryptKey(opts)
 		if err != nil {
 			return err
@@ -127,7 +131,6 @@ func (m *ImageManifest) DecryptKeys(
 	for i, l := range m.Layers {
 		switch blob := l.(type) {
 		case EncryptedBlob:
-			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
 			m.Layers[i], err = blob.DecryptKey(opts)
 			if err != nil {
 				return err
@@ -150,7 +153,6 @@ func DecryptManifest(
 	var config Blob
 	switch blob := manifest.Config.(type) {
 	case KeyDecryptedBlob:
-		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 		config, err = blob.DecryptFile(opts, blob.GetFilename()+".dec")
 	case *NoncryptedBlob:
 		config = blob
@@ -166,7 +168,6 @@ func DecryptManifest(
 	for i, l := range manifest.Layers {
 		switch blob := l.(type) {
 		case KeyDecryptedBlob:
-			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
 			layers[i], err = blob.DecryptFile(opts, blob.GetFilename()+".dec")
 		case CompressedBlob:
 			layers[i], err = blob.Decompress(blob.GetFilename() + ".dec")

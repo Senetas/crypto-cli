@@ -22,63 +22,76 @@ import (
 	"encoding/json"
 
 	"github.com/Senetas/crypto-cli/utils"
+	"github.com/pkg/errors"
 )
 
 // EncryptJSON encrypts a JSON object and base64 (URL) encodes the ciphertext
-func EncryptJSON(val interface{}, key, ad []byte) (string, error) {
+func EncryptJSON(val interface{}, key, salt []byte) (_ string, err error) {
 	plaintext, err := json.Marshal(val)
 	if err != nil {
-		return "", utils.ErrEncrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return "", utils.ErrEncrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	// create random nonce
 	nonce := make([]byte, 12)
 	if _, err = rand.Read(nonce); err != nil {
-		return "", utils.ErrEncrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", utils.ErrEncrypt
+		err = errors.WithStack(err)
+		return
 	}
 
-	ciphertext := aesgcm.Seal(nil, nonce, plaintext, ad)
-	noncecipher := utils.Concat([][]byte{nonce, ciphertext})
-	return base64.URLEncoding.EncodeToString(noncecipher), nil
+	ciphertext := aesgcm.Seal(nil, nonce, plaintext, salt)
+	saltnoncecipher := utils.Concat([][]byte{salt, nonce, ciphertext})
+
+	return base64.URLEncoding.EncodeToString(saltnoncecipher), nil
 }
 
-// DecryptJSON decrypts a string that is the base64 (URL) encoded ciphertext of a json object
-func DecryptJSON(ciphertext string, key, ad []byte, val interface{}) error {
+// DecryptJSON decrypts a string that is the base64 (URL) encoded ciphertext of
+// a json object and assigns that object to val
+func DecryptJSON(ciphertext string, key []byte, val interface{}) (err error) {
 	decoded, err := base64.URLEncoding.DecodeString(ciphertext)
 	if err != nil {
-		return utils.ErrDecrypt
+		err = errors.WithStack(err)
+		return
 	}
 
-	nonce := decoded[:12]
-	cjstr := decoded[12:]
+	ad := decoded[:16]
+	nonce := decoded[16:28]
+	cjstr := decoded[28:]
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return utils.ErrDecrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return utils.ErrDecrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	plaintext, err := aesgcm.Open(nil, nonce, cjstr, ad)
 	if err != nil {
-		return utils.ErrDecrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	if err = json.Unmarshal(plaintext, val); err != nil {
-		return utils.ErrDecrypt
+		err = errors.WithStack(err)
+		return
 	}
 
 	return nil
