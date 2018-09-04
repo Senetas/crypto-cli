@@ -38,9 +38,6 @@ import (
 )
 
 const (
-	saltBase    = "com.senetas.crypto/%s/%s"
-	configSalt  = saltBase + "/config"
-	layerSalt   = saltBase + "/layer%d"
 	labelString = "LABEL com.senetas.crypto.enabled"
 )
 
@@ -190,8 +187,10 @@ func mkBlobs(
 	}
 
 	// read the archive manifest
+	// manifestfile consists of information that is local to the os, or supplied by the user or the
+	// docker daemon. Thus, assuming they are not comprimised, it is safe to open
 	manifestfile := filepath.Join(path, "manifest.json")
-	manifestFH, err := os.Open(manifestfile)
+	manifestFH, err := os.Open(manifestfile) // #nosec
 	defer func() { err = utils.CheckedClose(manifestFH, err) }()
 	if err != nil {
 		err = errors.Wrapf(err, "could not open file: %s", manifestfile)
@@ -274,7 +273,9 @@ func pbkdf2Aes256GcmEncrypt(
 }
 
 func fileDigest(filename string) (d digest.Digest, err error) {
-	fh, err := os.Open(filename)
+	// filename consists of information that is local to the os or the docker
+	// daemon. Thus assuming they are not comprimised, it is safe to open
+	fh, err := os.Open(filename) // #nosec
 	defer func() { err = utils.CheckedClose(fh, err) }()
 	if err != nil {
 		return
@@ -497,15 +498,7 @@ func (m *ImageManifest) Decrypt(
 	// decrypt keys and files for layers
 	out.Layers = make([]Blob, len(m.Layers))
 	for i, l := range m.Layers {
-		switch blob := l.(type) {
-		case EncryptedBlob:
-			out.Layers[i], err = blob.DecryptBlob(opts, blob.GetFilename()+".dec")
-		case KeyDecryptedBlob:
-			out.Layers[i], err = blob.DecryptFile(opts, blob.GetFilename()+".dec")
-		case CompressedBlob:
-			out.Layers[i], err = blob.Decompress(blob.GetFilename() + ".dec")
-		default:
-		}
+		out.Layers[i], err = decryptLayer(ref, opts, l, i)
 		if err != nil {
 			return
 		}

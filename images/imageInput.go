@@ -142,7 +142,7 @@ func mkTar(dir string, contents []string, w io.WriteCloser, errCh chan<- error) 
 	tarball := tar.NewWriter(w)
 	defer func() { errCh <- tarball.Close() }()
 
-	var err error
+	var err error // err2 is needed below to prevent shadowing
 	for _, src := range contents {
 		fullpath := filepath.Join(dir, src)
 
@@ -163,7 +163,12 @@ func mkTar(dir string, contents []string, w io.WriteCloser, errCh chan<- error) 
 			break
 		}
 
-		file, err2 := os.Open(fullpath)
+		// the only part of fullpath that may be varied by anadvesary is the digest
+		// but we have explicitly validated that the digest is a digest previously.
+		// of course the advsaery could replace both the file and the digest, but then
+		// decryption will fail
+		file, err2 := os.Open(fullpath) // #nosec
+		defer func() { err = utils.CheckedClose(file, err) }()
 		if err2 != nil {
 			err = errors.WithStack(err2)
 			break
@@ -171,11 +176,6 @@ func mkTar(dir string, contents []string, w io.WriteCloser, errCh chan<- error) 
 
 		_, err = io.Copy(tarball, file)
 		if err != nil {
-			err = errors.WithStack(err)
-			break
-		}
-
-		if err = file.Close(); err != nil {
 			err = errors.WithStack(err)
 			break
 		}
