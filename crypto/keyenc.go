@@ -84,5 +84,5 @@ func Deckey(ciphertext []byte, pass string) (plaintext, salt []byte, err error) 
 
 // passSalt2Key deterministically returns a 32 byte encryption key given a passphrase and a salt
 func passSalt2Key(pass string, salt []byte) []byte {
-	return pbkdf2.Key([]byte(pass), salt, 8192, 32, sha256.New)
+	return pbkdf2.Key([]byte(pass), salt, 100000, 32, sha256.New)
 }

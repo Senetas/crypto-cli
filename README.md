@@ -7,6 +7,8 @@ This application is not suitable for use in a production environment. There are 
 
 ## Prerequisites
 Ensure that `docker` and `go` are installed and that `$GOPATH` has been set and that `$GOPATH/bin` is in the `$PATH`.
+This document assumes that `docker` may be run without prefixing it with `sudo`, for a guide on how to achieve this, see <https://docs.docker.com/install/linux/linux-postinstall/>.
+Currently, only Linux containers on Linux hosts are supported.
 
 ## Installation
 ```console
@@ -32,7 +34,6 @@ LABEL com.senetas.crypto.enabled=false
 or the end of the file or stage will be encrypted.
 As many of these may be specified to encrypt any nonempty subset of the layers that is disjoint from the base image.
 
-
 However, the typical usage is expected to have the `Dockerfile` containing exactly one `com.senetas.crypto.enabled=true` after the initial `FROM`.
 This will leave the base image unencrypted but encrypt any layers created on top of it.
 
@@ -45,7 +46,7 @@ LABEL "com.senetas.crypto.enabled"="false"
 RUN rm file.txt
 ENTRYPOINT ["/bin/sh"]
 ```
-the layer resulting from the command `RUN echo "hello" > file.txt` will be encrypted.
+only the layer resulting from the command `RUN echo "hello" > file.txt` will be encrypted.
 
 Note that although in general a `LABEL` line may contain multiple labels, this is not supported for the `com.senetas.crypto.enabled` label for the purposes of this application.
 
@@ -79,3 +80,10 @@ See also the privacy note below.
 
 ## Privacy
 The user MUST be logged into a docker hub account. Because `docker login` stores an encoded username and password, the clear text password is exposed to this utility. While the password is not transmitted anywhere other then the repository in either a clear, encoded or encrypted form, it may be logged to `STDOUT` in certain situations. Thus, it is recommended to set up an alternate Docker Hub account while this is under development.
+
+## Encryption
+The layer archives are (if specified) encrypted using AES-GCM, with a 256-bit key that is randomly generated.
+Chunking is handled by the go SIO library: <https://github.com/minio/sio>, which implements the DARE standard for data encryption at rest.
+The keys are encrypted using AES-GCM from a key derived from a user specified passphrase and a random salt.
+The key derivation function is 100,000 iterations of PBKDF2 with SHA256 used in the HMAC.
+The encrypted key and salt are stored in the image manifest and may be inspected using the `docker manifest` command, which is experimental at this stage.
