@@ -15,26 +15,26 @@
 package crypto_test
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/Senetas/crypto-cli/crypto"
+	"github.com/stretchr/testify/require"
 )
 
 func TestKey(t *testing.T) {
+	require := require.New(t)
+
 	plaintext := []byte("Hello")
-	salt := "com.senetas.crypto/narthanaepa1/my-alpine/test/config"
-	ciphertext, err := crypto.Enckey([]byte(plaintext), "hunter2", salt)
-	if err != nil {
-		panic(err)
-	}
+	salt := []byte("0123456789012345")
 
-	plaintext1, err := crypto.Deckey(ciphertext, "hunter2", salt)
-	if err != nil {
-		panic(err)
-	}
+	ciphertext, err := crypto.Enckey([]byte(plaintext), salt, "hunter2")
+	require.NoError(err)
 
-	if !bytes.Equal(plaintext, plaintext1) {
-		t.Errorf("plaintext %s was encrypted to %v which decrypted to %s", plaintext, ciphertext, plaintext1)
-	}
+	require.Equal(salt, ciphertext[:16])
+
+	plaintext1, salt1, err := crypto.Deckey(ciphertext, "hunter2")
+	require.NoError(err)
+
+	require.Equal(salt, salt1)
+	require.Equal(plaintext, plaintext1)
 }

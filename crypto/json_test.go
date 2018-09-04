@@ -18,51 +18,45 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/Senetas/crypto-cli/crypto"
 )
 
+type test struct {
+	A1, A2 string
+	T1     test2
+	C1     []int
+}
+
+type test2 struct {
+	B1, B2 int
+}
+
 func TestJSONEncDec(t *testing.T) {
-	assert := assert.New(t)
-
-	type test2 struct {
-		B1, B2 int
-	}
-
-	type test struct {
-		A1, A2 string
-		T1     test2
-		C1     []int
-	}
+	require := require.New(t)
 
 	o := test{
 		A1: "hello",
 		C1: []int{1, 2, 3},
 	}
 
-	var key [32]byte
-	n, err := rand.Read(key[:])
-	if err != nil {
-		t.Fatalf("%+v", err)
-	} else if n != 32 {
-		t.Fatal("failed to read 32 random bytes")
-	}
+	key := make([]byte, 32)
+	n, err := rand.Read(key)
+	require.NoError(err)
+	require.Equal(32, n)
 
-	str, err := crypto.EncryptJSON(o, key[:], []byte("hello"))
-	if !assert.NoError(err) {
-		return
-	}
+	salt := make([]byte, 16)
+	m, err := rand.Read(salt)
+	require.NoError(err)
+	require.Equal(16, m)
+
+	str, err := crypto.EncryptJSON(o, key, salt)
+	require.NoError(err)
 
 	t.Log(str)
-
 	o1 := test{}
 
-	if err = crypto.DecryptJSON(str, key[:], []byte("hello"), &o1); !assert.NoError(err) {
-		return
-	}
-
-	if !assert.Equal(o, o1) {
-		t.Fatalf("Decryption did not invert Encryption\no = %#v, o1 = %#v", o, o1)
-	}
+	require.NoError(crypto.DecryptJSON(str, key, &o1))
+	require.Equal(o, o1)
 }

@@ -28,6 +28,7 @@ import (
 type EnCrypto struct {
 	Algos  crypto.Algos `json:"cryptoType"`
 	EncKey string       `json:"key"`
+	Salt   []byte       `json:"-"`
 }
 
 // NewEncryptoCompat create a new Encrypto struct from some URLs
@@ -78,7 +79,7 @@ func DecryptKey(e EnCrypto, opts *crypto.Opts) (d DeCrypto, err error) {
 	}
 
 	d = DeCrypto{Algos: e.Algos}
-	d.DecKey, err = crypto.Deckey(decoded, passphrase, opts.Salt)
+	d.DecKey, d.Salt, err = crypto.Deckey(decoded, passphrase)
 	if err != nil {
 		return
 	}
@@ -90,18 +91,26 @@ func DecryptKey(e EnCrypto, opts *crypto.Opts) (d DeCrypto, err error) {
 type DeCrypto struct {
 	Algos  crypto.Algos `json:"cryptoType"`
 	DecKey []byte       `json:"-"`
+	Salt   []byte       `json:"-"`
 }
 
 // NewDecrypto create a new DeCrypto struct that holds decrupted key data
-func NewDecrypto(opts *crypto.Opts) (*DeCrypto, error) {
-	key := make([]byte, 32)
-	if _, err := rand.Read(key); err != nil {
-		return nil, err
-	}
-	return &DeCrypto{
+func NewDecrypto(opts *crypto.Opts) (d *DeCrypto, err error) {
+	d = &DeCrypto{
 		Algos:  opts.EncType,
-		DecKey: key,
-	}, nil
+		DecKey: make([]byte, 32),
+		Salt:   make([]byte, 16),
+	}
+
+	if _, err = rand.Read(d.DecKey); err != nil {
+		return
+	}
+
+	if _, err = rand.Read(d.Salt); err != nil {
+		return
+	}
+
+	return
 }
 
 // EncryptKey encrypts a plaintext key with a passphrase and salt
@@ -111,18 +120,20 @@ func EncryptKey(d DeCrypto, opts *crypto.Opts) (e EnCrypto, err error) {
 		return
 	}
 
+	e.Algos = d.Algos
+	e.Salt = d.Salt
+
 	passphrase, err := opts.GetPassphrase(crypto.StdinPassReader)
 	if err != nil {
 		return
 	}
 
-	ciphertextKey, err := crypto.Enckey(d.DecKey, passphrase, opts.Salt)
+	ciphertextKey, err := crypto.Enckey(d.DecKey, e.Salt, passphrase)
 	if err != nil {
 		err = errors.WithStack(err)
 		return
 	}
 
-	e = EnCrypto{Algos: d.Algos}
 	e.EncKey = base64.URLEncoding.EncodeToString(ciphertextKey)
 
 	return

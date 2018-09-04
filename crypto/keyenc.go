@@ -27,9 +27,8 @@ import (
 )
 
 // Enckey encrypts the ciphertext = key with the given passphrase and salt
-func Enckey(plaintext []byte, pass, salt string) (_ []byte, err error) {
-	bsalt := []byte(salt)
-	key := passSalt2Key(pass, bsalt)
+func Enckey(plaintext, salt []byte, pass string) (ciphertext []byte, err error) {
+	key := passSalt2Key(pass, salt)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -49,19 +48,20 @@ func Enckey(plaintext []byte, pass, salt string) (_ []byte, err error) {
 		return
 	}
 
-	ciphertext := aesgcm.Seal(nil, nonce, plaintext, bsalt)
+	cipherkey := aesgcm.Seal(nil, nonce, plaintext, salt)
 
-	return utils.Concat([][]byte{nonce, ciphertext}), nil
+	return utils.Concat([][]byte{salt, nonce, cipherkey}), nil
 }
 
 // Deckey decrypts the ciphertext = key with the given passphrase and salt
-func Deckey(ciphertext []byte, pass, salt string) (plaintext []byte, err error) {
-	nonce := ciphertext[:12]
-	ckey := ciphertext[12:]
-	bsalt := []byte(salt)
-	key := passSalt2Key(pass, bsalt)
+func Deckey(ciphertext []byte, pass string) (plaintext, salt []byte, err error) {
+	salt = ciphertext[:16]
+	nonce := ciphertext[16:28]
+	key := ciphertext[28:]
 
-	block, err := aes.NewCipher(key)
+	kek := passSalt2Key(pass, salt)
+
+	block, err := aes.NewCipher(kek)
 	if err != nil {
 		err = errors.WithStack(err)
 		return
@@ -73,7 +73,7 @@ func Deckey(ciphertext []byte, pass, salt string) (plaintext []byte, err error) 
 		return
 	}
 
-	plaintext, err = aesgcm.Open(nil, nonce, ckey, bsalt)
+	plaintext, err = aesgcm.Open(nil, nonce, key, salt)
 	if err != nil {
 		err = errors.WithStack(err)
 		return
@@ -84,5 +84,5 @@ func Deckey(ciphertext []byte, pass, salt string) (plaintext []byte, err error) 
 
 // passSalt2Key deterministically returns a 32 byte encryption key given a passphrase and a salt
 func passSalt2Key(pass string, salt []byte) []byte {
-	return pbkdf2.Key([]byte(pass), salt, 8192, 32, sha256.New)
+	return pbkdf2.Key([]byte(pass), salt, 100000, 32, sha256.New)
 }

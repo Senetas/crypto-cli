@@ -18,7 +18,6 @@ import (
 	"archive/tar"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -39,9 +38,6 @@ import (
 )
 
 const (
-	saltBase    = "com.senetas.crypto/%s/%s"
-	configSalt  = saltBase + "/config"
-	layerSalt   = saltBase + "/layer%d"
 	labelString = "LABEL com.senetas.crypto.enabled"
 )
 
@@ -191,8 +187,10 @@ func mkBlobs(
 	}
 
 	// read the archive manifest
+	// manifestfile consists of information that is local to the os, or supplied by the user or the
+	// docker daemon. Thus, assuming they are not comprimised, it is safe to open
 	manifestfile := filepath.Join(path, "manifest.json")
-	manifestFH, err := os.Open(manifestfile)
+	manifestFH, err := os.Open(manifestfile) // #nosec
 	defer func() { err = utils.CheckedClose(manifestFH, err) }()
 	if err != nil {
 		err = errors.Wrapf(err, "could not open file: %s", manifestfile)
@@ -275,7 +273,9 @@ func pbkdf2Aes256GcmEncrypt(
 }
 
 func fileDigest(filename string) (d digest.Digest, err error) {
-	fh, err := os.Open(filename)
+	// filename consists of information that is local to the os or the docker
+	// daemon. Thus assuming they are not comprimised, it is safe to open
+	fh, err := os.Open(filename) // #nosec
 	defer func() { err = utils.CheckedClose(fh, err) }()
 	if err != nil {
 		return
@@ -380,17 +380,24 @@ func unencryptedConfig(blob *NoncryptedBlob) (_ Blob, err error) {
 	return NewPlainConfig(blob.GetFilename(), d, size), nil
 }
 
-func prepareConfig(config Blob, opts *crypto.Opts, ref names.NamedTaggedRepository) (Blob, error) {
+func prepareConfig(
+	config Blob,
+	opts *crypto.Opts,
+	ref names.NamedTaggedRepository,
+) (
+	_ Blob,
+	err error,
+) {
 	switch blob := config.(type) {
 	case DecryptedBlob:
 		log.Debug().Msg("encrypting config")
-		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 		return blob.EncryptBlob(opts, blob.GetFilename()+".aes")
 	case *NoncryptedBlob:
 		log.Debug().Msgf("preparing config")
 		return unencryptedConfig(blob)
 	}
-	return nil, errors.New("config is of wrong type")
+	err = errors.New("config is of wrong type")
+	return
 }
 
 // Encrypt an image, generating an image manifest suitable for upload to a repo
@@ -410,11 +417,10 @@ func (m *ImageManifest) Encrypt(
 	for i, l := range m.Layers {
 		switch blob := l.(type) {
 		case DecryptedBlob:
-			log.Debug().Msgf("encrypting layer %d", i)
-			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
+			log.Debug().Msgf("encrypting layer %d: %s", i, blob.GetFilename())
 			layerBlobs[i], err = blob.EncryptBlob(opts, blob.GetFilename()+".aes")
 		case *NoncryptedBlob:
-			log.Debug().Msgf("compressing layer %d", i)
+			log.Debug().Msgf("compressing layer %d: %s", i, blob.GetFilename())
 			layerBlobs[i], err = blob.Compress(blob.GetFilename() + ".gz")
 		default:
 		}
@@ -439,7 +445,6 @@ func (m *ImageManifest) DecryptKeys(
 ) (err error) {
 	switch blob := m.Config.(type) {
 	case EncryptedBlob:
-		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 		m.Config, err = blob.DecryptKey(opts)
 		if err != nil {
 			return err
@@ -452,7 +457,6 @@ func (m *ImageManifest) DecryptKeys(
 	for i, l := range m.Layers {
 		switch blob := l.(type) {
 		case EncryptedBlob:
-			opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
 			m.Layers[i], err = blob.DecryptKey(opts)
 			if err != nil {
 				return err
@@ -479,10 +483,8 @@ func (m *ImageManifest) Decrypt(
 
 	switch blob := m.Config.(type) {
 	case EncryptedBlob:
-		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 		out.Config, err = blob.DecryptBlob(opts, blob.GetFilename()+".dec")
 	case KeyDecryptedBlob:
-		opts.Salt = fmt.Sprintf(configSalt, ref.Path(), ref.Tag())
 		out.Config, err = blob.DecryptFile(opts, blob.GetFilename()+".dec")
 	case *NoncryptedBlob:
 		out.Config = blob
@@ -494,6 +496,7 @@ func (m *ImageManifest) Decrypt(
 	}
 
 	// decrypt keys and files for layers
+	out.Layers = make([]Blob, len(m.Layers))
 	for i, l := range m.Layers {
 		out.Layers[i], err = decryptLayer(ref, opts, l, i)
 		if err != nil {
@@ -512,10 +515,8 @@ func decryptLayer(
 ) (layer Blob, err error) {
 	switch blob := l.(type) {
 	case EncryptedBlob:
-		opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
 		layer, err = blob.DecryptBlob(opts, blob.GetFilename()+".dec")
 	case KeyDecryptedBlob:
-		opts.Salt = fmt.Sprintf(layerSalt, ref.Path(), ref.Tag(), i)
 		layer, err = blob.DecryptFile(opts, blob.GetFilename()+".dec")
 	case CompressedBlob:
 		layer, err = blob.Decompress(blob.GetFilename() + ".dec")

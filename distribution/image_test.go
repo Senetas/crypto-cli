@@ -35,14 +35,15 @@ import (
 func TestImageEncryptDecrypt(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
+
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
 	defer func() { assert.NoError((utils.CleanUp(dir, nil))) }()
 
 	ref, err := reference.ParseNormalizedNamed("narthanaepa1/my-alpine:test")
-	require.Nil(err)
+	require.NoError(err)
 
 	nTRep, err := names.CastToTagged(ref)
-	require.Nil(err)
+	require.NoError(err)
 
 	passphrase := "hunter2"
 
@@ -63,6 +64,7 @@ func TestImageEncryptDecrypt(t *testing.T) {
 		if !assert.NoError(err) {
 			continue
 		}
+		_ = manifest
 
 		emanifest, err := manifest.Encrypt(test.ref, test.opts)
 		if !assert.NoError(err) {
@@ -74,7 +76,7 @@ func TestImageEncryptDecrypt(t *testing.T) {
 			continue
 		}
 
-		assert.Nil(checkFiles(dmanifest, manifest))
+		assert.NoError(checkFiles(dmanifest, manifest))
 	}
 }
 
