@@ -8,7 +8,6 @@ This application is not suitable for use in a production environment. There are 
 ## Prerequisites
 Ensure that `docker` and `go` are installed and that `$GOPATH` has been set and that `$GOPATH/bin` is in the `$PATH`.
 This document assumes that `docker` may be run without prefixing it with `sudo`, for a guide on how to achieve this, see <https://docs.docker.com/install/linux/linux-postinstall/>.
-Currently, only Linux containers on Linux hosts are supported.
 
 ## Installation
 ```console
@@ -81,7 +80,7 @@ See also the privacy note below.
 ## Privacy
 The user MUST be logged into a docker hub account. Because `docker login` stores an encoded username and password, the clear text password is exposed to this utility. While the password is not transmitted anywhere other then the repository in either a clear, encoded or encrypted form, it may be logged to `STDOUT` in certain situations. Thus, it is recommended to set up an alternate Docker Hub account while this is under development.
 
-## Encryption
+## Cryptography
 The layer archives are (if specified) encrypted using AES-GCM, with a 256-bit key that is randomly generated.
 Chunking is handled by the go SIO library: <https://github.com/minio/sio>, which implements the DARE standard for data encryption at rest.
 The keys are encrypted using AES-GCM from a key derived from a user specified passphrase and a random salt.
