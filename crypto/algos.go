@@ -24,9 +24,13 @@ type Algos string
 const (
 	// None represents an identity encryption function
 	None Algos = "NONE"
+
 	// Pbkdf2Aes256Gcm represents aead with AES256-GCM with a key derived
 	// from a passphrase using PBKDF2
 	Pbkdf2Aes256Gcm Algos = "PBKDF2-AES256-GCM"
+
+	// Pbkdf2Iter is the number of iterations of PBKDF2 to run
+	Pbkdf2Iter = 4e4
 )
 
 // ValidateAlgos converts a string to valid Algos if possible

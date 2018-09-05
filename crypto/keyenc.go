@@ -19,6 +19,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/binary"
 
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/pbkdf2"
@@ -27,8 +28,8 @@ import (
 )
 
 // Enckey encrypts the ciphertext = key with the given passphrase and salt
-func Enckey(plaintext, salt []byte, pass string) (ciphertext []byte, err error) {
-	key := passSalt2Key(pass, salt)
+func Enckey(plaintext, salt []byte, iter int, pass string) (ciphertext []byte, err error) {
+	key := passSalt2Key(pass, salt, iter)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -50,16 +51,24 @@ func Enckey(plaintext, salt []byte, pass string) (ciphertext []byte, err error) 
 
 	cipherkey := aesgcm.Seal(nil, nonce, plaintext, salt)
 
-	return utils.Concat([][]byte{salt, nonce, cipherkey}), nil
+	bIter := make([]byte, 8)
+	binary.BigEndian.PutUint64(bIter, uint64(iter))
+
+	return utils.Concat([][]byte{bIter, salt, nonce, cipherkey}), nil
 }
 
 // Deckey decrypts the ciphertext = key with the given passphrase and salt
-func Deckey(ciphertext []byte, pass string) (plaintext, salt []byte, err error) {
-	salt = ciphertext[:16]
-	nonce := ciphertext[16:28]
-	key := ciphertext[28:]
+func Deckey(ciphertext []byte, pass string) (plaintext, salt []byte, iter int, err error) {
+	iter, err = utils.Uint64ToPosInt(binary.BigEndian.Uint64(ciphertext[0:]))
+	if err != nil {
+		return
+	}
 
-	kek := passSalt2Key(pass, salt)
+	salt = ciphertext[8:24]
+	nonce := ciphertext[24:36]
+	key := ciphertext[36:]
+
+	kek := passSalt2Key(pass, salt, iter)
 
 	block, err := aes.NewCipher(kek)
 	if err != nil {
@@ -83,6 +92,6 @@ func Deckey(ciphertext []byte, pass string) (plaintext, salt []byte, err error) 
 }
 
 // passSalt2Key deterministically returns a 32 byte encryption key given a passphrase and a salt
-func passSalt2Key(pass string, salt []byte) []byte {
-	return pbkdf2.Key([]byte(pass), salt, 100000, 32, sha256.New)
+func passSalt2Key(pass string, salt []byte, iter int) []byte {
+	return pbkdf2.Key([]byte(pass), salt, iter, 32, sha256.New)
 }
