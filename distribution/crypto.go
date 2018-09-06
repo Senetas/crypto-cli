@@ -81,12 +81,14 @@ func DecryptKey(e EnCrypto, opts *crypto.Opts) (d DeCrypto, err error) {
 
 	passphrase, err := opts.GetPassphrase(crypto.StdinPassReader)
 	if err != nil {
+		err = errors.WithStack(err)
 		return
 	}
 
 	d = DeCrypto{Algos: e.Algos}
 	d.DecKey, d.Salt, d.Iter, err = crypto.Deckey(decoded, passphrase)
 	if err != nil {
+		err = errors.WithStack(err)
 		return
 	}
 
