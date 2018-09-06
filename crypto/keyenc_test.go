@@ -24,17 +24,21 @@ import (
 func TestKey(t *testing.T) {
 	require := require.New(t)
 
-	plaintext := []byte("Hello")
-	salt := []byte("0123456789012345")
+	var (
+		iter      int = 1e5
+		plaintext     = []byte("Hello")
+		salt          = []byte("0123456789012345")
+	)
 
-	ciphertext, err := crypto.Enckey([]byte(plaintext), salt, "hunter2")
+	ciphertext, err := crypto.Enckey([]byte(plaintext), salt, iter, "hunter2")
 	require.NoError(err)
 
-	require.Equal(salt, ciphertext[:16])
+	require.Equal(salt, ciphertext[8:24])
 
-	plaintext1, salt1, err := crypto.Deckey(ciphertext, "hunter2")
+	plaintext1, salt1, iter1, err := crypto.Deckey(ciphertext, "hunter2")
 	require.NoError(err)
 
+	require.Equal(iter, iter1)
 	require.Equal(salt, salt1)
 	require.Equal(plaintext, plaintext1)
 }

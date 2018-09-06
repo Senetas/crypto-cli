@@ -36,18 +36,20 @@ func useTLS(
 	ref names.NamedRepository,
 	repoInfo dregistry.RepositoryInfo,
 	endpoint dregistry.APIEndpoint,
-) (bool, error) {
+) (_ bool, err error) {
 	endpoint.URL.Scheme = "http"
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
 	urlStr, err := bldr.BuildBaseURL()
 	if err != nil {
-		return false, errors.Wrapf(err, "base = %s", endpoint.URL)
+		err = errors.Wrapf(err, "base = %s", endpoint.URL)
+		return
 	}
 
 	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
-		return false, errors.Wrapf(err, "url = %s", urlStr)
+		err = errors.Wrapf(err, "url = %s", urlStr)
+		return
 	}
 
 	httpClient := *httpclient.DefaultClient
@@ -60,7 +62,7 @@ func useTLS(
 		defer func() { err = utils.CheckedClose(resp.Body, err) }()
 	}
 	if err != nil {
-		return false, err
+		return
 	}
 
 	switch resp.StatusCode {
@@ -83,30 +85,31 @@ func useTLS(
 }
 
 func authProcedure(ref reference.Named) (
-	auth.Token,
-	names.NamedTaggedRepository,
-	*dregistry.APIEndpoint,
-	error,
+	_ auth.Token,
+	_ names.NamedTaggedRepository,
+	_ *dregistry.APIEndpoint,
+	err error,
 ) {
 	nTRep, err := names.CastToTagged(ref)
 	if err != nil {
-		return nil, nil, nil, err
+		return
 	}
 
 	repoInfo, err := dregistry.ParseRepositoryInfo(ref)
 	if err != nil {
-		return nil, nil, nil, errors.Wrapf(err, "could not parse ref = %v", ref)
+		err = errors.Wrapf(err, "could not parse ref = %v", ref)
+		return
 	}
 
 	endpoint, err := registry.GetEndpoint(ref, *repoInfo)
 	if err != nil {
-		return nil, nil, nil,
-			errors.Wrapf(err, "could not get endpoint ref = %v, repoInfo = %v", ref, *repoInfo)
+		err = errors.Wrapf(err, "could not get endpoint ref = %v, repoInfo = %v", ref, *repoInfo)
+		return
 	}
 
 	tls, err := useTLS(nTRep, *repoInfo, endpoint)
 	if err != nil {
-		return nil, nil, nil, err
+		return
 	}
 	if !tls {
 		return nil, nTRep, &endpoint, nil
@@ -114,23 +117,23 @@ func authProcedure(ref reference.Named) (
 
 	creds, err := auth.NewDefaultCreds(repoInfo)
 	if err != nil {
-		return nil, nil, nil, err
+		return
 	}
 
 	authenticator := auth.NewAuthenticator(httpclient.DefaultClient, creds)
 	header, err := auth.ChallengeHeader(nTRep, *repoInfo, endpoint, creds)
 	if err != nil {
-		return nil, nil, nil, err
+		return
 	}
 
 	ch, err := auth.ParseChallengeHeader(header)
 	if err != nil {
-		return nil, nil, nil, err
+		return
 	}
 
 	token, err := authenticator.Authenticate(ch)
 	if err != nil {
-		return nil, nil, nil, err
+		return
 	}
 
 	log.Info().Msg("Authentication successful.")

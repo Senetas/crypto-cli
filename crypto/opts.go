@@ -32,6 +32,7 @@ type Opts struct {
 	passphraseSet bool
 	passphrase    string
 	EncType       Algos
+	Iter          int
 }
 
 // SetPassphrase sets the passphrase

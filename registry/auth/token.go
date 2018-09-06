@@ -45,8 +45,7 @@ func (t *token) Fresh() bool {
 
 func decodeRespose(respBody io.Reader) (Token, error) {
 	t := &token{}
-	dec := json.NewDecoder(respBody)
-	if err := dec.Decode(&t); err != nil {
+	if err := json.NewDecoder(respBody).Decode(&t); err != nil {
 		return nil, errors.Wrapf(err, "could not decode response from auth server")
 	}
 	if t.Token == "" {
