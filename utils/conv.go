@@ -14,7 +14,7 @@
 
 package utils
 
-import "errors"
+import "github.com/pkg/errors"
 
 // Uint64ToPosInt convertes a uint64 to an int if it is positive as an int, returning an error
 // otherwise

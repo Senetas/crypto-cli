@@ -14,7 +14,9 @@
 
 package utils
 
-import "bytes"
+import (
+	"bytes"
+)
 
 // Error is an error type that may be used to turn off the stack trace
 type Error struct {
@@ -54,7 +56,7 @@ func (es Errors) Error() string {
 
 	i := 0
 	for ; i < len(es) && es[i] == nil; i++ {
-	}
+	} // notest
 
 	var msg *bytes.Buffer
 	if i < len(es) {
@@ -63,10 +65,10 @@ func (es Errors) Error() string {
 
 	for j := i + 1; j < len(es); j++ {
 		if _, err := msg.WriteString("\n"); err != nil {
-			return "buffer became too large"
+			return "buffer became too large" // notest
 		}
 		if _, err := msg.WriteString(es[j].Error()); err != nil {
-			return "buffer became too large"
+			return "buffer became too large" // notest
 		}
 	}
 

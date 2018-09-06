@@ -20,17 +20,19 @@ import (
 	"github.com/pkg/errors"
 )
 
+// RemoveFunc is the function to remove dir
+var RemoveFunc = os.RemoveAll
+
 // CleanUp temporary files
 func CleanUp(dir string, err error) error {
 	if dir == "" {
 		return err
 	}
-	if err2 := os.RemoveAll(dir); err2 != nil {
-		err2 = errors.Wrapf(err, "could not clean up temp files in: %s", dir)
-		if err == nil {
-			return err2
+	if err2 := RemoveFunc(dir); err2 != nil {
+		if err != nil {
+			err2 = errors.Wrapf(err, err2.Error())
 		}
-		return Errors{err, err2}
+		err = errors.Wrapf(err2, "could not clean up temp files in: %s", dir)
 	}
 	return err
 }
