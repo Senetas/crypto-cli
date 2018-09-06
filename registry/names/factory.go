@@ -15,10 +15,9 @@
 package names
 
 import (
-	"errors"
-
 	"github.com/docker/distribution/reference"
 	digest "github.com/opencontainers/go-digest"
+	"github.com/rs/zerolog/log"
 )
 
 // TrimNamed removes a tag from a Named
@@ -27,6 +26,7 @@ func TrimNamed(ref reference.Named) NamedRepository {
 	case NamedTaggedRepository:
 		return &repository{domain: r.Domain(), path: r.Path()}
 	default:
+		log.Debug().Msg("here")
 		domain, path := reference.SplitHostname(ref)
 		return &repository{domain: domain, path: path}
 	}
@@ -52,11 +52,9 @@ func CastToTagged(ref reference.Named) (NamedTaggedRepository, error) {
 	switch r := ref.(type) {
 	case reference.NamedTagged:
 		return SeperateTaggedRepository(r), nil
-	case reference.Named:
+	default:
 		sep := SeperateRepository(r)
 		return &taggedRepository{"latest", sep.Domain(), sep.Path()}, nil
-	default:
-		return nil, errors.New("invalid image name")
 	}
 }
 

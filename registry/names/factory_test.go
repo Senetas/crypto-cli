@@ -22,6 +22,7 @@ import (
 	"github.com/docker/distribution/reference"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/Senetas/crypto-cli/registry/names"
 )
@@ -36,9 +37,12 @@ const (
 
 func TestTrimedNamed(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
 
 	ref, err := reference.ParseNamed(fmt.Sprintf("%s/%s:%s", domain, repo, tag))
-	assert.Nil(err)
+	require.NoError(err)
+	ref2, err := reference.ParseNamed(fmt.Sprintf("%s/%s", domain, repo))
+	require.NoError(err)
 
 	type results struct {
 		domain string
@@ -50,10 +54,11 @@ func TestTrimedNamed(t *testing.T) {
 		results
 	}{
 		{ref, results{domain, repo}},
+		{ref2, results{domain, repo}},
 	}
 
 	for _, test := range tests {
-		trimed := names.TrimNamed(ref)
+		trimed := names.TrimNamed(test.ref)
 		assert.Equal(trimed.Domain(), test.domain)
 		assert.Equal(trimed.Path(), test.path)
 	}
@@ -61,13 +66,14 @@ func TestTrimedNamed(t *testing.T) {
 
 func TestSeperateRepository(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
 
 	ref1, err := reference.ParseNamed(fmt.Sprintf("%s/%s:%s", domain, repo, tag))
-	assert.Nil(err)
+	require.NoError(err)
 	ref2, err := reference.ParseNormalizedNamed(fmt.Sprintf("%s:%s", repo, tag))
-	assert.Nil(err)
+	require.NoError(err)
 	ref3, err := reference.ParseNormalizedNamed(fmt.Sprintf("%s/%s:%s", domain, repo, tag))
-	assert.Nil(err)
+	require.NoError(err)
 
 	type results struct {
 		domain string
@@ -86,6 +92,7 @@ func TestSeperateRepository(t *testing.T) {
 
 	for _, test := range tests {
 		sep := names.SeperateRepository(test.ref)
+		assert.Equal(sep.String(), fmt.Sprintf("%s/%s", test.domain, test.path))
 		assert.Equal(sep.Domain(), test.domain)
 		assert.Equal(sep.Path(), test.path)
 		assert.Equal(sep.Name(), test.name)
@@ -94,12 +101,13 @@ func TestSeperateRepository(t *testing.T) {
 
 func TestSeperateTaggedRepository(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
 
 	ref, err := reference.ParseNamed(fmt.Sprintf("%s/%s", domain, repo))
-	assert.Nil(err)
+	require.NoError(err)
 
 	tagged, err := reference.WithTag(ref, tag)
-	assert.Nil(err)
+	require.NoError(err)
 
 	sep := names.SeperateTaggedRepository(tagged)
 	assert.Equal(sep.Domain(), domain)
@@ -110,11 +118,12 @@ func TestSeperateTaggedRepository(t *testing.T) {
 
 func TestCastToTagged(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
 
 	ref1, err := reference.ParseNamed(fmt.Sprintf("%s/%s", domain, repo))
-	assert.Nil(err)
+	require.NoError(err)
 	ref2, err := reference.ParseNamed(fmt.Sprintf("%s/%s:%s", domain, repo, tag))
-	assert.Nil(err)
+	require.NoError(err)
 
 	type results struct {
 		domain string
@@ -133,7 +142,9 @@ func TestCastToTagged(t *testing.T) {
 
 	for _, test := range tests {
 		cast, err := names.CastToTagged(test.ref)
-		assert.Nil(err)
+		if !assert.NoError(err) {
+			continue
+		}
 		assert.Equal(cast.Domain(), test.domain)
 		assert.Equal(cast.Path(), test.path)
 		assert.Equal(cast.Name(), test.name)
@@ -143,14 +154,16 @@ func TestCastToTagged(t *testing.T) {
 
 func TestAppendDigest(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
 
 	ref, err := reference.ParseNamed(fmt.Sprintf("%s/%s", domain, repo))
-	assert.Nil(err)
+	require.NoError(err)
 
 	sep := names.SeperateRepository(ref)
 	d := digest.Canonical.FromString("foobar")
 
 	dig := names.AppendDigest(sep, d)
+	assert.Equal(dig.String(), domain+"/"+repo)
 	assert.Equal(dig.Name(), repo)
 	assert.Equal(dig.Digest(), d)
 }
