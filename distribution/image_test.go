@@ -48,13 +48,17 @@ func TestImageEncryptDecrypt(t *testing.T) {
 	passphrase := "hunter2"
 
 	tests := []struct {
-		ref        names.NamedTaggedRepository
-		opts       *crypto.Opts
-		passphrase string
+		ref         names.NamedTaggedRepository
+		opts        *crypto.Opts
+		passphrase  string
+		decryptKeys bool
 	}{
-		{nTRep, opts, passphrase},
-		{nTRep, optsNone, ""},
-		{nTRep, optsCompat, passphrase},
+		{nTRep, opts, passphrase, true},
+		{nTRep, optsNone, "", true},
+		{nTRep, optsCompat, passphrase, true},
+		{nTRep, opts, passphrase, false},
+		{nTRep, optsNone, "", false},
+		{nTRep, optsCompat, passphrase, false},
 	}
 
 	for _, test := range tests {
@@ -69,6 +73,12 @@ func TestImageEncryptDecrypt(t *testing.T) {
 		emanifest, err := manifest.Encrypt(test.ref, test.opts)
 		if !assert.NoError(err) {
 			continue
+		}
+
+		if test.decryptKeys {
+			if !assert.NoError(emanifest.DecryptKeys(test.opts, test.ref)) {
+				continue
+			}
 		}
 
 		dmanifest, err := emanifest.Decrypt(test.ref, test.opts)
