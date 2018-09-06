@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/Senetas/crypto-cli/registry/auth"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -59,4 +60,32 @@ func TestCreds(t *testing.T) {
 	defer func() { require.NoError(resp.Body.Close()) }()
 
 	require.Equal(http.StatusOK, resp.StatusCode)
+}
+
+func TestChallengerLoc(t *testing.T) {
+	assert := assert.New(t)
+	invalidHeader := `Bearer realm=,service=,scope="repository:my-repo/my-alpine:pull,push"`
+
+	tests := []struct {
+		header string
+		errMsg string
+	}{
+		{
+			`Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:my-repo/my-alpine:pull,push"`,
+			"",
+		},
+		{
+			invalidHeader,
+			fmt.Sprintf("malformed challenge header: %s", invalidHeader),
+		},
+	}
+
+	for _, test := range tests {
+		_, err := auth.ParseChallengeHeader(test.header)
+		if err != nil {
+			assert.EqualError(err, test.errMsg)
+		} else {
+			assert.Equal("", test.errMsg)
+		}
+	}
 }
