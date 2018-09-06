@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -138,13 +137,8 @@ func PullManifest(
 		return nil, errors.New("manifest download failed with status: " + resp.Status)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
 	manifest := &distribution.ImageManifest{DirName: dir}
-	if err = json.Unmarshal(body, manifest); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(manifest); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
