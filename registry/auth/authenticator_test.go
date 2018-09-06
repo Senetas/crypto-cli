@@ -15,7 +15,6 @@
 package auth_test
 
 import (
-	"os"
 	"testing"
 
 	"github.com/Senetas/crypto-cli/registry"
@@ -24,8 +23,6 @@ import (
 	"github.com/Senetas/crypto-cli/registry/names"
 	"github.com/docker/distribution/reference"
 	dregistry "github.com/docker/docker/registry"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 func TestAuthenticator(t *testing.T) {
@@ -98,12 +95,4 @@ func TestChallenger(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log(tok)
-}
-
-func init() {
-	// use UNIX time for logs
-	zerolog.TimeFieldFormat = ""
-
-	// use a prettier logger
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 }
