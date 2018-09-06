@@ -77,7 +77,10 @@ func constructImageArchive(
 	return utils.ConcatErrChan(errCh, 3)
 }
 
-func writeArchiveManifestFile(manifestfile string, archiveManifest *distribution.ArchiveManifest) (err error) {
+func writeArchiveManifestFile(
+	manifestfile string,
+	archiveManifest *distribution.ArchiveManifest,
+) (err error) {
 	amFH, err := os.Create(manifestfile)
 	if err != nil {
 		err = utils.CheckedClose(amFH, errors.Wrapf(err, "filename = %s", manifestfile))

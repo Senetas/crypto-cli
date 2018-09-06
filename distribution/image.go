@@ -102,15 +102,122 @@ func NewManifest(
 		return
 	}
 
-	configBlob, layerBlobs, err := mkBlobs(ref.Path(), ref.Tag(), manifest.DirName, layers, opts)
+	manifest.Config, manifest.Layers, err = mkBlobs(
+		ref.Path(),
+		ref.Tag(),
+		manifest.DirName,
+		layers,
+		opts,
+	)
 	if err != nil {
 		return
 	}
 
-	manifest.Config = configBlob
-	manifest.Layers = layerBlobs
-
 	return manifest, nil
+}
+
+// Encrypt an image, generating an image manifest suitable for upload to a repo
+func (m *ImageManifest) Encrypt(
+	ref names.NamedTaggedRepository,
+	opts *crypto.Opts,
+) (
+	_ *ImageManifest,
+	err error,
+) {
+	configBlob, err := prepareConfig(m.Config, opts, ref)
+	if err != nil {
+		return
+	}
+
+	layerBlobs := make([]Blob, len(m.Layers))
+	for i, l := range m.Layers {
+		switch blob := l.(type) {
+		case DecryptedBlob:
+			log.Debug().Msgf("encrypting layer %d: %s", i, blob.GetFilename())
+			layerBlobs[i], err = blob.EncryptBlob(opts, blob.GetFilename()+".aes")
+		case *NoncryptedBlob:
+			log.Debug().Msgf("compressing layer %d: %s", i, blob.GetFilename())
+			layerBlobs[i], err = blob.Compress(blob.GetFilename() + ".gz")
+		default:
+		}
+		if err != nil {
+			return
+		}
+	}
+
+	return &ImageManifest{
+		SchemaVersion: m.SchemaVersion,
+		MediaType:     m.MediaType,
+		DirName:       m.DirName,
+		Config:        configBlob,
+		Layers:        layerBlobs,
+	}, nil
+}
+
+// DecryptKeys attempts to decrypt all keys in a manifest
+func (m *ImageManifest) DecryptKeys(
+	opts *crypto.Opts,
+	ref names.NamedTaggedRepository,
+) (err error) {
+	switch blob := m.Config.(type) {
+	case EncryptedBlob:
+		m.Config, err = blob.DecryptKey(opts)
+	case *NoncryptedBlob:
+	default:
+		err = errors.New("mainfest blobs are of wrong type")
+	}
+	if err != nil {
+		return
+	}
+
+	for i, l := range m.Layers {
+		switch blob := l.(type) {
+		case EncryptedBlob:
+			m.Layers[i], err = blob.DecryptKey(opts)
+		case *NoncryptedBlob:
+		default:
+			err = errors.New("mainfest blobs are of wrong type")
+		}
+		if err != nil {
+			return
+		}
+	}
+	return nil
+}
+
+// Decrypt attempts to decrypt a manifest
+func (m *ImageManifest) Decrypt(
+	ref names.NamedTaggedRepository,
+	opts *crypto.Opts,
+) (out *ImageManifest, err error) {
+	out = &ImageManifest{
+		SchemaVersion: m.SchemaVersion,
+		MediaType:     m.MediaType,
+		Layers:        make([]Blob, len(m.Layers)),
+		DirName:       m.DirName,
+	}
+
+	switch blob := m.Config.(type) {
+	case EncryptedBlob:
+		out.Config, err = blob.DecryptBlob(opts, blob.GetFilename()+".dec")
+	case KeyDecryptedBlob:
+		out.Config, err = blob.DecryptFile(opts, blob.GetFilename()+".dec")
+	case *NoncryptedBlob:
+		out.Config = blob
+	default:
+		err = errors.Errorf("manifest is not decryptable: %T", m.Config)
+	}
+	if err != nil {
+		return
+	}
+
+	// decrypt keys and files for layers
+	out.Layers = make([]Blob, len(m.Layers))
+	for i := 0; i < len(m.Layers) && err == nil; i++ {
+		out.Layers[i], err = decryptLayer(ref, opts, m.Layers[i], i)
+	}
+
+	return
 }
 
 func extractTarBall(r io.Reader, size int64, manifest *ImageManifest) (err error) {
@@ -350,8 +457,7 @@ type archiveStruct struct {
 
 func mkArchiveStruct(path string, manifestFH io.Reader) (a *archiveStruct, err error) {
 	var images []*archiveStruct
-	dec := json.NewDecoder(manifestFH)
-	if err = dec.Decode(&images); err != nil {
+	if err = json.NewDecoder(manifestFH).Decode(&images); err != nil {
 		err = errors.Wrapf(err, "error unmarshalling manifest")
 		return
 	}
@@ -400,113 +506,6 @@ func prepareConfig(
 	return
 }
 
-// Encrypt an image, generating an image manifest suitable for upload to a repo
-func (m *ImageManifest) Encrypt(
-	ref names.NamedTaggedRepository,
-	opts *crypto.Opts,
-) (
-	_ *ImageManifest,
-	err error,
-) {
-	configBlob, err := prepareConfig(m.Config, opts, ref)
-	if err != nil {
-		return nil, err
-	}
-
-	layerBlobs := make([]Blob, len(m.Layers))
-	for i, l := range m.Layers {
-		switch blob := l.(type) {
-		case DecryptedBlob:
-			log.Debug().Msgf("encrypting layer %d: %s", i, blob.GetFilename())
-			layerBlobs[i], err = blob.EncryptBlob(opts, blob.GetFilename()+".aes")
-		case *NoncryptedBlob:
-			log.Debug().Msgf("compressing layer %d: %s", i, blob.GetFilename())
-			layerBlobs[i], err = blob.Compress(blob.GetFilename() + ".gz")
-		default:
-		}
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &ImageManifest{
-		SchemaVersion: m.SchemaVersion,
-		MediaType:     m.MediaType,
-		DirName:       m.DirName,
-		Config:        configBlob,
-		Layers:        layerBlobs,
-	}, nil
-}
-
-// DecryptKeys attempts to decrypt all keys in a manifest
-func (m *ImageManifest) DecryptKeys(
-	opts *crypto.Opts,
-	ref names.NamedTaggedRepository,
-) (err error) {
-	switch blob := m.Config.(type) {
-	case EncryptedBlob:
-		m.Config, err = blob.DecryptKey(opts)
-		if err != nil {
-			return err
-		}
-	case *NoncryptedBlob:
-	default:
-		return errors.New("mainfest blobs are of wrong type")
-	}
-
-	for i, l := range m.Layers {
-		switch blob := l.(type) {
-		case EncryptedBlob:
-			m.Layers[i], err = blob.DecryptKey(opts)
-			if err != nil {
-				return err
-			}
-		case *NoncryptedBlob:
-		default:
-			return errors.New("mainfest blobs are of wrong type")
-		}
-	}
-	return nil
-}
-
-// Decrypt attempts to decrypt a manifest
-func (m *ImageManifest) Decrypt(
-	ref names.NamedTaggedRepository,
-	opts *crypto.Opts,
-) (out *ImageManifest, err error) {
-	out = &ImageManifest{
-		SchemaVersion: m.SchemaVersion,
-		MediaType:     m.MediaType,
-		Layers:        make([]Blob, len(m.Layers)),
-		DirName:       m.DirName,
-	}
-
-	switch blob := m.Config.(type) {
-	case EncryptedBlob:
-		out.Config, err = blob.DecryptBlob(opts, blob.GetFilename()+".dec")
-	case KeyDecryptedBlob:
-		out.Config, err = blob.DecryptFile(opts, blob.GetFilename()+".dec")
-	case *NoncryptedBlob:
-		out.Config = blob
-	default:
-		err = errors.Errorf("manifest is not decryptable: %T", m.Config)
-	}
-	if err != nil {
-		return
-	}
-
-	// decrypt keys and files for layers
-	out.Layers = make([]Blob, len(m.Layers))
-	for i, l := range m.Layers {
-		out.Layers[i], err = decryptLayer(ref, opts, l, i)
-		if err != nil {
-			return
-		}
-	}
-
-	return
-}
-
 func decryptLayer(
 	ref names.NamedTaggedRepository,
 	opts *crypto.Opts,
@@ -522,6 +521,8 @@ func decryptLayer(
 		layer, err = blob.Decompress(blob.GetFilename() + ".dec")
 	case *NoncryptedBlob:
 		layer = l
+	default:
+		err = errors.New("layer is of wrong type")
 	}
 	return
 }
