@@ -50,6 +50,9 @@ var (
 		EncType: crypto.Pbkdf2Aes256Gcm,
 		Compat:  true,
 	}
+	optsMock = &crypto.Opts{
+		EncType: crypto.Algos("mock"),
+	}
 	urlsValid   = []string{"https://crypto.senetas.com/?algos=PBKDF2-AES256-GCM&key=AAAAAAAAnECtJQZpzaepbGxVsLqfhEVdGEh3tadKd7w-wZIXTY-yMo8LidOYbJZ2axuUExIhDGPQZxyZzdzVD2OuiPyFMNj98Ju1rF-D2Sh2Qxd3"}
 	urlsInvalid = []string{"http://crypto.senetas.com/?algos=PBKDF2-AES256-GCM&key=3m6X-rV110o2DEm3pU-8qZpV-7ZKbBroFkWOUaI1Dv0_WRaVceZy5tsJ-PMoOMUW5CScc2wpL-PoBPMVAen7Nf9BPPCdcbrtpmFsMw=="}
 )

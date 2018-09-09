@@ -15,12 +15,15 @@
 package distribution_test
 
 import (
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/docker/distribution/reference"
 	"github.com/google/uuid"
+	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,6 +34,102 @@ import (
 	"github.com/Senetas/crypto-cli/registry/names"
 	"github.com/Senetas/crypto-cli/utils"
 )
+
+type mockBlob byte
+
+func (b *mockBlob) GetContentType() string             { return "" }
+func (b *mockBlob) GetDigest() digest.Digest           { return digest.Canonical.FromString("") }
+func (b *mockBlob) GetSize() int64                     { return 0 }
+func (b *mockBlob) GetFilename() string                { return "" }
+func (b *mockBlob) SetFilename(f string)               {}
+func (b *mockBlob) ReadCloser() (io.ReadCloser, error) { return nil, nil }
+
+func TestImageMock(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
+	defer func() { assert.NoError((utils.CleanUp(dir, nil))) }()
+
+	ref, err := reference.ParseNormalizedNamed("narthanaepa1/my-alpine:test")
+	require.NoError(err)
+
+	nTRep, err := names.CastToTagged(ref)
+	require.NoError(err)
+
+	manifest, err := distribution.NewManifest(nTRep, opts, dir)
+	require.NoError(err)
+
+	mockConfig := &distribution.ImageManifest{
+		SchemaVersion: 0,
+		MediaType:     "",
+		Config:        new(mockBlob),
+		Layers:        []distribution.Blob{new(mockBlob)},
+		DirName:       "",
+	}
+	_ = mockConfig
+
+	mockLayer := &distribution.ImageManifest{
+		SchemaVersion: 0,
+		MediaType:     "",
+		Config:        manifest.Config,
+		Layers:        []distribution.Blob{new(mockBlob)},
+		DirName:       "",
+	}
+
+	tests := []struct {
+		manifest   *distribution.ImageManifest
+		opts       crypto.Opts
+		passphrase string
+		errMsgEnc  string
+		errMsgDec1 string
+		errMsgDec2 string
+	}{
+		{
+			mockConfig,
+			*opts,
+			passphrase,
+			fmt.Sprintf("config is of wrong type: %T", new(mockBlob)),
+			fmt.Sprintf("config is of wrong type: %T", new(mockBlob)),
+			fmt.Sprintf("layer is of wrong type: %T", new(mockBlob)),
+		},
+		{
+			mockLayer,
+			*opts,
+			passphrase,
+			"",
+			fmt.Sprintf("config is of wrong type: %T", manifest.Config),
+			fmt.Sprintf("layer is of wrong type: %T", new(mockBlob)),
+		},
+	}
+
+	for _, test := range tests {
+		test.opts.SetPassphrase(test.passphrase)
+
+		if _, err = test.manifest.Encrypt(nTRep, &test.opts); err != nil {
+			assert.EqualError(err, test.errMsgEnc)
+		}
+
+		err = test.manifest.DecryptKeys(nTRep, &test.opts)
+		assert.EqualError(err, test.errMsgDec1)
+
+		_, err = test.manifest.Decrypt(nTRep, &test.opts)
+		assert.EqualError(err, test.errMsgDec1)
+
+		emanifest, err := manifest.Encrypt(nTRep, &test.opts)
+		if !assert.NoError(err) {
+			continue
+		}
+
+		emanifest.Layers = test.manifest.Layers
+
+		err = emanifest.DecryptKeys(nTRep, &test.opts)
+		assert.EqualError(err, test.errMsgDec2)
+
+		_, err = emanifest.Decrypt(nTRep, &test.opts)
+		assert.EqualError(err, test.errMsgDec2)
+	}
+}
 
 func TestImageEncryptDecrypt(t *testing.T) {
 	assert := assert.New(t)
@@ -45,30 +144,36 @@ func TestImageEncryptDecrypt(t *testing.T) {
 	nTRep, err := names.CastToTagged(ref)
 	require.NoError(err)
 
-	passphrase := "hunter2"
-
 	tests := []struct {
 		ref         names.NamedTaggedRepository
 		opts        *crypto.Opts
 		passphrase  string
+		errMsg      string
 		decryptKeys bool
 	}{
-		{nTRep, opts, passphrase, true},
-		{nTRep, optsNone, "", true},
-		{nTRep, optsCompat, passphrase, true},
-		{nTRep, opts, passphrase, false},
-		{nTRep, optsNone, "", false},
-		{nTRep, optsCompat, passphrase, false},
+		{
+			nTRep,
+			optsMock,
+			passphrase,
+			"mock is not a valid encryption type",
+			false,
+		},
+		{nTRep, opts, "", passphrase, true},
+		{nTRep, optsNone, "", "", true},
+		{nTRep, optsCompat, passphrase, "", true},
+		{nTRep, opts, passphrase, "", false},
+		{nTRep, optsNone, "", "", false},
+		{nTRep, optsCompat, passphrase, "", false},
 	}
 
 	for _, test := range tests {
-		test.opts.SetPassphrase(passphrase)
+		test.opts.SetPassphrase(test.passphrase)
 
 		manifest, err := distribution.NewManifest(test.ref, test.opts, dir)
-		if !assert.NoError(err) {
+		if err != nil {
+			assert.EqualError(err, test.errMsg)
 			continue
 		}
-		_ = manifest
 
 		emanifest, err := manifest.Encrypt(test.ref, test.opts)
 		if !assert.NoError(err) {
@@ -76,7 +181,7 @@ func TestImageEncryptDecrypt(t *testing.T) {
 		}
 
 		if test.decryptKeys {
-			if !assert.NoError(emanifest.DecryptKeys(test.opts, test.ref)) {
+			if !assert.NoError(emanifest.DecryptKeys(test.ref, test.opts)) {
 				continue
 			}
 		}

@@ -57,7 +57,7 @@ func PullImage(
 	}
 	log.Info().Msg("Mainfest obtained.")
 
-	if err = manifest.DecryptKeys(opts, ref); err != nil {
+	if err = manifest.DecryptKeys(ref, opts); err != nil {
 		return
 	}
 
