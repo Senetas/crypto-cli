@@ -57,6 +57,7 @@ func ParseChallengeHeader(header string) (*Challenge, error) {
 	}, nil
 }
 
+// buildURL creates the url to respond to the challenge
 func (c *Challenge) buildURL() *url.URL {
 	authURL := *c.realm
 	authParams := make(url.Values)
@@ -74,17 +75,18 @@ func ChallengeHeader(
 	repoInfo dregistry.RepositoryInfo,
 	endpoint dregistry.APIEndpoint,
 	creds Credentials,
-) (string, error) {
+) (auth string, err error) {
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
 	urlStr, err := bldr.BuildManifestURL(ref)
 	if err != nil {
-		return "", errors.Wrapf(err, "base = %s", endpoint.URL)
+		err = errors.Wrapf(err, "base = %s", endpoint.URL)
+		return
 	}
 
 	req, err := http.NewRequest("PUT", urlStr, nil)
 	if err != nil {
-		return "", err
+		return
 	}
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
@@ -92,19 +94,18 @@ func ChallengeHeader(
 		defer func() { err = utils.CheckedClose(resp.Body, err) }()
 	}
 	if err != nil {
-		return "", err
+		return
 	}
 
-	var auth string
 	if resp.StatusCode == http.StatusUnauthorized {
 		auth = resp.Header.Get("Www-Authenticate")
 		if auth == "" {
-			return "", errors.New("login error")
+			err = errors.New("login error")
 		}
 	} else if resp.StatusCode == http.StatusOK {
-		return "", nil
+		return
 	} else {
-		return "", errors.New("login not supported")
+		err = errors.New("login not supported")
 	}
-	return auth, nil
+	return
 }

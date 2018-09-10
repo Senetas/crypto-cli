@@ -43,15 +43,16 @@ func (t *token) Fresh() bool {
 	return t.fresh
 }
 
-func decodeRespose(respBody io.Reader) (Token, error) {
-	t := &token{}
-	if err := json.NewDecoder(respBody).Decode(&t); err != nil {
-		return nil, errors.Wrapf(err, "could not decode response from auth server")
+func decodeRespose(respBody io.Reader) (t Token, err error) {
+	t = &token{}
+	if err = json.NewDecoder(respBody).Decode(&t); err != nil {
+		err = errors.WithStack(err)
+		return
 	}
-	if t.Token == "" {
-		return nil, errors.New("malformed response from auth server")
+	if t.String() == "" {
+		err = errors.New("malformed response from auth server")
 	}
-	return t, nil
+	return
 }
 
 // AddToReqest adds a token as a Bearer Authorization of a request

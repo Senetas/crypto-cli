@@ -16,15 +16,19 @@ package utils_test
 
 import (
 	"bytes"
-	"errors"
+	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/Senetas/crypto-cli/utils"
 )
@@ -77,15 +81,24 @@ func TestConcat(t *testing.T) {
 
 func TestPathTrailingJoin(t *testing.T) {
 	path := utils.PathTrailingJoin("path/", "to", "file/")
-	assert.Equal(t, path, "path/to/file/")
+	require.Equal(t, path, "path/to/file/")
 }
 
 func TestFilePathTrailingJoin(t *testing.T) {
 	path := utils.FilePathTrailingJoin("path/", "to", "file/")
-	assert.Equal(
+	require.Equal(
 		t,
 		path,
 		"path"+string(os.PathSeparator)+"to"+string(os.PathSeparator)+"file"+string(os.PathSeparator),
+	)
+}
+
+func TestFilePathSansExt(t *testing.T) {
+	path := utils.FilePathSansExt("path/to/file.text")
+	require.Equal(
+		t,
+		path,
+		"path"+string(os.PathSeparator)+"to"+string(os.PathSeparator)+"file",
 	)
 }
 
@@ -178,4 +191,131 @@ func TestLargeResetReader(t *testing.T) {
 	n, err := io.CopyN(fh, trr, int64(N))
 
 	_ = !assert.NoError(err) && assert.Equal(N, int(n))
+}
+
+func TestError(t *testing.T) {
+	assert := assert.New(t)
+	err := errors.New("an error")
+
+	err = utils.WrapError(err, true)
+	e, ok := err.(utils.Error)
+	if assert.True(ok) {
+		assert.True(e.HasStack)
+	}
+
+	err = utils.StripTrace(err)
+	if e, ok = err.(utils.Error); assert.True(ok) {
+		assert.False(e.HasStack)
+	}
+}
+
+func TestErrors(t *testing.T) {
+	assert := assert.New(t)
+
+	tests := []struct {
+		errs utils.Errors
+		msg  string
+	}{
+		{utils.Errors{}, ""},
+		{utils.Errors{errors.New("hello")}, "hello"},
+	}
+
+	for _, test := range tests {
+		assert.True(test.errs.Error() == test.msg)
+	}
+}
+
+func TestConcatErrChan(t *testing.T) {
+	assert := assert.New(t)
+
+	for n := 0; n < 3; n++ {
+		errCh := make(chan error, n)
+		for i := 0; i < n; i++ {
+			go func(i int) { errCh <- errors.Errorf("%d", i) }(i)
+		}
+		err := utils.ConcatErrChan(errCh, n)
+		for i := 0; i < n; i++ {
+			assert.True(strings.Contains(err.Error(), fmt.Sprintf("%d", i)))
+		}
+	}
+}
+
+func TestUint64ToPosInt(t *testing.T) {
+	assert := assert.New(t)
+	tests := []struct {
+		i      uint64
+		o      int
+		errMsg string
+	}{
+		{0, 0, ""},
+		{238746, 238746, ""},
+		{math.MaxInt32, math.MaxInt32, ""},
+		{math.MaxUint64, 0, "expected positive integer"},
+	}
+
+	for _, test := range tests {
+		o, err := utils.Uint64ToPosInt(test.i)
+		if err != nil {
+			assert.EqualError(err, test.errMsg)
+		} else { // expecting an error?
+			assert.Equal("", test.errMsg)
+			assert.Equal(test.o, o)
+		}
+	}
+}
+
+func TestCheckedClose(t *testing.T) {
+	tests := []struct {
+		errIn  error
+		errOut error
+		c      io.Closer
+	}{
+		{nil, nil, nil},
+	}
+
+	for _, test := range tests {
+		err := utils.CheckedClose(test.c, test.errIn)
+		assert.Equal(t, test.errOut, err)
+	}
+}
+
+func TestCleanUp(t *testing.T) {
+	assert := assert.New(t)
+
+	var (
+		errorRemove = func(s string) error { return errors.New("internal error") }
+		dir         = filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
+	)
+
+	tests := []struct {
+		remove func(s string) error
+		dir    string
+		errIn  error
+		errMsg string
+	}{
+		{utils.RemoveFunc, dir, nil, ""},
+		{utils.RemoveFunc, "", errors.New("an error"), "an error"},
+		{
+			errorRemove,
+			dir,
+			nil,
+			fmt.Sprintf(`could not clean up temp files in: %s: internal error`, dir),
+		},
+		{
+			errorRemove,
+			dir,
+			errors.New("external error"),
+			fmt.Sprintf(`could not clean up temp files in: %s: internal error: external error`, dir),
+		},
+	}
+
+	for _, test := range tests {
+		utils.RemoveFunc = test.remove
+		err := utils.CleanUp(test.dir, test.errIn)
+		if err != nil {
+			assert.EqualError(err, test.errMsg)
+		} else {
+			assert.Equal("", test.errMsg)
+		}
+	}
 }
