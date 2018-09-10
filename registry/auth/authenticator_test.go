@@ -17,82 +17,61 @@ package auth_test
 import (
 	"testing"
 
+	"github.com/docker/distribution/reference"
+	dregistry "github.com/docker/docker/registry"
+	"github.com/stretchr/testify/require"
+
 	"github.com/Senetas/crypto-cli/registry"
 	"github.com/Senetas/crypto-cli/registry/auth"
 	"github.com/Senetas/crypto-cli/registry/httpclient"
 	"github.com/Senetas/crypto-cli/registry/names"
-	"github.com/docker/distribution/reference"
-	dregistry "github.com/docker/docker/registry"
 )
 
+const imageName = "cryptocli/alpine:test"
+
 func TestAuthenticator(t *testing.T) {
-	ref, err := reference.ParseNormalizedNamed("narthanaepa1/my-alpine:test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require := require.New(t)
+
+	ref, err := reference.ParseNormalizedNamed(imageName)
+	require.NoError(err)
 
 	repoInfo, err := dregistry.ParseRepositoryInfo(ref)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	creds, err := auth.NewDefaultCreds(repoInfo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	a := auth.NewAuthenticator(httpclient.DefaultClient, creds)
-	ch, err := auth.ParseChallengeHeader(`Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:narthanaepa1:pull,push"`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tok, err := a.Authenticate(ch)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log(tok)
+	ch, err := auth.ParseChallengeHeader(`Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:cryptocli:pull,push"`)
+	require.NoError(err)
+
+	_, err = auth.NewAuthenticator(httpclient.DefaultClient, creds).Authenticate(ch)
+	require.NoError(err)
 }
 
 func TestChallenger(t *testing.T) {
-	ref, err := reference.ParseNormalizedNamed("narthanaepa1/my-alpine:test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require := require.New(t)
+
+	ref, err := reference.ParseNormalizedNamed(imageName)
+	require.NoError(err)
 
 	nTRep, err := names.CastToTagged(ref)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	repoInfo, err := dregistry.ParseRepositoryInfo(ref)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	endpoint, err := registry.GetEndpoint(ref, *repoInfo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	creds, err := auth.NewDefaultCreds(repoInfo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	header, err := auth.ChallengeHeader(nTRep, *repoInfo, endpoint, creds)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	a := auth.NewAuthenticator(httpclient.DefaultClient, creds)
 	ch, err := auth.ParseChallengeHeader(header)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	tok, err := a.Authenticate(ch)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log(tok)
+	_, err = auth.NewAuthenticator(httpclient.DefaultClient, creds).Authenticate(ch)
+	require.NoError(err)
 }

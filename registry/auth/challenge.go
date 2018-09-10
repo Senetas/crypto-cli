@@ -57,6 +57,7 @@ func ParseChallengeHeader(header string) (*Challenge, error) {
 	}, nil
 }
 
+// buildURL creates the url to respond to the challenge
 func (c *Challenge) buildURL() *url.URL {
 	authURL := *c.realm
 	authParams := make(url.Values)

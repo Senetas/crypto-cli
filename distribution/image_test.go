@@ -35,6 +35,8 @@ import (
 	"github.com/Senetas/crypto-cli/utils"
 )
 
+const imageName = "cryptocli/alpine:latest"
+
 type mockBlob byte
 
 func (b *mockBlob) GetContentType() string             { return "" }
@@ -51,7 +53,7 @@ func TestImageMock(t *testing.T) {
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
 	defer func() { assert.NoError((utils.CleanUp(dir, nil))) }()
 
-	ref, err := reference.ParseNormalizedNamed("narthanaepa1/my-alpine:test")
+	ref, err := reference.ParseNormalizedNamed(imageName)
 	require.NoError(err)
 
 	nTRep, err := names.CastToTagged(ref)
@@ -138,7 +140,7 @@ func TestImageEncryptDecrypt(t *testing.T) {
 	dir := filepath.Join(os.TempDir(), "com.senetas.crypto", uuid.New().String())
 	defer func() { assert.NoError((utils.CleanUp(dir, nil))) }()
 
-	ref, err := reference.ParseNormalizedNamed("narthanaepa1/my-alpine:test")
+	ref, err := reference.ParseNormalizedNamed(imageName)
 	require.NoError(err)
 
 	nTRep, err := names.CastToTagged(ref)
