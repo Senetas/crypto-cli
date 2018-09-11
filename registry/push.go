@@ -72,11 +72,12 @@ func PushManifest(
 	ref reference.Named,
 	manifest *distribution.ImageManifest,
 	endpoint *registry.APIEndpoint,
-) (string, error) {
+) (_ string, err error) {
 	builder := v2.NewURLBuilder(endpoint.URL, false)
 	urlStr, err := builder.BuildManifestURL(ref)
 	if err != nil {
-		return "", errors.Wrapf(err, "ref = %v", ref)
+		err = errors.Wrapf(err, "ref = %v", ref)
+		return
 	}
 
 	// a pipe allows using the struct directly as the http body
@@ -94,7 +95,8 @@ func PushManifest(
 
 	req, err := http.NewRequest("PUT", urlStr, pr)
 	if err != nil {
-		return "", errors.Wrapf(err, "url = %v", urlStr)
+		err = errors.Wrapf(err, "url = %v", urlStr)
+		return
 	}
 
 	req.Header.Set("Accept", "application/json, */*")
@@ -107,16 +109,18 @@ func PushManifest(
 		defer func() { err = utils.CheckedClose(resp.Body, err) }()
 	}
 	if err != nil {
-		return "", err
+		return
 	}
 
 	// close the channel after request is done
 	if err = utils.ConcatErrChan(errChan, 2); err != nil {
-		return "", errors.WithStack(err)
+		err = errors.WithStack(err)
+		return
 	}
 
 	if resp.StatusCode != http.StatusCreated {
-		return "", errors.New("manifest upload failed with status: " + resp.Status)
+		err = errors.New("manifest upload failed with status: " + resp.Status)
+		return
 	}
 
 	return resp.Header.Get("Docker-Content-Digest"), nil
@@ -133,12 +137,12 @@ func PushLayer(
 	dig := names.AppendDigest(sep, layer.GetDigest())
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
-	layerExists, err := checkLayer(token, dig, bldr)
+	exists, err := layerExists(token, dig, bldr)
 	if err != nil {
-		return err
-	} else if layerExists {
+		return
+	} else if exists {
 		log.Info().Msgf("Blob %s exists.", layer.GetDigest())
-		return nil
+		return
 	}
 
 	log.Info().Msgf("Blob %s is new, proceed to upload.", layer.GetDigest())
@@ -146,22 +150,24 @@ func PushLayer(
 	// query the server for which location to upload to
 	loc, err := getUploadLoc(token, dig, bldr, layer)
 	if err != nil {
-		return err
+		return
 	}
 
 	// now actually upload the blob
 	return uploadBlob(loc, token, dig, bldr, layer)
 }
 
-func checkLayer(token dauth.Scope, ref reference.Canonical, bldr *v2.URLBuilder) (b bool, err error) {
+func layerExists(token dauth.Scope, ref reference.Canonical, bldr *v2.URLBuilder) (b bool, err error) {
 	layerURLStr, err := bldr.BuildBlobURL(ref)
 	if err != nil {
-		return false, errors.Wrapf(err, "%#v", ref)
+		err = errors.Wrapf(err, "%#v", ref)
+		return
 	}
 
 	req, err := http.NewRequest("HEAD", layerURLStr, nil)
 	if err != nil {
-		return false, errors.Wrapf(err, "%v", layerURLStr)
+		err = errors.Wrapf(err, "%v", layerURLStr)
+		return
 	}
 
 	auth.AddToReqest(token, req)
@@ -171,16 +177,24 @@ func checkLayer(token dauth.Scope, ref reference.Canonical, bldr *v2.URLBuilder)
 		defer func() { err = utils.CheckedClose(resp.Body, err) }()
 	}
 	if err != nil {
-		return false, errors.Wrapf(err, "%v", req)
+		err = errors.Wrapf(err, "%v", req)
+		return
 	}
 
-	if resp.StatusCode == http.StatusOK {
-		return true, nil
-	} else if resp.StatusCode == http.StatusNotFound {
-		return false, nil
+	log.Debug().Msg(resp.Status)
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		b = true
+	case http.StatusNotFound:
+		b = false
+	case http.StatusUnauthorized:
+		err = errors.Errorf("this account is not authorised to access the repository: %s", ref.Name())
+	default:
+		err = errors.New("error testing exsistence of layer")
 	}
 
-	return false, errors.New("error testing exsistance of layer")
+	return
 }
 
 func getUploadLoc(
@@ -192,12 +206,14 @@ func getUploadLoc(
 	// get the location to upload the blob
 	uploadURLStr, err := bldr.BuildBlobUploadURL(dig, nil)
 	if err != nil {
-		return "", errors.Wrapf(err, "%#v", dig)
+		err = errors.Wrapf(err, "%#v", dig)
+		return
 	}
 
 	req, err := http.NewRequest("POST", uploadURLStr, nil)
 	if err != nil {
-		return "", errors.Wrapf(err, "could not make req = %v", req)
+		err = errors.Wrapf(err, "could not make req = %v", req)
+		return
 	}
 
 	auth.AddToReqest(token, req)
@@ -207,19 +223,22 @@ func getUploadLoc(
 		defer func() { err = utils.CheckedClose(resp.Body, err) }()
 	}
 	if err != nil {
-		return "", err
+		return
 	}
 
-	if resp.StatusCode != http.StatusAccepted {
-		return "", errors.New("upload of layer " + layerData.GetDigest().String() + " was not accepted")
+	switch resp.StatusCode {
+	case http.StatusAccepted:
+		loc = resp.Header.Get("Location")
+		if loc == "" {
+			err = errors.New("server did not return location to upload to")
+		}
+	case http.StatusUnauthorized:
+		err = errors.Errorf("this account is not authorised to access the repository: %s", dig.Name())
+	default:
+		err = errors.Errorf("upload of layer %v was not accepted", layerData.GetDigest())
 	}
 
-	loc = resp.Header.Get("Location")
-	if loc == "" {
-		return "", errors.New("server did not return location to upload to")
-	}
-
-	return loc, nil
+	return
 }
 
 func uploadBlob(
