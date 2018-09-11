@@ -27,6 +27,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	invalidHeader = `Bearer realm=,service=,scope="repository:my-repo/my-alpine:pull,push"`
+	validHeader   = `Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:my-repo/my-alpine:pull,push"`
+)
+
 func TestCreds(t *testing.T) {
 	require := require.New(t)
 
@@ -64,20 +69,13 @@ func TestCreds(t *testing.T) {
 
 func TestChallengerLoc(t *testing.T) {
 	assert := assert.New(t)
-	invalidHeader := `Bearer realm=,service=,scope="repository:my-repo/my-alpine:pull,push"`
 
 	tests := []struct {
 		header string
 		errMsg string
 	}{
-		{
-			`Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:my-repo/my-alpine:pull,push"`,
-			"",
-		},
-		{
-			invalidHeader,
-			fmt.Sprintf("malformed challenge header: %s", invalidHeader),
-		},
+		{validHeader, ""},
+		{invalidHeader, fmt.Sprintf("malformed challenge header: %s", invalidHeader)},
 	}
 
 	for _, test := range tests {

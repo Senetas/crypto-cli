@@ -15,10 +15,15 @@
 package auth_test
 
 import (
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/docker/distribution/reference"
 	dregistry "github.com/docker/docker/registry"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/Senetas/crypto-cli/registry"
@@ -30,22 +35,67 @@ import (
 const imageName = "cryptocli/alpine:test"
 
 func TestAuthenticator(t *testing.T) {
+	assert := assert.New(t)
 	require := require.New(t)
 
-	ref, err := reference.ParseNormalizedNamed(imageName)
-	require.NoError(err)
+	server := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, err := ioutil.ReadAll(r.Body)
+			require.NoError(err)
+			w.WriteHeader(http.StatusUnauthorized)
+		}),
+	)
+	defer server.Close()
 
-	repoInfo, err := dregistry.ParseRepositoryInfo(ref)
-	require.NoError(err)
+	tests := []struct {
+		challenge string
+		errMsg    string
+	}{
+		{
+			`Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:cryptocli:pull,push"`,
+			"",
+		},
+		{
+			fmt.Sprintf(
+				`Bearer realm="%s",service="registry.docker.io",scope="repository:cryptocli:pull,push"`,
+				server.URL,
+			),
+			fmt.Sprintf(
+				"authentication failed with status: %d %s",
+				http.StatusUnauthorized,
+				http.StatusText(http.StatusUnauthorized),
+			),
+		},
+	}
 
-	creds, err := auth.NewDefaultCreds(repoInfo)
-	require.NoError(err)
+	for _, test := range tests {
+		ref, err := reference.ParseNormalizedNamed(imageName)
+		if !assert.NoError(err) {
+			continue
+		}
 
-	ch, err := auth.ParseChallengeHeader(`Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:cryptocli:pull,push"`)
-	require.NoError(err)
+		repoInfo, err := dregistry.ParseRepositoryInfo(ref)
+		if !assert.NoError(err) {
+			continue
+		}
 
-	_, err = auth.NewAuthenticator(httpclient.DefaultClient, creds).Authenticate(ch)
-	require.NoError(err)
+		creds, err := auth.NewDefaultCreds(repoInfo)
+		if !assert.NoError(err) {
+			continue
+		}
+
+		ch, err := auth.ParseChallengeHeader(test.challenge)
+		if !assert.NoError(err) {
+			continue
+		}
+
+		_, err = auth.NewAuthenticator(httpclient.DefaultClient, creds).Authenticate(ch)
+		if err != nil {
+			assert.EqualError(err, test.errMsg)
+		} else {
+			assert.Equal(test.errMsg, "")
+		}
+	}
 }
 
 func TestChallenger(t *testing.T) {
