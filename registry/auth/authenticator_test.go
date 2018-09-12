@@ -47,6 +47,15 @@ func TestAuthenticator(t *testing.T) {
 	)
 	defer server.Close()
 
+	ref, err := reference.ParseNormalizedNamed(imageName)
+	require.NoError(err)
+
+	repoInfo, err := dregistry.ParseRepositoryInfo(ref)
+	require.NoError(err)
+
+	creds, err := auth.NewDefaultCreds(repoInfo)
+	require.NoError(err)
+
 	tests := []struct {
 		challenge string
 		errMsg    string
@@ -69,21 +78,6 @@ func TestAuthenticator(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ref, err := reference.ParseNormalizedNamed(imageName)
-		if !assert.NoError(err) {
-			continue
-		}
-
-		repoInfo, err := dregistry.ParseRepositoryInfo(ref)
-		if !assert.NoError(err) {
-			continue
-		}
-
-		creds, err := auth.NewDefaultCreds(repoInfo)
-		if !assert.NoError(err) {
-			continue
-		}
-
 		ch, err := auth.ParseChallengeHeader(test.challenge)
 		if !assert.NoError(err) {
 			continue

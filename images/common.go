@@ -85,12 +85,12 @@ func useTLS(
 }
 
 func authProcedure(ref reference.Named) (
-	_ auth.Token,
-	_ names.NamedTaggedRepository,
-	_ *dregistry.APIEndpoint,
+	token auth.Token,
+	nTRep names.NamedTaggedRepository,
+	endpoint *dregistry.APIEndpoint,
 	err error,
 ) {
-	nTRep, err := names.CastToTagged(ref)
+	nTRep, err = names.CastToTagged(ref)
 	if err != nil {
 		return
 	}
@@ -101,18 +101,15 @@ func authProcedure(ref reference.Named) (
 		return
 	}
 
-	endpoint, err := registry.GetEndpoint(ref, *repoInfo)
+	*endpoint, err = registry.GetEndpoint(ref, *repoInfo)
 	if err != nil {
 		err = errors.Wrapf(err, "could not get endpoint ref = %v, repoInfo = %v", ref, *repoInfo)
 		return
 	}
 
-	tls, err := useTLS(nTRep, *repoInfo, endpoint)
-	if err != nil {
+	tls, err := useTLS(nTRep, *repoInfo, *endpoint)
+	if err != nil || !tls {
 		return
-	}
-	if !tls {
-		return nil, nTRep, &endpoint, nil
 	}
 
 	creds, err := auth.NewDefaultCreds(repoInfo)
@@ -120,8 +117,7 @@ func authProcedure(ref reference.Named) (
 		return
 	}
 
-	authenticator := auth.NewAuthenticator(httpclient.DefaultClient, creds)
-	header, err := auth.ChallengeHeader(nTRep, *repoInfo, endpoint, creds)
+	header, err := auth.ChallengeHeader(nTRep, *repoInfo, *endpoint, creds)
 	if err != nil {
 		return
 	}
@@ -131,12 +127,12 @@ func authProcedure(ref reference.Named) (
 		return
 	}
 
-	token, err := authenticator.Authenticate(ch)
+	token, err = auth.NewAuthenticator(httpclient.DefaultClient, creds).Authenticate(ch)
 	if err != nil {
 		return
 	}
 
 	log.Info().Msg("Authentication successful.")
 
-	return token, nTRep, &endpoint, nil
+	return
 }

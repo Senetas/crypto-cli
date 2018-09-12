@@ -19,13 +19,12 @@ import (
 	"net/url"
 	"regexp"
 
+	"github.com/Senetas/crypto-cli/registry/httpclient"
+	"github.com/Senetas/crypto-cli/utils"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/v2"
 	dregistry "github.com/docker/docker/registry"
 	"github.com/pkg/errors"
-
-	"github.com/Senetas/crypto-cli/registry/httpclient"
-	"github.com/Senetas/crypto-cli/utils"
 )
 
 var challengeRE = regexp.MustCompile(`^\s*Bearer\s+realm="([^"]+)",service="([^"]+)"(,scope="([^"]+)")?\s*$`)
