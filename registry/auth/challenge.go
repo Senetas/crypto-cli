@@ -19,13 +19,12 @@ import (
 	"net/url"
 	"regexp"
 
+	"github.com/Senetas/crypto-cli/registry/httpclient"
+	"github.com/Senetas/crypto-cli/utils"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/v2"
 	dregistry "github.com/docker/docker/registry"
 	"github.com/pkg/errors"
-
-	"github.com/Senetas/crypto-cli/registry/httpclient"
-	"github.com/Senetas/crypto-cli/utils"
 )
 
 var challengeRE = regexp.MustCompile(`^\s*Bearer\s+realm="([^"]+)",service="([^"]+)"(,scope="([^"]+)")?\s*$`)
@@ -38,23 +37,26 @@ type Challenge struct {
 }
 
 // ParseChallengeHeader parses the challenge header and extract the relevant parts
-func ParseChallengeHeader(header string) (*Challenge, error) {
+func ParseChallengeHeader(header string) (ch *Challenge, err error) {
 	match := challengeRE.FindAllStringSubmatch(header, -1)
 
 	if len(match) != 1 {
-		return nil, errors.Errorf("malformed challenge header: %s", header)
+		err = errors.Errorf("malformed challenge header: %s", header)
+		return
 	}
 
-	realmURL, err := url.Parse(match[0][1])
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	return &Challenge{
-		realm:   realmURL,
+	ch = &Challenge{
 		service: match[0][2],
 		scope:   match[0][4],
-	}, nil
+	}
+
+	ch.realm, err = url.Parse(match[0][1])
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+
+	return
 }
 
 // buildURL creates the url to respond to the challenge
@@ -97,14 +99,14 @@ func ChallengeHeader(
 		return
 	}
 
-	if resp.StatusCode == http.StatusUnauthorized {
+	switch resp.StatusCode {
+	case http.StatusUnauthorized:
 		auth = resp.Header.Get("Www-Authenticate")
 		if auth == "" {
 			err = errors.New("login error")
 		}
-	} else if resp.StatusCode == http.StatusOK {
-		return
-	} else {
+	case http.StatusOK:
+	default:
 		err = errors.New("login not supported")
 	}
 	return
