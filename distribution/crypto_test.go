@@ -36,7 +36,8 @@ import (
 )
 
 var (
-	passphrase = "196884 = 196883 + 1"
+	//passphrase = "196884 = 196883 + 1"
+	passphrase = "hunter2"
 	opts       = &crypto.Opts{
 		EncType: crypto.Pbkdf2Aes256Gcm,
 		Compat:  false,
@@ -49,6 +50,11 @@ var (
 		EncType: crypto.Pbkdf2Aes256Gcm,
 		Compat:  true,
 	}
+	optsMock = &crypto.Opts{
+		EncType: crypto.Algos("mock"),
+	}
+	urlsValid   = []string{"https://crypto.senetas.com/?algos=PBKDF2-AES256-GCM&key=AAAAAAAAnECtJQZpzaepbGxVsLqfhEVdGEh3tadKd7w-wZIXTY-yMo8LidOYbJZ2axuUExIhDGPQZxyZzdzVD2OuiPyFMNj98Ju1rF-D2Sh2Qxd3"}
+	urlsInvalid = []string{"http://crypto.senetas.com/?algos=PBKDF2-AES256-GCM&key=3m6X-rV110o2DEm3pU-8qZpV-7ZKbBroFkWOUaI1Dv0_WRaVceZy5tsJ-PMoOMUW5CScc2wpL-PoBPMVAen7Nf9BPPCdcbrtpmFsMw=="}
 )
 
 func TestCrypto(t *testing.T) {
@@ -271,6 +277,28 @@ func TestEncDecCrypto(t *testing.T) {
 		}
 
 		assert.Equal(d, &c)
+	}
+}
+
+func TestEncDecCryptoCompat(t *testing.T) {
+	assert := assert.New(t)
+
+	tests := []struct {
+		urls []string
+		opts *crypto.Opts
+		err  error
+	}{
+		{urlsValid, opts, nil},
+		{urlsInvalid, opts, nil},
+		{[]string{}, opts, errors.New("missing encryption key")},
+		{urlsValid, optsNone, utils.NewError("encryption type does not match decryption type", false)},
+	}
+
+	for _, test := range tests {
+		_, err := distribution.NewEncryptoCompat(test.urls, test.opts)
+		if err != nil {
+			assert.Error(err, test.err.Error())
+		}
 	}
 }
 

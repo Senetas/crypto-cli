@@ -24,11 +24,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+// SaltIter contains the salt and the number of iterations
+type SaltIter struct {
+	Salt []byte `json:"-"`
+	Iter int    `json:"-"`
+}
+
 // EnCrypto is a encrypted key with the algotithms used to encrypt it and the data
 type EnCrypto struct {
 	Algos  crypto.Algos `json:"cryptoType"`
 	EncKey string       `json:"key"`
-	Salt   []byte       `json:"-"`
+	SaltIter
 }
 
 // NewEncryptoCompat create a new Encrypto struct from some URLs
@@ -75,12 +81,14 @@ func DecryptKey(e EnCrypto, opts *crypto.Opts) (d DeCrypto, err error) {
 
 	passphrase, err := opts.GetPassphrase(crypto.StdinPassReader)
 	if err != nil {
+		err = errors.WithStack(err)
 		return
 	}
 
 	d = DeCrypto{Algos: e.Algos}
-	d.DecKey, d.Salt, err = crypto.Deckey(decoded, passphrase)
+	d.DecKey, d.Salt, d.Iter, err = crypto.Deckey(decoded, passphrase)
 	if err != nil {
+		err = errors.WithStack(err)
 		return
 	}
 
@@ -91,7 +99,7 @@ func DecryptKey(e EnCrypto, opts *crypto.Opts) (d DeCrypto, err error) {
 type DeCrypto struct {
 	Algos  crypto.Algos `json:"cryptoType"`
 	DecKey []byte       `json:"-"`
-	Salt   []byte       `json:"-"`
+	SaltIter
 }
 
 // NewDecrypto create a new DeCrypto struct that holds decrupted key data
@@ -99,7 +107,10 @@ func NewDecrypto(opts *crypto.Opts) (d *DeCrypto, err error) {
 	d = &DeCrypto{
 		Algos:  opts.EncType,
 		DecKey: make([]byte, 32),
-		Salt:   make([]byte, 16),
+		SaltIter: SaltIter{
+			Salt: make([]byte, 16),
+			Iter: crypto.Pbkdf2Iter,
+		},
 	}
 
 	if _, err = rand.Read(d.DecKey); err != nil {
@@ -122,13 +133,14 @@ func EncryptKey(d DeCrypto, opts *crypto.Opts) (e EnCrypto, err error) {
 
 	e.Algos = d.Algos
 	e.Salt = d.Salt
+	e.Iter = d.Iter
 
 	passphrase, err := opts.GetPassphrase(crypto.StdinPassReader)
 	if err != nil {
 		return
 	}
 
-	ciphertextKey, err := crypto.Enckey(d.DecKey, e.Salt, passphrase)
+	ciphertextKey, err := crypto.Enckey(d.DecKey, e.Salt, e.Iter, passphrase)
 	if err != nil {
 		err = errors.WithStack(err)
 		return

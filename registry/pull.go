@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -58,7 +57,7 @@ func PullImage(
 	}
 	log.Info().Msg("Mainfest obtained.")
 
-	if err = manifest.DecryptKeys(opts, ref); err != nil {
+	if err = manifest.DecryptKeys(ref, opts); err != nil {
 		return
 	}
 
@@ -124,7 +123,7 @@ func PullManifest(
 	// TODO: Handle list manifests
 	req.Header.Set("Accept", distribution.MediaTypeManifest)
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
-	auth.AddToReqest(token, req)
+	auth.AddToRequest(token, req)
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
 	if resp != nil {
@@ -138,13 +137,8 @@ func PullManifest(
 		return nil, errors.New("manifest download failed with status: " + resp.Status)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
 	manifest := &distribution.ImageManifest{DirName: dir}
-	if err = json.Unmarshal(body, manifest); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(manifest); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
@@ -180,7 +174,7 @@ func PullFromDigest(
 
 	req.Header.Set("Accept", distribution.MediaTypeLayer)
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
-	auth.AddToReqest(token, req)
+	auth.AddToRequest(token, req)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	req = req.WithContext(ctx)

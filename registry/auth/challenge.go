@@ -19,13 +19,12 @@ import (
 	"net/url"
 	"regexp"
 
+	"github.com/Senetas/crypto-cli/registry/httpclient"
+	"github.com/Senetas/crypto-cli/utils"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/v2"
 	dregistry "github.com/docker/docker/registry"
 	"github.com/pkg/errors"
-
-	"github.com/Senetas/crypto-cli/registry/httpclient"
-	"github.com/Senetas/crypto-cli/utils"
 )
 
 var challengeRE = regexp.MustCompile(`^\s*Bearer\s+realm="([^"]+)",service="([^"]+)"(,scope="([^"]+)")?\s*$`)
@@ -38,25 +37,29 @@ type Challenge struct {
 }
 
 // ParseChallengeHeader parses the challenge header and extract the relevant parts
-func ParseChallengeHeader(header string) (*Challenge, error) {
+func ParseChallengeHeader(header string) (ch *Challenge, err error) {
 	match := challengeRE.FindAllStringSubmatch(header, -1)
 
 	if len(match) != 1 {
-		return nil, errors.Errorf("malformed challenge header: %s", header)
+		err = errors.Errorf("malformed challenge header: %s", header)
+		return
 	}
 
-	realmURL, err := url.Parse(match[0][1])
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	return &Challenge{
-		realm:   realmURL,
+	ch = &Challenge{
 		service: match[0][2],
 		scope:   match[0][4],
-	}, nil
+	}
+
+	ch.realm, err = url.Parse(match[0][1])
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+
+	return
 }
 
+// buildURL creates the url to respond to the challenge
 func (c *Challenge) buildURL() *url.URL {
 	authURL := *c.realm
 	authParams := make(url.Values)
@@ -74,17 +77,18 @@ func ChallengeHeader(
 	repoInfo dregistry.RepositoryInfo,
 	endpoint dregistry.APIEndpoint,
 	creds Credentials,
-) (string, error) {
+) (auth string, err error) {
 	bldr := v2.NewURLBuilder(endpoint.URL, false)
 
 	urlStr, err := bldr.BuildManifestURL(ref)
 	if err != nil {
-		return "", errors.Wrapf(err, "base = %s", endpoint.URL)
+		err = errors.Wrapf(err, "base = %s", endpoint.URL)
+		return
 	}
 
 	req, err := http.NewRequest("PUT", urlStr, nil)
 	if err != nil {
-		return "", err
+		return
 	}
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
@@ -92,19 +96,18 @@ func ChallengeHeader(
 		defer func() { err = utils.CheckedClose(resp.Body, err) }()
 	}
 	if err != nil {
-		return "", err
+		return
 	}
 
-	var auth string
-	if resp.StatusCode == http.StatusUnauthorized {
+	switch resp.StatusCode {
+	case http.StatusUnauthorized:
 		auth = resp.Header.Get("Www-Authenticate")
 		if auth == "" {
-			return "", errors.New("login error")
+			err = errors.New("login error")
 		}
-	} else if resp.StatusCode == http.StatusOK {
-		return "", nil
-	} else {
-		return "", errors.New("login not supported")
+	case http.StatusOK:
+	default:
+		err = errors.New("login not supported")
 	}
-	return auth, nil
+	return
 }

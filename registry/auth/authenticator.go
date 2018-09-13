@@ -40,11 +40,12 @@ func NewAuthenticator(client *http.Client, credentials Credentials) Authenticato
 	}
 }
 
-func (a *authenticator) Authenticate(c *Challenge) (Token, error) {
+func (a *authenticator) Authenticate(c *Challenge) (_ Token, err error) {
 	reqURL := c.buildURL()
 	req, err := http.NewRequest("GET", reqURL.String(), nil)
 	if err != nil {
-		return nil, errors.Wrapf(err, "url = %s", reqURL)
+		err = errors.Wrapf(err, "url = %s", reqURL)
+		return
 	}
 
 	req = a.credentials.SetAuth(req)
@@ -54,12 +55,14 @@ func (a *authenticator) Authenticate(c *Challenge) (Token, error) {
 		defer func() { err = utils.CheckedClose(resp.Body, err) }()
 	}
 	if err != nil {
-		return nil, errors.Wrapf(err, "req = %#v", req)
+		err = errors.Wrapf(err, "req = %#v", req)
+		return
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.Errorf("authentication failed with status: %s", resp.Status)
+		err = errors.Errorf("authentication failed with status: %s", resp.Status)
+		return
 	}
 
-	return decodeRespose(resp.Body)
+	return NewTokenFromResp(resp.Body)
 }
