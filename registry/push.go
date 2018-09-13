@@ -102,7 +102,7 @@ func PushManifest(
 	req.Header.Set("Accept", "application/json, */*")
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	req.Header.Set("Content-Type", distribution.MediaTypeManifest)
-	auth.AddToReqest(token, req)
+	auth.AddToRequest(token, req)
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
 	if resp != nil {
@@ -170,7 +170,7 @@ func layerExists(token dauth.Scope, ref reference.Canonical, bldr *v2.URLBuilder
 		return
 	}
 
-	auth.AddToReqest(token, req)
+	auth.AddToRequest(token, req)
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
 	if resp != nil {
@@ -216,7 +216,7 @@ func getUploadLoc(
 		return
 	}
 
-	auth.AddToReqest(token, req)
+	auth.AddToRequest(token, req)
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
 	if resp != nil {
@@ -289,7 +289,7 @@ func uploadBlob(
 	req = req.WithContext(ctx)
 	req.ContentLength = blob.GetSize()
 	req.Header.Set("Content-Type", "application/octect-stream")
-	auth.AddToReqest(token, req)
+	auth.AddToRequest(token, req)
 
 	go upload(req, bar, blob, errCh)
 

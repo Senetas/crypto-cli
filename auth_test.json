@@ -15,7 +15,6 @@
 package auth_test
 
 import (
-	"bytes"
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
@@ -93,8 +92,10 @@ func TestAuthenticator(t *testing.T) {
 		}
 
 		_, err = auth.NewAuthenticator(httpclient.DefaultClient, creds).Authenticate(ch)
-		if err != nil && assert.EqualError(err, test.errMsg) || !assert.Equal(test.errMsg, "") {
-			continue
+		if err != nil {
+			assert.EqualError(err, test.errMsg)
+		} else {
+			assert.Equal(test.errMsg, "")
 		}
 	}
 }
@@ -174,8 +175,10 @@ func TestChallengerLoc(t *testing.T) {
 
 	for _, test := range tests {
 		_, err := auth.ParseChallengeHeader(test.header)
-		if err != nil && assert.EqualError(err, test.errMsg) || !assert.Equal(test.errMsg, "") {
-			continue
+		if err != nil {
+			assert.EqualError(err, test.errMsg)
+		} else {
+			assert.Equal("", test.errMsg)
 		}
 	}
 }
@@ -252,41 +255,10 @@ func TestChallengeHeader(t *testing.T) {
 
 	for _, test := range tests {
 		_, err = auth.ChallengeHeader(test.ref, test.repoInfo, test.endpoint, test.creds)
-		_ = err != nil && assert.EqualError(err, test.errMsg) || !assert.Equal(test.errMsg, "")
-	}
-}
-
-func TestToken(t *testing.T) {
-	assert := assert.New(t)
-
-	tokenStr := "this is the token"
-
-	tests := []struct {
-		tokenStr string
-		errMsg   string
-	}{
-		{tokenStr, ""},
-		{"", "malformed response from auth server"},
-	}
-
-	for _, test := range tests {
-		tokenRaw := fmt.Sprintf(`{"token": "%s"}`, test.tokenStr)
-		tokenJSON := bytes.NewBuffer([]byte(tokenRaw))
-		token, err := auth.NewTokenFromResp(tokenJSON)
-		if err != nil && assert.EqualError(err, test.errMsg) || !assert.Equal(test.errMsg, "") {
-			continue
+		if err != nil {
+			assert.EqualError(err, test.errMsg)
+		} else {
+			assert.Equal(test.errMsg, "")
 		}
-		if !assert.Equal(tokenStr, token.String()) {
-			continue
-		}
-		if !assert.False(token.Fresh()) {
-			continue
-		}
-		req, err := http.NewRequest("GET", "http://localhost", nil)
-		if !assert.NoError(err) {
-			continue
-		}
-		auth.AddToRequest(token, req)
-		assert.Equal(req.Header.Get("Authorization"), fmt.Sprintf("Bearer %s", test.tokenStr))
 	}
 }

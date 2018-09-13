@@ -64,5 +64,5 @@ func (a *authenticator) Authenticate(c *Challenge) (_ Token, err error) {
 		return
 	}
 
-	return decodeRespose(resp.Body)
+	return NewTokenFromResp(resp.Body)
 }

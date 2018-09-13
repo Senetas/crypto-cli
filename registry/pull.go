@@ -123,7 +123,7 @@ func PullManifest(
 	// TODO: Handle list manifests
 	req.Header.Set("Accept", distribution.MediaTypeManifest)
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
-	auth.AddToReqest(token, req)
+	auth.AddToRequest(token, req)
 
 	resp, err := httpclient.DoRequest(httpclient.DefaultClient, req, true, true)
 	if resp != nil {
@@ -174,7 +174,7 @@ func PullFromDigest(
 
 	req.Header.Set("Accept", distribution.MediaTypeLayer)
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
-	auth.AddToReqest(token, req)
+	auth.AddToRequest(token, req)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	req = req.WithContext(ctx)
