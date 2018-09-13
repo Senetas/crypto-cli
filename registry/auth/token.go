@@ -43,7 +43,8 @@ func (t *token) Fresh() bool {
 	return t.fresh
 }
 
-func decodeRespose(respBody io.Reader) (t Token, err error) {
+// NewTokenFromResp creates a new token from a http response
+func NewTokenFromResp(respBody io.Reader) (t Token, err error) {
 	t = &token{}
 	if err = json.NewDecoder(respBody).Decode(&t); err != nil {
 		err = errors.WithStack(err)
@@ -55,8 +56,8 @@ func decodeRespose(respBody io.Reader) (t Token, err error) {
 	return
 }
 
-// AddToReqest adds a token as a Bearer Authorization of a request
-func AddToReqest(t auth.Scope, req *http.Request) {
+// AddToRequest adds a token as a Bearer Authorization of a request
+func AddToRequest(t auth.Scope, req *http.Request) {
 	if t != nil && t.String() != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", t))
 	}
