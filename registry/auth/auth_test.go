@@ -91,7 +91,6 @@ func TestAuthenticator(t *testing.T) {
 		if !assert.NoError(err) {
 			continue
 		}
-
 		_, err = auth.NewAuthenticator(httpclient.DefaultClient, creds).Authenticate(ch)
 		if err != nil && assert.EqualError(err, test.errMsg) || !assert.Equal(test.errMsg, "") {
 			continue
