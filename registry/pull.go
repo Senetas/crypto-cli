@@ -179,13 +179,13 @@ func PullFromDigest(
 	ctx, cancel := context.WithCancel(context.Background())
 	req = req.WithContext(ctx)
 
-	errChan := make(chan error)
-	defer close(errChan)
+	errCh := make(chan error)
+	defer close(errCh)
 
 	// timeout
 	timer := time.AfterFunc(100*time.Second, cancel)
 
-	go download(ctx, req, timer, dir, fn, d, errChan)
+	go download(ctx, req, timer, dir, fn, d, errCh)
 
 	select {
 	case <-ctx.Done():
@@ -194,42 +194,48 @@ func PullFromDigest(
 	default:
 	}
 
-	err = <-errChan
+	err = <-errCh
 	return
 }
 
+// download handles the downloading of the blob file in PullFromDigest
 func download(
 	ctx context.Context,
 	req *http.Request,
 	timer *time.Timer,
 	dir, fn string,
 	d digest.Digest,
-	errChan chan<- error,
+	errCh chan<- error,
 ) {
+	var err error
+	defer func() { errCh <- err }()
+
 	resp, err := httpclient.DoRequest(&http.Client{}, req, true, false)
 	if resp != nil {
 		defer func() { err = utils.CheckedClose(resp.Body, err) }()
 	}
 	if err != nil {
-		errChan <- err
 		return
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		errChan <- errors.Errorf("Failed to download blob %s", fn)
+		err = errors.Errorf("Failed to download blob %s", fn)
 		return
 	}
 
 	fh, err := os.Create(fn)
 	if err != nil {
-		errChan <- errors.Wrapf(err, "filename = %s", fn)
+		err = errors.Wrapf(err, "filename = %s", fn)
 		return
 	}
 	defer func() { err = utils.CheckedClose(fh, err) }()
 
-	errChan <- processResp(resp, d, fn, fh, timer)
+	err = processResp(resp, d, fn, fh, timer)
 }
 
+// processResp handles the responce to the request to download a blob
+// includeing: downloading any data, time handling, verifying that the
+// download matches the expected digest
 func processResp(
 	resp *http.Response,
 	d digest.Digest,
@@ -243,7 +249,7 @@ func processResp(
 
 	bar.Start()
 
-	// reset timeout everetime there is new data
+	// reset timeout everytime 1 KiB is downloaded
 	for {
 		timer.Reset(100 * time.Second)
 		_, err = io.CopyN(mw, resp.Body, 1024)
@@ -264,6 +270,8 @@ func processResp(
 	return nil
 }
 
+// quitUnVerified cleans up downloaded files in the case that the digest does
+// not match the download
 func quitUnVerified(fn string, fh io.Closer, err error) error {
 	if err2 := os.Remove(fn); err != nil {
 		return errors.Wrapf(

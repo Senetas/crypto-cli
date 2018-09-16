@@ -53,10 +53,10 @@ func (b *NoncryptedBlob) GetSize() int64 { return b.Size }
 // SetFilename set the filename of the file that the blob is stored in
 func (b *NoncryptedBlob) SetFilename(filename string) { b.Filename = filename }
 
-// GetFilename retunrs the filename of the file that the blob is stored in
+// GetFilename retun the filename of the file that the blob is stored in
 func (b *NoncryptedBlob) GetFilename() string { return b.Filename }
 
-// ReadCloser opens the file that back the blob and returns a handle to it
+// ReadCloser opens the file that backs the blob and returns a handle to it
 // It is the user's responsibility to close the file handle
 func (b *NoncryptedBlob) ReadCloser() (io.ReadCloser, error) { return os.Open(b.Filename) }
 
