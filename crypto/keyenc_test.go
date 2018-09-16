@@ -17,28 +17,144 @@ package crypto_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/Senetas/crypto-cli/crypto"
-	"github.com/stretchr/testify/require"
+	"github.com/Senetas/crypto-cli/utils"
 )
 
-func TestKey(t *testing.T) {
-	require := require.New(t)
+var (
+	//passphrase = "196884 = 196883 + 1"
+	passphrase = "hunter2"
+	opts       = &crypto.Opts{
+		Algos:  crypto.Pbkdf2Aes256Gcm,
+		Compat: false,
+	}
+	optsNone = &crypto.Opts{
+		Algos:  crypto.None,
+		Compat: false,
+	}
+	optsCompat = &crypto.Opts{
+		Algos:  crypto.Pbkdf2Aes256Gcm,
+		Compat: true,
+	}
+	optsMock = &crypto.Opts{
+		Algos: crypto.Algos("mock"),
+	}
+	urlsValid   = []string{"https://crypto.senetas.com/?algos=PBKDF2-AES256-GCM&key=AAAAAAAAnECtJQZpzaepbGxVsLqfhEVdGEh3tadKd7w-wZIXTY-yMo8LidOYbJZ2axuUExIhDGPQZxyZzdzVD2OuiPyFMNj98Ju1rF-D2Sh2Qxd3"}
+	urlsInvalid = []string{"http://crypto.senetas.com/?algos=PBKDF2-AES256-GCM&key=3m6X-rV110o2DEm3pU-8qZpV-7ZKbBroFkWOUaI1Dv0_WRaVceZy5tsJ-PMoOMUW5CScc2wpL-PoBPMVAen7Nf9BPPCdcbrtpmFsMw=="}
+)
 
-	var (
-		iter      int = 1e5
-		plaintext     = []byte("Hello")
-		salt          = []byte("0123456789012345")
-	)
+func TestCrypto(t *testing.T) {
+	assert := assert.New(t)
 
-	ciphertext, err := crypto.Enckey([]byte(plaintext), salt, iter, "hunter2")
-	require.NoError(err)
+	tests := []struct {
+		opts       *crypto.Opts
+		passphrase string
+	}{
+		{opts, passphrase},
+		{optsNone, passphrase},
+		{optsCompat, passphrase},
+	}
 
-	require.Equal(salt, ciphertext[8:24])
+	for _, test := range tests {
+		test.opts.SetPassphrase(test.passphrase)
 
-	plaintext1, salt1, iter1, err := crypto.Deckey(ciphertext, "hunter2")
-	require.NoError(err)
+		c, err := crypto.NewDecrypto(test.opts)
+		if !assert.NoError(err) {
+			continue
+		}
 
-	require.Equal(iter, iter1)
-	require.Equal(salt, salt1)
-	require.Equal(plaintext, plaintext1)
+		e, err := crypto.EncryptKey(*c, test.opts)
+		if !assert.NoError(err) {
+			continue
+		}
+
+		d, err := crypto.DecryptKey(e, test.opts)
+		if !assert.NoError(err) {
+			continue
+		}
+
+		assert.Equal(*c, d)
+	}
 }
+
+func TestEncDecCrypto(t *testing.T) {
+	assert := assert.New(t)
+
+	tests := []struct {
+		opts    *crypto.Opts
+		optsEnc *crypto.Opts
+		optsDec *crypto.Opts
+		errEnc  error
+		errDec  error
+	}{
+		{
+			opts,
+			opts,
+			opts,
+			nil,
+			nil,
+		},
+		{
+			opts,
+			optsNone,
+			nil,
+			utils.NewError("encryption type does not match decryption type", false),
+			nil,
+		},
+		{
+			opts,
+			opts,
+			optsNone,
+			nil,
+			utils.NewError("encryption type does not match decryption type", false),
+		},
+	}
+
+	for _, test := range tests {
+		d, err := crypto.NewDecrypto(test.opts)
+		if !assert.NoError(err) {
+			continue
+		}
+
+		e, err := crypto.EncryptKey(*d, test.optsEnc)
+		if err != nil {
+			assert.Equal(test.errEnc, err)
+			continue
+		}
+
+		assert.NotNil(test.optsDec)
+		assert.NotNil(e)
+
+		c, err := crypto.DecryptKey(e, test.optsDec)
+		if err != nil {
+			assert.Equal(test.errDec, err)
+			continue
+		}
+
+		assert.Equal(d, &c)
+	}
+}
+
+//func TestEncDecCryptoCompat(t *testing.T) {
+//assert := assert.New(t)
+
+//tests := []struct {
+//urls []string
+//opts *crypto.Opts
+//err  error
+//}{
+//{urlsValid, opts, nil},
+//{urlsInvalid, opts, nil},
+//{[]string{}, opts, errors.New("missing encryption key")},
+//{urlsValid, optsNone, utils.NewError("encryption type does not match decryption type", false)},
+//}
+
+//for _, test := range tests {
+//_, err := crypto.NewEncryptoCompat(test.urls, test.opts)
+//if err != nil {
+//assert.Error(err, test.err.Error())
+//}
+//}
+//}

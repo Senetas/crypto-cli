@@ -1,17 +1,3 @@
-// Copyright © 2018 SENETAS SECURITY PTY LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package distribution_test
 
 import (
@@ -24,86 +10,49 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/Senetas/crypto-cli/crypto"
+	"github.com/Senetas/crypto-cli/distribution"
+	"github.com/Senetas/crypto-cli/utils"
 	"github.com/google/uuid"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/udhos/equalfile"
-
-	"github.com/Senetas/crypto-cli/crypto"
-	"github.com/Senetas/crypto-cli/distribution"
-	"github.com/Senetas/crypto-cli/utils"
 )
 
 var (
 	//passphrase = "196884 = 196883 + 1"
 	passphrase = "hunter2"
 	opts       = &crypto.Opts{
-		EncType: crypto.Pbkdf2Aes256Gcm,
-		Compat:  false,
+		Algos:  crypto.Pbkdf2Aes256Gcm,
+		Compat: false,
 	}
 	optsNone = &crypto.Opts{
-		EncType: crypto.None,
-		Compat:  false,
+		Algos:  crypto.None,
+		Compat: false,
 	}
 	optsCompat = &crypto.Opts{
-		EncType: crypto.Pbkdf2Aes256Gcm,
-		Compat:  true,
+		Algos:  crypto.Pbkdf2Aes256Gcm,
+		Compat: true,
 	}
 	optsMock = &crypto.Opts{
-		EncType: crypto.Algos("mock"),
+		Algos: crypto.Algos("mock"),
 	}
-	urlsValid   = []string{"https://crypto.senetas.com/?algos=PBKDF2-AES256-GCM&key=AAAAAAAAnECtJQZpzaepbGxVsLqfhEVdGEh3tadKd7w-wZIXTY-yMo8LidOYbJZ2axuUExIhDGPQZxyZzdzVD2OuiPyFMNj98Ju1rF-D2Sh2Qxd3"}
-	urlsInvalid = []string{"http://crypto.senetas.com/?algos=PBKDF2-AES256-GCM&key=3m6X-rV110o2DEm3pU-8qZpV-7ZKbBroFkWOUaI1Dv0_WRaVceZy5tsJ-PMoOMUW5CScc2wpL-PoBPMVAen7Nf9BPPCdcbrtpmFsMw=="}
-)
 
-func TestCrypto(t *testing.T) {
-	assert := assert.New(t)
-
-	tests := []struct {
+	tests = []struct {
 		opts       *crypto.Opts
 		passphrase string
+		mkFile     func(*testing.T, string) (int64, digest.Digest, string, error)
+		newBlob    func(string, digest.Digest, int64, *crypto.DeCrypto) distribution.DecryptedBlob
 	}{
-		{opts, passphrase},
-		{optsNone, passphrase},
-		{optsCompat, passphrase},
+		{opts, passphrase, mkRandFile, distribution.NewLayer},
+		{optsNone, "", mkRandFile, distribution.NewLayer},
+		{optsCompat, passphrase, mkRandFile, distribution.NewLayer},
+		{opts, passphrase, mkConfigFile, distribution.NewConfig},
+		{optsNone, "", mkConfigFile, distribution.NewConfig},
+		{optsCompat, passphrase, mkConfigFile, distribution.NewConfig},
 	}
-
-	for _, test := range tests {
-		test.opts.SetPassphrase(test.passphrase)
-
-		c, err := distribution.NewDecrypto(test.opts)
-		if !assert.NoError(err) {
-			continue
-		}
-
-		e, err := distribution.EncryptKey(*c, test.opts)
-		if !assert.NoError(err) {
-			continue
-		}
-
-		d, err := distribution.DecryptKey(e, test.opts)
-		if !assert.NoError(err) {
-			continue
-		}
-
-		assert.Equal(*c, d)
-	}
-}
-
-var tests = []struct {
-	opts       *crypto.Opts
-	passphrase string
-	mkFile     func(*testing.T, string) (int64, digest.Digest, string, error)
-	newBlob    func(string, digest.Digest, int64, *distribution.DeCrypto) distribution.DecryptedBlob
-}{
-	{opts, passphrase, mkRandFile, distribution.NewLayer},
-	{optsNone, "", mkRandFile, distribution.NewLayer},
-	{optsCompat, passphrase, mkRandFile, distribution.NewLayer},
-	{opts, passphrase, mkConfigFile, distribution.NewConfig},
-	{optsNone, "", mkConfigFile, distribution.NewConfig},
-	{optsCompat, passphrase, mkConfigFile, distribution.NewConfig},
-}
+)
 
 func TestCryptoBlobsEncDec(t *testing.T) {
 	assert := assert.New(t)
@@ -111,7 +60,7 @@ func TestCryptoBlobsEncDec(t *testing.T) {
 	for _, test := range tests {
 		test.opts.SetPassphrase(test.passphrase)
 
-		c, err := distribution.NewDecrypto(test.opts)
+		c, err := crypto.NewDecrypto(test.opts)
 		if !assert.NoError(err) {
 			continue
 		}
@@ -153,7 +102,7 @@ func TestCryptoBlobsEncDecEncDec(t *testing.T) {
 	for _, test := range tests {
 		test.opts.SetPassphrase(test.passphrase)
 
-		c, err := distribution.NewDecrypto(test.opts)
+		c, err := crypto.NewDecrypto(test.opts)
 		if !assert.NoError(err) {
 			continue
 		}
@@ -220,86 +169,6 @@ func TestCompressBlobs(t *testing.T) {
 	}
 
 	assert.NoError(blobTest(t, dir, fn, compath, decpath, blob, comp, dec))
-}
-
-func TestEncDecCrypto(t *testing.T) {
-	assert := assert.New(t)
-
-	tests := []struct {
-		opts    *crypto.Opts
-		optsEnc *crypto.Opts
-		optsDec *crypto.Opts
-		errEnc  error
-		errDec  error
-	}{
-		{
-			opts,
-			opts,
-			opts,
-			nil,
-			nil,
-		},
-		{
-			opts,
-			optsNone,
-			nil,
-			utils.NewError("encryption type does not match decryption type", false),
-			nil,
-		},
-		{
-			opts,
-			opts,
-			optsNone,
-			nil,
-			utils.NewError("encryption type does not match decryption type", false),
-		},
-	}
-
-	for _, test := range tests {
-		d, err := distribution.NewDecrypto(test.opts)
-		if !assert.NoError(err) {
-			continue
-		}
-
-		e, err := distribution.EncryptKey(*d, test.optsEnc)
-		if err != nil {
-			assert.Equal(test.errEnc, err)
-			continue
-		}
-
-		assert.NotNil(test.optsDec)
-		assert.NotNil(e)
-
-		c, err := distribution.DecryptKey(e, test.optsDec)
-		if err != nil {
-			assert.Equal(test.errDec, err)
-			continue
-		}
-
-		assert.Equal(d, &c)
-	}
-}
-
-func TestEncDecCryptoCompat(t *testing.T) {
-	assert := assert.New(t)
-
-	tests := []struct {
-		urls []string
-		opts *crypto.Opts
-		err  error
-	}{
-		{urlsValid, opts, nil},
-		{urlsInvalid, opts, nil},
-		{[]string{}, opts, errors.New("missing encryption key")},
-		{urlsValid, optsNone, utils.NewError("encryption type does not match decryption type", false)},
-	}
-
-	for _, test := range tests {
-		_, err := distribution.NewEncryptoCompat(test.urls, test.opts)
-		if err != nil {
-			assert.Error(err, test.err.Error())
-		}
-	}
 }
 
 func blobTest(

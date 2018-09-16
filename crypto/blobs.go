@@ -40,7 +40,8 @@ func EncBlobWriter(in io.Writer, key []byte) (io.WriteCloser, error) {
 	return sio.EncryptWriter(in, cfg)
 }
 
-// DecBlobReader returns an io.Reader that decrypts reads with the supplied key
+// DecBlobReader returns an io.Reader that decrypts read data with
+// the supplied key
 func DecBlobReader(in io.Reader, key []byte) (io.Reader, error) {
 	if len(key) != 32 {
 		return nil, errors.New("key was of the wrong length")

@@ -18,6 +18,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/Senetas/crypto-cli/crypto"
 	digest "github.com/opencontainers/go-digest"
 )
 
@@ -79,7 +80,7 @@ func NewConfig(
 	filename string,
 	d digest.Digest,
 	size int64,
-	dec *DeCrypto,
+	dec *crypto.DeCrypto,
 ) DecryptedBlob {
 	return &decryptedConfig{
 		NoncryptedBlob: newPlainBlob(filename, d, size, MediaTypeImageConfig),
@@ -92,7 +93,7 @@ func NewLayer(
 	filename string,
 	d digest.Digest,
 	size int64,
-	dec *DeCrypto,
+	dec *crypto.DeCrypto,
 ) DecryptedBlob {
 	return &decryptedBlob{
 		NoncryptedBlob: newPlainBlob(filename, d, size, MediaTypeLayer),

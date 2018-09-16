@@ -19,56 +19,334 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/binary"
+	"encoding/base64"
+	"encoding/json"
+	"net/url"
+	"strconv"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/pbkdf2"
 
 	"github.com/Senetas/crypto-cli/utils"
 )
 
-// Enckey encrypts the ciphertext = key with the given passphrase and salt
-func Enckey(plaintext, salt []byte, iter int, pass string) (ciphertext []byte, err error) {
-	key := passSalt2Key(pass, salt, iter)
+const (
+	// BaseCryptoURL is the base url to append query params to in compat mode
+	BaseCryptoURL = "https://crypto.senetas.com/"
 
-	block, err := aes.NewCipher(key)
+	// AlgosKey is the key used for the algos field in the url encoding of the crypto object
+	AlgosKey = "algos"
+
+	// VersionKey is the key used for the version field in the url encoding of the crypto object
+	VersionKey = "version"
+
+	// KeyKey is the key used for the (encrypted) data key in the url encoding of the crypto object
+	KeyKey = "key"
+
+	// NonceKey is the key used for the version field in the url encoding of the crypto object
+	NonceKey = "nonce"
+
+	// SaltKey is the key used for the version field in the url encoding of the crypto object
+	SaltKey = "salt"
+
+	// ItersKey is the key used for the version field in the url encoding of the crypto object
+	ItersKey = "iters"
+)
+
+// Crypto contains the common parts of EnCrypto and DeCrypto
+type Crypto struct {
+	Algos   Algos  `json:"algos"`
+	Nonce   []byte `json:"nonce"`
+	Salt    []byte `json:"salt"`
+	Iters   int    `json:"iters"`
+	Version int    `json:"version"`
+}
+
+// MarshalJSON converts a Crypto to JSON
+func (c *Crypto) MarshalJSON() ([]byte, error) {
+	type Alias Crypto
+	return json.Marshal(&struct {
+		Nonce string `json:"nonce"`
+		Salt  string `json:"salt"`
+		*Alias
+	}{
+		Nonce: base64.URLEncoding.EncodeToString(c.Nonce),
+		Salt:  base64.URLEncoding.EncodeToString(c.Salt),
+		Alias: (*Alias)(c),
+	})
+}
+
+// UnmarshalJSON converts JSON to Crypto
+func (c *Crypto) UnmarshalJSON(data []byte) (err error) {
+	type Alias Crypto
+	aux := &struct {
+		Nonce string `json:"nonce"`
+		Salt  string `json:"salt"`
+		*Alias
+	}{
+		Alias: (*Alias)(c),
+	}
+	if err = json.Unmarshal(data, &aux); err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+	c.Nonce, err = base64.URLEncoding.DecodeString(aux.Nonce)
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+	c.Salt, err = base64.URLEncoding.DecodeString(aux.Salt)
+	if err != nil {
+		err = errors.WithStack(err)
+	}
+	return
+}
+
+// EnCrypto is a encrypted key with the algotithms used to encrypt it and the data
+type EnCrypto struct {
+	Crypto
+	EncKey []byte `json:"key"`
+}
+
+// MarshalJSON converts an EnCrypto to JSON
+func (e *EnCrypto) MarshalJSON() ([]byte, error) {
+	type Alias EnCrypto
+	return json.Marshal(&struct {
+		EncKey string `json:"key"`
+		*Alias
+	}{
+		EncKey: base64.URLEncoding.EncodeToString(e.EncKey),
+		Alias:  (*Alias)(e),
+	})
+}
+
+// UnmarshalJSON converts JSON to an EnCrypto
+func (e *EnCrypto) UnmarshalJSON(data []byte) (err error) {
+	type Alias EnCrypto
+	aux := &struct {
+		EncKey string `json:"key"`
+		*Alias
+	}{
+		Alias: (*Alias)(e),
+	}
+	if err = json.Unmarshal(data, &aux); err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+	e.EncKey, err = base64.URLEncoding.DecodeString(aux.EncKey)
+	if err != nil {
+		err = errors.WithStack(err)
+	}
+	return
+}
+
+// NewEncryptoCompat create a new Encrypto struct from some URLs
+func NewEncryptoCompat(urls []string, opts *Opts) (e EnCrypto, err error) {
+	if len(urls) == 0 {
+		err = errors.New("missing encryption key")
+		return
+	}
+
+	u, err := url.Parse(urls[0])
 	if err != nil {
 		err = errors.WithStack(err)
 		return
 	}
 
-	nonce := make([]byte, 12)
-	if _, err = rand.Read(nonce); err != nil {
+	e.Algos, err = ValidateAlgos(u.Query().Get(AlgosKey))
+	if err != nil {
+		return
+	}
+
+	if e.Algos != opts.Algos {
+		err = utils.NewError("encryption type does not match decryption type", false)
+		return
+	}
+
+	e.EncKey, err = base64.URLEncoding.DecodeString(u.Query().Get(KeyKey))
+	if err != nil {
 		err = errors.WithStack(err)
+		return
+	}
+
+	e.Nonce, err = base64.URLEncoding.DecodeString(u.Query().Get(NonceKey))
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+
+	e.Salt, err = base64.URLEncoding.DecodeString(u.Query().Get(SaltKey))
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+
+	e.Iters, err = strconv.Atoi(u.Query().Get(ItersKey))
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+
+	e.Version, err = strconv.Atoi(u.Query().Get(VersionKey))
+	if err != nil {
+		err = errors.WithStack(err)
+	}
+
+	return
+}
+
+// NewURLCompat creates a url from an EnCrypto struct
+func NewURLCompat(e *EnCrypto, opts *Opts) (u *url.URL, err error) {
+	u, err = url.Parse(BaseCryptoURL)
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+	v := url.Values{}
+	v.Set(AlgosKey, string(e.Algos))
+	v.Set(KeyKey, base64.URLEncoding.EncodeToString(e.EncKey))
+	v.Set(NonceKey, base64.URLEncoding.EncodeToString(e.Nonce))
+	v.Set(SaltKey, base64.URLEncoding.EncodeToString(e.Salt))
+	v.Set(ItersKey, strconv.Itoa(e.Iters))
+	v.Set(VersionKey, strconv.Itoa(e.Version))
+	u.RawQuery = v.Encode()
+	return
+}
+
+// DecryptKey is the inverse function of EncryptKey (up to error)
+func DecryptKey(e EnCrypto, opts *Opts) (d DeCrypto, err error) {
+	if e.Algos != opts.Algos {
+		err = utils.NewError("encryption type does not match decryption type", false)
+		return
+	}
+
+	passphrase, err := opts.GetPassphrase(StdinPassReader)
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+
+	d.Crypto = e.Crypto
+
+	log.Debug().Msgf("%s", spew.Sdump(e))
+	log.Debug().Msgf("%s", spew.Sdump(d))
+
+	if vD, ok := versionDataStore[d.Version]; !ok {
+		err = errors.New("unknown version")
+	} else {
+		if vD.saltLength != len(d.Salt) {
+			err = errors.New("salt is wrong length")
+			return
+		}
+
+		if vD.nonceLength != len(d.Nonce) {
+			err = errors.New("nonce is wrong length")
+			return
+		}
+
+		d.DecKey, err = deckey(e.EncKey, e.Nonce, e.Salt, e.Iters, passphrase)
+		if err != nil {
+			err = errors.WithStack(err)
+		}
+	}
+
+	return
+}
+
+// deckey decrypts the ciphertext (=encrpted data key) with the given passphrase and salt
+func deckey(
+	ciphertext, nonce, salt []byte,
+	iter int,
+	pass string,
+) (
+	plaintext []byte,
+	err error,
+) {
+	kek := passSalt2Key(pass, salt, iter)
+
+	block, err := aes.NewCipher(kek)
+	if err != nil {
 		return
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
+		return
+	}
+
+	return aesgcm.Open(nil, nonce, ciphertext, salt)
+}
+
+// DeCrypto is a decrypted key with the algotithms used to encrypt it and the data
+type DeCrypto struct {
+	Crypto
+	DecKey []byte `json:"-"`
+}
+
+// NewDecrypto create a new DeCrypto struct that holds decrupted key data
+func NewDecrypto(opts *Opts) (d *DeCrypto, err error) {
+	d = &DeCrypto{
+		Crypto: Crypto{
+			Algos:   opts.Algos,
+			Version: opts.Version,
+			Nonce:   make([]byte, 12),
+			Salt:    make([]byte, 16),
+			Iters:   Pbkdf2Iter,
+		},
+		DecKey: make([]byte, 32),
+	}
+
+	if _, err = rand.Read(d.DecKey); err != nil {
 		err = errors.WithStack(err)
 		return
 	}
 
-	cipherkey := aesgcm.Seal(nil, nonce, plaintext, salt)
+	if _, err = rand.Read(d.Nonce); err != nil {
+		err = errors.WithStack(err)
+		return
+	}
 
-	bIter := make([]byte, 8)
-	binary.BigEndian.PutUint64(bIter, uint64(iter))
+	if _, err = rand.Read(d.Salt); err != nil {
+		err = errors.WithStack(err)
+	}
 
-	return utils.Concat([][]byte{bIter, salt, nonce, cipherkey}), nil
+	return
 }
 
-// Deckey decrypts the ciphertext = key with the given passphrase and salt
-func Deckey(ciphertext []byte, pass string) (plaintext, salt []byte, iter int, err error) {
-	iter, err = utils.Uint64ToPosInt(binary.BigEndian.Uint64(ciphertext[0:]))
+// EncryptKey encrypts a plaintext key with a passphrase and salt
+func EncryptKey(d DeCrypto, opts *Opts) (e EnCrypto, err error) {
+	if d.Algos != opts.Algos {
+		err = utils.NewError("encryption type does not match decryption type", false)
+		return
+	}
+
+	passphrase, err := opts.GetPassphrase(StdinPassReader)
 	if err != nil {
 		return
 	}
 
-	salt = ciphertext[8:24]
-	nonce := ciphertext[24:36]
-	key := ciphertext[36:]
+	e.Crypto = d.Crypto
+	e.EncKey, err = enckey(d.DecKey, e.Nonce, e.Salt, e.Iters, passphrase)
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
 
-	kek := passSalt2Key(pass, salt, iter)
+	return
+}
+
+// enckey encrypts the plaintext (= data key) with the given passphrase and salt
+func enckey(
+	plaintext, nonce, salt []byte,
+	iters int,
+	pass string,
+) (
+	ciphertext []byte,
+	err error,
+) {
+	kek := passSalt2Key(pass, salt, iters)
 
 	block, err := aes.NewCipher(kek)
 	if err != nil {
@@ -82,13 +360,7 @@ func Deckey(ciphertext []byte, pass string) (plaintext, salt []byte, iter int, e
 		return
 	}
 
-	plaintext, err = aesgcm.Open(nil, nonce, key, salt)
-	if err != nil {
-		err = errors.WithStack(err)
-		return
-	}
-
-	return
+	return aesgcm.Seal(nil, nonce, plaintext, salt), nil
 }
 
 // passSalt2Key deterministically returns a 32 byte encryption key given a passphrase and a salt

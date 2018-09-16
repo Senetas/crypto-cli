@@ -32,7 +32,7 @@ var pushCmd = &cobra.Command{
 to a remote repository. It may be used to distribute docker images
 confidentially. It does not sign images so cannot guarantee identities.`,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-		opts.EncType, err = crypto.ValidateAlgos(typeStr)
+		opts.Algos, err = crypto.ValidateAlgos(typeStr)
 		if err != nil {
 			return err
 		}
@@ -45,7 +45,7 @@ confidentially. It does not sign images so cannot guarantee identities.`,
 func checkFlagsPush(f *pflag.Flag) {
 	switch f.Name {
 	case "pass":
-		if opts.EncType != crypto.None {
+		if opts.Algos != crypto.None {
 			if !f.Changed {
 				var err error
 				passphrase, err = crypto.GetPassSTDIN("Enter passphrase: ", crypto.StdinPassReader)

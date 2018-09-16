@@ -318,14 +318,14 @@ func mkBlobs(
 		return
 	}
 
-	switch opts.EncType {
+	switch opts.Algos {
 	case crypto.Pbkdf2Aes256Gcm:
 		return pbkdf2Aes256GcmEncrypt(path, layerSet, image, opts)
 	case crypto.None:
 		return noneEncrypt(path, layerSet, image, opts)
 	default:
 	}
-	return nil, nil, errors.Errorf("%v is not a valid encryption type", opts.EncType)
+	return nil, nil, errors.Errorf("%v is not a valid encryption type", opts.Algos)
 }
 
 // noneEncrypt encrypts the images's Blob structs when the enctype is NONE
@@ -361,8 +361,8 @@ func pbkdf2Aes256GcmEncrypt(
 	err error,
 ) {
 	// make the config
-	var dec *DeCrypto
-	dec, err = NewDecrypto(opts)
+	var dec *crypto.DeCrypto
+	dec, err = crypto.NewDecrypto(opts)
 	if err != nil {
 		return
 	}
@@ -372,7 +372,7 @@ func pbkdf2Aes256GcmEncrypt(
 	for i, f := range image.Layers {
 		basename := filepath.Join(path, f)
 
-		dec, err = NewDecrypto(opts)
+		dec, err = crypto.NewDecrypto(opts)
 		if err != nil {
 			return
 		}

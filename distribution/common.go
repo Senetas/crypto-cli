@@ -35,13 +35,4 @@ const (
 	// MediaTypeUncompressedLayer is the mediaType used for layers which
 	// are not compressed.
 	MediaTypeUncompressedLayer = "application/vnd.docker.image.rootfs.diff.tar"
-
-	// BaseCryptoURL is the base url to append query params to in compat mode
-	BaseCryptoURL = "https://crypto.senetas.com/"
-
-	// AlgosKey is the key used for the algos field in the url encoding of the crypto object
-	AlgosKey = "algos"
-
-	// KeyKey is the key used for the (encrypted) data key in the url encoding of the crypto object
-	KeyKey = "key"
 )
