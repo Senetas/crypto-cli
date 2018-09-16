@@ -91,7 +91,6 @@ func TestAuthenticator(t *testing.T) {
 		if !assert.NoError(err) {
 			continue
 		}
-
 		_, err = auth.NewAuthenticator(httpclient.DefaultClient, creds).Authenticate(ch)
 		if err != nil && assert.EqualError(err, test.errMsg) || !assert.Equal(test.errMsg, "") {
 			continue
@@ -117,7 +116,7 @@ func TestChallenger(t *testing.T) {
 	creds, err := auth.NewDefaultCreds(repoInfo)
 	require.NoError(err)
 
-	header, err := auth.ChallengeHeader(nTRep, *repoInfo, endpoint, creds)
+	header, err := auth.ChallengeHeader(nTRep, *repoInfo, *endpoint, creds)
 	require.NoError(err)
 
 	ch, err := auth.ParseChallengeHeader(header)
@@ -221,7 +220,7 @@ func TestChallengeHeader(t *testing.T) {
 	server1URL, err := url.Parse(server1.URL)
 	require.NoError(err)
 
-	endpoint1 := dregistry.APIEndpoint{
+	endpoint1 := &dregistry.APIEndpoint{
 		Mirror: true,
 		URL:    server1URL,
 	}
@@ -231,7 +230,7 @@ func TestChallengeHeader(t *testing.T) {
 	server2URL, err := url.Parse(server2.URL)
 	require.NoError(err)
 
-	endpoint2 := dregistry.APIEndpoint{
+	endpoint2 := &dregistry.APIEndpoint{
 		Mirror: true,
 		URL:    server2URL,
 	}
@@ -241,7 +240,7 @@ func TestChallengeHeader(t *testing.T) {
 	tests := []struct {
 		ref      reference.Named
 		repoInfo dregistry.RepositoryInfo
-		endpoint dregistry.APIEndpoint
+		endpoint *dregistry.APIEndpoint
 		creds    auth.Credentials
 		errMsg   string
 	}{
@@ -251,7 +250,7 @@ func TestChallengeHeader(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		_, err = auth.ChallengeHeader(test.ref, test.repoInfo, test.endpoint, test.creds)
+		_, err = auth.ChallengeHeader(test.ref, test.repoInfo, *test.endpoint, test.creds)
 		_ = err != nil && assert.EqualError(err, test.errMsg) || !assert.Equal(test.errMsg, "")
 	}
 }
