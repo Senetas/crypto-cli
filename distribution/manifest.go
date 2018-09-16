@@ -70,12 +70,14 @@ func NewManifest(
 		return
 	}
 
+	// run docker inspect to optain the image ID
 	inspt, _, err := cli.ImageInspectWithRaw(ctx, ref.String())
 	if err != nil {
 		err = errors.WithStack(err)
 		return
 	}
 
+	// docker save the image (as a ReadCloser)
 	imageTar, err := cli.ImageSave(ctx, []string{inspt.ID})
 	if err != nil {
 		err = errors.WithStack(err)
@@ -83,6 +85,7 @@ func NewManifest(
 	}
 	defer func() { err = utils.CheckedClose(imageTar, err) }()
 
+	// determine which layers need to be encrypted
 	layers, err := layersToEncrypt(ctx, cli, inspt)
 	if err != nil {
 		return
@@ -102,6 +105,7 @@ func NewManifest(
 		return
 	}
 
+	// make the Blob structs for the manifest
 	manifest.Config, manifest.Layers, err = mkBlobs(
 		ref.Path(),
 		ref.Tag(),
@@ -109,11 +113,8 @@ func NewManifest(
 		layers,
 		opts,
 	)
-	if err != nil {
-		return
-	}
 
-	return manifest, nil
+	return
 }
 
 // Encrypt an image, generating an image manifest suitable for upload to a repo
@@ -263,6 +264,12 @@ func extractTarBall(r io.Reader, size int64, manifest *ImageManifest) (err error
 	}
 }
 
+// dontExtract holds the names of the file int the image archive to not extract
+func dontExtract(name string) bool {
+	return name == "json" || name == "VERSION" || name == "repositories"
+}
+
+// mkFile makes the file in extractTarBall
 func mkFile(path string, info os.FileInfo, r io.Reader) (err error) {
 	fh, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
 	defer func() { err = utils.CheckedClose(fh, err) }()
@@ -278,11 +285,7 @@ func mkFile(path string, info os.FileInfo, r io.Reader) (err error) {
 	return
 }
 
-func dontExtract(name string) bool {
-	return name == "json" || name == "VERSION" || name == "repositories"
-}
-
-// TODO: find a way to do this by interfacing with the daemon directly
+// mkBlobs
 func mkBlobs(
 	repo, tag, path string,
 	layers []string,
@@ -324,6 +327,7 @@ func mkBlobs(
 	return nil, nil, errors.Errorf("%v is not a valid encryption type", opts.EncType)
 }
 
+// noneEncrypt encrypts the images's Blob structs when the enctype is NONE
 func noneEncrypt(
 	path string,
 	layerSet map[string]bool,
@@ -342,35 +346,39 @@ func noneEncrypt(
 	return configBlob, layerBlobs, nil
 }
 
+// noneEncrypt encrypts the images's Blob structs when the enctype is Pbkdf2Aes256Gcm
 func pbkdf2Aes256GcmEncrypt(
 	path string,
 	layerSet map[string]bool,
 	image *archiveStruct,
 	opts *crypto.Opts,
 ) (
-	_ Blob,
-	_ []Blob,
+	configBlob Blob,
+	layerBlobs []Blob,
 	err error,
 ) {
 	// make the config
-	dec, err := NewDecrypto(opts)
+	var dec *DeCrypto
+	dec, err = NewDecrypto(opts)
 	if err != nil {
-		return nil, nil, err
+		return
 	}
-	configBlob := NewConfig(filepath.Join(path, image.Config), "", 0, dec)
+	configBlob = NewConfig(filepath.Join(path, image.Config), "", 0, dec)
 
-	layerBlobs := make([]Blob, len(image.Layers))
+	layerBlobs = make([]Blob, len(image.Layers))
 	for i, f := range image.Layers {
 		basename := filepath.Join(path, f)
 
-		dec, err := NewDecrypto(opts)
+		dec, err = NewDecrypto(opts)
 		if err != nil {
-			return nil, nil, err
+			return
 		}
 
-		d, err := fileDigest(basename)
+		var d digest.Digest
+		d, err = fileDigest(basename)
 		if err != nil {
-			return nil, nil, errors.WithStack(err)
+			err = errors.WithStack(err)
+			return
 		}
 
 		log.Debug().Msgf("preparing %s", d)
@@ -381,9 +389,11 @@ func pbkdf2Aes256GcmEncrypt(
 		}
 	}
 
-	return configBlob, layerBlobs, nil
+	return
 }
 
+// fileDigest calculates the digest of the file at location filename
+// note its error are not wraped
 func fileDigest(filename string) (d digest.Digest, err error) {
 	// filename consists of information that is local to the os or the docker
 	// daemon. Thus assuming they are not comprimised, it is safe to open
@@ -395,17 +405,23 @@ func fileDigest(filename string) (d digest.Digest, err error) {
 	return digest.Canonical.FromReader(fh)
 }
 
-func layersToEncrypt(ctx context.Context, cli *client.Client, inspt types.ImageInspect) ([]string, error) {
+// layersToEncrypt returns the diffIDs of the layers that have been marked for encryption
+func layersToEncrypt(
+	ctx context.Context,
+	cli *client.Client,
+	inspt types.ImageInspect,
+) (_ []string, err error) {
 	// get the history
 	hist, err := cli.ImageHistory(ctx, inspt.ID)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		err = errors.WithStack(err)
+		return
 	}
 
 	// the positions of the layers to encrypt
 	eps, err := encryptPositions(hist)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	log.Debug().Msgf("%v", eps)
@@ -423,6 +439,8 @@ func layersToEncrypt(ctx context.Context, cli *client.Client, inspt types.ImageI
 	return diffIDsToEncrypt, nil
 }
 
+// encryptPositions gives the positions in the image history that correspond to encrypted layers
+// the length of the output array is the number of layers that are to be encrypted
 func encryptPositions(hist []image.HistoryResponseItem) (encryptPos []int, err error) {
 	n := 0
 	toEncrypt := false
@@ -455,11 +473,14 @@ func encryptPositions(hist []image.HistoryResponseItem) (encryptPos []int, err e
 	return encryptPos, nil
 }
 
+// archiveStruct collects the filenames of the config and layers in the image
+// archive obtained from a docker save command
 type archiveStruct struct {
 	Config string
 	Layers []string
 }
 
+// mkArchiveStruct creates a new archiveStruct
 func mkArchiveStruct(path string, manifestFH io.Reader) (a *archiveStruct, err error) {
 	var images []*archiveStruct
 	if err = json.NewDecoder(manifestFH).Decode(&images); err != nil {
@@ -475,22 +496,7 @@ func mkArchiveStruct(path string, manifestFH io.Reader) (a *archiveStruct, err e
 	return images[0], nil
 }
 
-func unencryptedConfig(blob *NoncryptedBlob) (_ Blob, err error) {
-	digester := digest.Canonical.Digester()
-	r, err := blob.ReadCloser()
-	if err != nil {
-		err = errors.WithStack(err)
-		return
-	}
-	size, err := io.Copy(digester.Hash(), r)
-	if err != nil {
-		err = errors.WithStack(err)
-		return
-	}
-	d := digester.Digest()
-	return NewPlainConfig(blob.GetFilename(), d, size), nil
-}
-
+// creates a blob a blob that contains a config
 func prepareConfig(
 	config Blob,
 	opts *crypto.Opts,
@@ -511,6 +517,23 @@ func prepareConfig(
 	return
 }
 
+// unencryptedConfig creates a blob that contains an unencrypted config
+func unencryptedConfig(blob *NoncryptedBlob) (_ Blob, err error) {
+	r, err := blob.ReadCloser()
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+	digester := digest.Canonical.Digester()
+	size, err := io.Copy(digester.Hash(), r)
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+	return NewPlainConfig(blob.GetFilename(), digester.Digest(), size), nil
+}
+
+// decryptLayer decides whether to decrypt or decompress the layer
 func decryptLayer(
 	ref names.NamedTaggedRepository,
 	opts *crypto.Opts,

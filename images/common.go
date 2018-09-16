@@ -101,7 +101,8 @@ func authProcedure(ref reference.Named) (
 		return
 	}
 
-	*endpoint, err = registry.GetEndpoint(ref, *repoInfo)
+	log.Debug().Msgf("%v %v", ref, *repoInfo)
+	endpoint, err = registry.GetEndpoint(ref, *repoInfo)
 	if err != nil {
 		err = errors.Wrapf(err, "could not get endpoint ref = %v, repoInfo = %v", ref, *repoInfo)
 		return

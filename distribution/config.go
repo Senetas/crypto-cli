@@ -67,31 +67,30 @@ type decConfig struct {
 func NewDecConfig() DecConfig { return &decConfig{} }
 
 // Sort the keys when marshalling
-func (c *decConfig) MarshalJSON() ([]byte, error) {
+func (c *decConfig) MarshalJSON() (_ []byte, err error) {
 	type MarshalImage decConfig
 
 	pass1, err := json.Marshal(MarshalImage(*c))
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	var sorted map[string]*json.RawMessage
-	if err := json.Unmarshal(pass1, &sorted); err != nil {
-		return nil, err
+	if err = json.Unmarshal(pass1, &sorted); err != nil {
+		return
 	}
 	return json.Marshal(sorted)
 }
 
-func (c *decConfig) Encrypt(key, salt []byte) (EncConfig, error) {
+func (c *decConfig) Encrypt(key, salt []byte) (_ EncConfig, err error) {
 	enc, err := crypto.EncryptJSON(c.secretFields, key, salt)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return
 	}
-	ec := &encConfig{
+	return &encConfig{
 		clearFields: c.clearFields,
 		Enc:         enc,
-	}
-	return ec, nil
+	}, nil
 }
 
 // EncConfig has the secretFields encrypted
@@ -104,12 +103,12 @@ type encConfig struct {
 	clearFields
 }
 
-func (c *encConfig) Decrypt(key []byte, opts *crypto.Opts) (_ DecConfig, err error) {
-	dc := decConfig{clearFields: c.clearFields}
+func (c *encConfig) Decrypt(key []byte, opts *crypto.Opts) (dc DecConfig, err error) {
+	dc = &decConfig{clearFields: c.clearFields}
 	log.Debug().Msgf("%v", opts)
-	if err = crypto.DecryptJSON(c.Enc, key, &dc.secretFields); err != nil {
+	if err = crypto.DecryptJSON(c.Enc, key, dc); err != nil {
 		err = errors.WithStack(err)
 		return
 	}
-	return &dc, nil
+	return
 }
