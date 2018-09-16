@@ -7,20 +7,29 @@ import (
 )
 
 // GetEndpoint returns the endpoint associated with the reference
-func GetEndpoint(ref reference.Named, repoInfo registry.RepositoryInfo) (registry.APIEndpoint, error) {
+func GetEndpoint(
+	ref reference.Named,
+	repoInfo registry.RepositoryInfo,
+) (
+	_ *registry.APIEndpoint,
+	err error,
+) {
 	options := registry.ServiceOptions{}
 	options.InsecureRegistries = append(options.InsecureRegistries, "0.0.0.0/0")
-	registryService, err := registry.NewService(options)
+
+	var registryService *registry.DefaultService
+	registryService, err = registry.NewService(options)
 	if err != nil {
-		return registry.APIEndpoint{}, errors.Wrapf(err, "opts = %#v", options)
+		err = errors.Wrapf(err, "opts = %#v", options)
+		return
 	}
 
-	endpoints, err := registryService.LookupPushEndpoints(repoInfo.Index.Name)
+	var endpoints []registry.APIEndpoint
+	endpoints, err = registryService.LookupPushEndpoints(repoInfo.Index.Name)
 	if err != nil {
-		return registry.APIEndpoint{}, errors.Wrapf(err, "index name = %#v", repoInfo.Index.Name)
+		err = errors.Wrapf(err, "index name = %#v", repoInfo.Index.Name)
+		return
 	}
 
-	endpoint := endpoints[0]
-
-	return endpoint, nil
+	return &endpoints[0], nil
 }
