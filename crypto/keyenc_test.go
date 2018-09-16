@@ -137,24 +137,26 @@ func TestEncDecCrypto(t *testing.T) {
 	}
 }
 
-//func TestEncDecCryptoCompat(t *testing.T) {
-//assert := assert.New(t)
+func TestEncDecCryptoCompat(t *testing.T) {
+	assert := assert.New(t)
 
-//tests := []struct {
-//urls []string
-//opts *crypto.Opts
-//err  error
-//}{
-//{urlsValid, opts, nil},
-//{urlsInvalid, opts, nil},
-//{[]string{}, opts, errors.New("missing encryption key")},
-//{urlsValid, optsNone, utils.NewError("encryption type does not match decryption type", false)},
-//}
+	tests := []struct {
+		urls   []string
+		opts   *crypto.Opts
+		errMsg string
+	}{
+		{urlsValid, opts, ""},
+		{urlsInvalid, opts, ""},
+		{[]string{}, opts, "missing encryption key"},
+		{urlsValid, optsNone, "encryption type does not match decryption type"},
+	}
 
-//for _, test := range tests {
-//_, err := crypto.NewEncryptoCompat(test.urls, test.opts)
-//if err != nil {
-//assert.Error(err, test.err.Error())
-//}
-//}
-//}
+	for _, test := range tests {
+		_, err := crypto.NewEncryptoCompat(test.urls, test.opts)
+		if err != nil {
+			assert.Error(err, test.errMsg)
+		} else {
+			assert.Equal(test.errMsg, "")
+		}
+	}
+}

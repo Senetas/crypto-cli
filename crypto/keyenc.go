@@ -20,7 +20,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"net/url"
 	"strconv"
 
@@ -64,82 +63,10 @@ type Crypto struct {
 	Version int    `json:"version"`
 }
 
-// MarshalJSON converts a Crypto to JSON
-func (c *Crypto) MarshalJSON() ([]byte, error) {
-	type Alias Crypto
-	return json.Marshal(&struct {
-		Nonce string `json:"nonce"`
-		Salt  string `json:"salt"`
-		*Alias
-	}{
-		Nonce: base64.URLEncoding.EncodeToString(c.Nonce),
-		Salt:  base64.URLEncoding.EncodeToString(c.Salt),
-		Alias: (*Alias)(c),
-	})
-}
-
-// UnmarshalJSON converts JSON to Crypto
-func (c *Crypto) UnmarshalJSON(data []byte) (err error) {
-	type Alias Crypto
-	aux := &struct {
-		Nonce string `json:"nonce"`
-		Salt  string `json:"salt"`
-		*Alias
-	}{
-		Alias: (*Alias)(c),
-	}
-	if err = json.Unmarshal(data, &aux); err != nil {
-		err = errors.WithStack(err)
-		return
-	}
-	c.Nonce, err = base64.URLEncoding.DecodeString(aux.Nonce)
-	if err != nil {
-		err = errors.WithStack(err)
-		return
-	}
-	c.Salt, err = base64.URLEncoding.DecodeString(aux.Salt)
-	if err != nil {
-		err = errors.WithStack(err)
-	}
-	return
-}
-
 // EnCrypto is a encrypted key with the algotithms used to encrypt it and the data
 type EnCrypto struct {
 	Crypto
 	EncKey []byte `json:"key"`
-}
-
-// MarshalJSON converts an EnCrypto to JSON
-func (e *EnCrypto) MarshalJSON() ([]byte, error) {
-	type Alias EnCrypto
-	return json.Marshal(&struct {
-		EncKey string `json:"key"`
-		*Alias
-	}{
-		EncKey: base64.URLEncoding.EncodeToString(e.EncKey),
-		Alias:  (*Alias)(e),
-	})
-}
-
-// UnmarshalJSON converts JSON to an EnCrypto
-func (e *EnCrypto) UnmarshalJSON(data []byte) (err error) {
-	type Alias EnCrypto
-	aux := &struct {
-		EncKey string `json:"key"`
-		*Alias
-	}{
-		Alias: (*Alias)(e),
-	}
-	if err = json.Unmarshal(data, &aux); err != nil {
-		err = errors.WithStack(err)
-		return
-	}
-	e.EncKey, err = base64.URLEncoding.DecodeString(aux.EncKey)
-	if err != nil {
-		err = errors.WithStack(err)
-	}
-	return
 }
 
 // NewEncryptoCompat create a new Encrypto struct from some URLs

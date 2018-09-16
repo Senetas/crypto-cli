@@ -18,8 +18,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/Senetas/crypto-cli/crypto"
 	digest "github.com/opencontainers/go-digest"
+
+	"github.com/Senetas/crypto-cli/crypto"
 )
 
 // Blob represents an entry for a blob in the image manifest

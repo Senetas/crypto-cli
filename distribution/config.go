@@ -69,7 +69,6 @@ func NewDecConfig() DecConfig { return &decConfig{} }
 // Sort the keys when marshalling
 func (c *decConfig) MarshalJSON() (_ []byte, err error) {
 	type MarshalImage decConfig
-
 	pass1, err := json.Marshal(MarshalImage(*c))
 	if err != nil {
 		return
@@ -79,6 +78,7 @@ func (c *decConfig) MarshalJSON() (_ []byte, err error) {
 	if err = json.Unmarshal(pass1, &sorted); err != nil {
 		return
 	}
+
 	return json.Marshal(sorted)
 }
 
@@ -108,7 +108,6 @@ func (c *encConfig) Decrypt(key, nonce, salt []byte, opts *crypto.Opts) (dc DecC
 	log.Debug().Msgf("%v", opts)
 	if err = crypto.DecryptJSON(c.Enc, key, nonce, salt, dc); err != nil {
 		err = errors.WithStack(err)
-		return
 	}
 	return
 }
