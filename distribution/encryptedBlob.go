@@ -35,7 +35,7 @@ type EncryptedBlob interface {
 // EncryptedBlob is the go type for an encrypted element in the layer array
 type encryptedBlobNew struct {
 	*NoncryptedBlob
-	*EnCrypto `json:"crypto"`
+	*crypto.EnCrypto `json:"crypto"`
 }
 
 func (eb *encryptedBlobNew) DecryptBlob(opts *crypto.Opts, outname string) (_ DecryptedBlob, err error) {
@@ -47,7 +47,7 @@ func (eb *encryptedBlobNew) DecryptBlob(opts *crypto.Opts, outname string) (_ De
 }
 
 func (eb *encryptedBlobNew) DecryptKey(opts *crypto.Opts) (_ KeyDecryptedBlob, err error) {
-	dk, err := DecryptKey(*eb.EnCrypto, opts)
+	dk, err := crypto.DecryptKey(*eb.EnCrypto, opts)
 	if err != nil {
 		return
 	}
@@ -64,26 +64,26 @@ type encryptedBlobCompat struct {
 }
 
 func (e *encryptedBlobCompat) DecryptBlob(opts *crypto.Opts, outname string) (_ DecryptedBlob, err error) {
-	ek, err := NewEncryptoCompat(e.URLs, opts)
+	ek, err := crypto.NewEncryptoCompat(e.URLs, opts)
 	if err != nil {
 		return
 	}
 
 	eb := &encryptedBlobNew{
 		NoncryptedBlob: e.NoncryptedBlob,
-		EnCrypto:       ek,
+		EnCrypto:       &ek,
 	}
 
 	return eb.DecryptBlob(opts, outname)
 }
 
 func (e *encryptedBlobCompat) DecryptKey(opts *crypto.Opts) (_ KeyDecryptedBlob, err error) {
-	ek, err := NewEncryptoCompat(e.URLs, opts)
+	ek, err := crypto.NewEncryptoCompat(e.URLs, opts)
 	if err != nil {
 		return
 	}
 
-	dk, err := DecryptKey(*ek, opts)
+	dk, err := crypto.DecryptKey(ek, opts)
 	if err != nil {
 		return
 	}
@@ -96,7 +96,7 @@ func (e *encryptedBlobCompat) DecryptKey(opts *crypto.Opts) (_ KeyDecryptedBlob,
 
 type encryptedConfigNew struct {
 	*NoncryptedBlob
-	*EnCrypto `json:"crypto"`
+	*crypto.EnCrypto `json:"crypto"`
 }
 
 func (ec *encryptedConfigNew) DecryptBlob(opts *crypto.Opts, outname string) (_ DecryptedBlob, err error) {
@@ -108,7 +108,7 @@ func (ec *encryptedConfigNew) DecryptBlob(opts *crypto.Opts, outname string) (_ 
 }
 
 func (ec *encryptedConfigNew) DecryptKey(opts *crypto.Opts) (_ KeyDecryptedBlob, err error) {
-	dk, err := DecryptKey(*ec.EnCrypto, opts)
+	dk, err := crypto.DecryptKey(*ec.EnCrypto, opts)
 	if err != nil {
 		return
 	}
@@ -124,26 +124,26 @@ type encryptedConfigCompat struct {
 }
 
 func (e *encryptedConfigCompat) DecryptBlob(opts *crypto.Opts, outname string) (_ DecryptedBlob, err error) {
-	ek, err := NewEncryptoCompat(e.URLs, opts)
+	ek, err := crypto.NewEncryptoCompat(e.URLs, opts)
 	if err != nil {
 		return
 	}
 
 	eb := &encryptedConfigNew{
 		NoncryptedBlob: e.NoncryptedBlob,
-		EnCrypto:       ek,
+		EnCrypto:       &ek,
 	}
 
 	return eb.DecryptBlob(opts, outname)
 }
 
 func (e *encryptedConfigCompat) DecryptKey(opts *crypto.Opts) (_ KeyDecryptedBlob, err error) {
-	ek, err := NewEncryptoCompat(e.URLs, opts)
+	ek, err := crypto.NewEncryptoCompat(e.URLs, opts)
 	if err != nil {
 		return
 	}
 
-	dk, err := DecryptKey(*ek, opts)
+	dk, err := crypto.DecryptKey(ek, opts)
 	if err != nil {
 		err = errors.WithStack(err)
 		return

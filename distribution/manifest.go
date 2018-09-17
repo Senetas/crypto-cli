@@ -37,9 +37,7 @@ import (
 	"github.com/Senetas/crypto-cli/utils"
 )
 
-const (
-	labelString = "LABEL com.senetas.crypto.enabled"
-)
+const labelString = "LABEL com.senetas.crypto.enabled"
 
 var createdRE = `#\(nop\)\s+` + labelString + `=(true|false)|(#\(nop\))`
 
@@ -100,7 +98,7 @@ func NewManifest(
 		DirName:       filepath.Join(tempDir, uuid.New().String()),
 	}
 
-	// extract image
+	// extract image and fill out manifest
 	if err = extractTarBall(imageTar, inspt.Size, manifest); err != nil {
 		return
 	}
@@ -154,7 +152,7 @@ func (m *ImageManifest) Encrypt(
 	return
 }
 
-// DecryptKeys attempts to decrypt all keys in a manifest
+// DecryptKeys decrypts all keys in a manifest
 func (m *ImageManifest) DecryptKeys(
 	ref names.NamedTaggedRepository,
 	opts *crypto.Opts,
@@ -185,7 +183,7 @@ func (m *ImageManifest) DecryptKeys(
 	return nil
 }
 
-// Decrypt attempts to decrypt a manifest
+// Decrypt decrypt a manifest, both the keys and layer data
 func (m *ImageManifest) Decrypt(
 	ref names.NamedTaggedRepository,
 	opts *crypto.Opts,
@@ -220,6 +218,8 @@ func (m *ImageManifest) Decrypt(
 	return
 }
 
+// extractTarBall extracts the tarball from a docker save and fills out the
+// provided image manifest that with details about the layers
 func extractTarBall(r io.Reader, size int64, manifest *ImageManifest) (err error) {
 	if err = os.MkdirAll(manifest.DirName, 0700); err != nil {
 		err = errors.Wrapf(err, "could not create: %s", manifest.DirName)
@@ -285,7 +285,8 @@ func mkFile(path string, info os.FileInfo, r io.Reader) (err error) {
 	return
 }
 
-// mkBlobs
+// mkBlobs assembles the list of filenames that contains the layers of the image
+// into a struct that contain additional information such as their digest
 func mkBlobs(
 	repo, tag, path string,
 	layers []string,
@@ -317,17 +318,18 @@ func mkBlobs(
 		return
 	}
 
-	switch opts.EncType {
+	switch opts.Algos {
 	case crypto.Pbkdf2Aes256Gcm:
 		return pbkdf2Aes256GcmEncrypt(path, layerSet, image, opts)
 	case crypto.None:
 		return noneEncrypt(path, layerSet, image, opts)
 	default:
 	}
-	return nil, nil, errors.Errorf("%v is not a valid encryption type", opts.EncType)
+	return nil, nil, errors.Errorf("%v is not a valid encryption type", opts.Algos)
 }
 
 // noneEncrypt encrypts the images's Blob structs when the enctype is NONE
+// (i.e. no encryption)
 func noneEncrypt(
 	path string,
 	layerSet map[string]bool,
@@ -346,7 +348,8 @@ func noneEncrypt(
 	return configBlob, layerBlobs, nil
 }
 
-// noneEncrypt encrypts the images's Blob structs when the enctype is Pbkdf2Aes256Gcm
+// pbkdf2Aes256GcmEncrypt encrypts the images's Blob structs when the enctype
+// is Pbkdf2Aes256Gcm
 func pbkdf2Aes256GcmEncrypt(
 	path string,
 	layerSet map[string]bool,
@@ -358,8 +361,8 @@ func pbkdf2Aes256GcmEncrypt(
 	err error,
 ) {
 	// make the config
-	var dec *DeCrypto
-	dec, err = NewDecrypto(opts)
+	var dec *crypto.DeCrypto
+	dec, err = crypto.NewDecrypto(opts)
 	if err != nil {
 		return
 	}
@@ -369,7 +372,7 @@ func pbkdf2Aes256GcmEncrypt(
 	for i, f := range image.Layers {
 		basename := filepath.Join(path, f)
 
-		dec, err = NewDecrypto(opts)
+		dec, err = crypto.NewDecrypto(opts)
 		if err != nil {
 			return
 		}
