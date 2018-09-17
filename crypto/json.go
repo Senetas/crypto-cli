@@ -40,6 +40,7 @@ func EncryptJSON(val interface{}, key, nonce, salt []byte) (ciphertext string, e
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
 		err = errors.WithStack(err)
+		return
 	}
 
 	ciphertext = base64.URLEncoding.EncodeToString(aesgcm.Seal(nil, nonce, plaintext, salt))

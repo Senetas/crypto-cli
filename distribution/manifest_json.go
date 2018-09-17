@@ -40,26 +40,35 @@ func marshalBlob(config Blob) (bs json.RawMessage, err error) {
 		MediaType string        `json:"mediaType"`
 		Size      int64         `json:"size"`
 	}
-	layer := Layer{
+	type New struct {
+		*Layer
+		Crypto crypto.EnCrypto `json:"crypto"`
+	}
+	type Compat struct {
+		*Layer
+		URLs []string `json:"urls"`
+	}
+	layer := &Layer{
 		Digest:    config.GetDigest(),
 		Size:      config.GetSize(),
 		MediaType: config.GetContentType(),
 	}
-	aux := &struct {
-		Layer
-		Crypto crypto.EnCrypto `json:"crypto"`
-	}{
-		Layer: layer,
-	}
 	switch b := config.(type) {
 	case *encryptedConfigNew:
-		aux.Crypto = *b.EnCrypto
+		aux := New{Layer: layer, Crypto: *b.EnCrypto}
+		return json.Marshal(aux)
+	case *encryptedConfigCompat:
+		aux := Compat{Layer: layer, URLs: b.URLs}
+		return json.Marshal(aux)
 	case *encryptedBlobNew:
-		aux.Crypto = *b.EnCrypto
+		aux := New{Layer: layer, Crypto: *b.EnCrypto}
+		return json.Marshal(aux)
+	case *encryptedBlobCompat:
+		aux := Compat{Layer: layer, URLs: b.URLs}
+		return json.Marshal(aux)
 	default:
 		return json.Marshal(layer)
 	}
-	return json.Marshal(aux)
 }
 
 func marshalLayers(layers []Blob) (out []json.RawMessage, err error) {
@@ -109,33 +118,17 @@ func unmarshalConfig(m json.RawMessage) (blob Blob, err error) {
 		return
 	}
 
-	if c, ok := blobMap["crypto"]; ok {
-		eblob := &encryptedConfigNew{}
-		eblob.EnCrypto = &crypto.EnCrypto{}
-		err = json.Unmarshal(c, eblob.EnCrypto)
-		if err != nil {
-			err = errors.WithStack(err)
-			return
-		}
-		nblob := &NoncryptedBlob{}
-		err = json.Unmarshal(m, nblob)
-		if err != nil {
-			err = errors.WithStack(err)
-			return
-		}
-		eblob.NoncryptedBlob = nblob
-		return eblob, nil
+	if _, ok := blobMap["crypto"]; ok {
+		blob = &encryptedConfigNew{}
 	} else if _, ok := blobMap["urls"]; ok {
 		blob = &encryptedConfigCompat{}
 	} else {
 		blob = &NoncryptedBlob{}
 	}
-
-	if err = json.Unmarshal(m, blob); err != nil {
+	if err = json.Unmarshal(m, &blob); err != nil {
 		err = errors.WithStack(err)
 		return
 	}
-
 	return
 }
 
@@ -162,27 +155,16 @@ func unmarshalLayer(m json.RawMessage) (blob Blob, err error) {
 		return
 	}
 
-	if c, ok := blobMap["crypto"]; ok {
-		eblob := &encryptedBlobNew{}
-		eblob.EnCrypto = &crypto.EnCrypto{}
-		err = json.Unmarshal(c, eblob.EnCrypto)
-		if err != nil {
-			return
-		}
-		nblob := &NoncryptedBlob{}
-		err = json.Unmarshal(m, nblob)
-		if err != nil {
-			return
-		}
-		eblob.NoncryptedBlob = nblob
-		return eblob, nil
+	if _, ok := blobMap["crypto"]; ok {
+		blob = &encryptedBlobNew{}
 	} else if _, ok := blobMap["urls"]; ok {
 		blob = &encryptedBlobCompat{}
 	} else {
 		blob = &NoncryptedBlob{}
 	}
-
-	err = json.Unmarshal(m, blob)
-
+	if err = json.Unmarshal(m, &blob); err != nil {
+		err = errors.WithStack(err)
+		return
+	}
 	return
 }

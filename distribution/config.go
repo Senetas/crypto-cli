@@ -20,8 +20,6 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/image"
-	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/crypto"
 )
@@ -83,14 +81,9 @@ func (c *decConfig) MarshalJSON() (_ []byte, err error) {
 }
 
 func (c *decConfig) Encrypt(key, nonce, salt []byte) (_ EncConfig, err error) {
-	enc, err := crypto.EncryptJSON(c.secretFields, key, nonce, salt)
-	if err != nil {
-		return
-	}
-	return &encConfig{
-		clearFields: c.clearFields,
-		Enc:         enc,
-	}, nil
+	out := &encConfig{clearFields: c.clearFields}
+	out.Enc, err = crypto.EncryptJSON(c.secretFields, key, nonce, salt)
+	return out, err
 }
 
 // EncConfig has the secretFields encrypted
@@ -105,9 +98,6 @@ type encConfig struct {
 
 func (c *encConfig) Decrypt(key, nonce, salt []byte, opts *crypto.Opts) (dc DecConfig, err error) {
 	dc = &decConfig{clearFields: c.clearFields}
-	log.Debug().Msgf("%v", opts)
-	if err = crypto.DecryptJSON(c.Enc, key, nonce, salt, dc); err != nil {
-		err = errors.WithStack(err)
-	}
-	return
+	err = crypto.DecryptJSON(c.Enc, key, nonce, salt, dc)
+	return dc, err
 }

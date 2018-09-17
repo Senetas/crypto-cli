@@ -51,6 +51,9 @@ func PullImage(ref reference.Named, opts *crypto.Opts, tempDir string) (err erro
 
 	s := spinner.StartNew("Decrypting...")
 	manifest, err := emanifest.Decrypt(nTRep, opts)
+	if err != nil {
+		return
+	}
 	s.Stop()
 
 	return constructImageArchive(manifest, nTRep, opts)

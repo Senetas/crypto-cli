@@ -23,9 +23,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/pbkdf2"
 
 	"github.com/Senetas/crypto-cli/utils"
@@ -119,6 +117,7 @@ func NewEncryptoCompat(urls []string, opts *Opts) (e EnCrypto, err error) {
 	e.Version, err = strconv.Atoi(u.Query().Get(VersionKey))
 	if err != nil {
 		err = errors.WithStack(err)
+		return
 	}
 
 	return
@@ -157,9 +156,6 @@ func DecryptKey(e EnCrypto, opts *Opts) (d DeCrypto, err error) {
 
 	d.Crypto = e.Crypto
 
-	log.Debug().Msgf("%s", spew.Sdump(e))
-	log.Debug().Msgf("%s", spew.Sdump(d))
-
 	if vD, ok := versionDataStore[d.Version]; !ok {
 		err = errors.New("unknown version")
 	} else {
@@ -174,9 +170,7 @@ func DecryptKey(e EnCrypto, opts *Opts) (d DeCrypto, err error) {
 		}
 
 		d.DecKey, err = deckey(e.EncKey, e.Nonce, e.Salt, e.Iters, passphrase)
-		if err != nil {
-			err = errors.WithStack(err)
-		}
+		err = errors.WithStack(err)
 	}
 
 	return
@@ -237,6 +231,7 @@ func NewDecrypto(opts *Opts) (d *DeCrypto, err error) {
 
 	if _, err = rand.Read(d.Salt); err != nil {
 		err = errors.WithStack(err)
+		return
 	}
 
 	return

@@ -137,6 +137,56 @@ func TestEncDecCrypto(t *testing.T) {
 	}
 }
 
+func TestEncCrypto(t *testing.T) {
+	assert := assert.New(t)
+
+	tests := []struct {
+		opts     *crypto.Opts
+		encrypto *crypto.EnCrypto
+		errMsg   string
+	}{
+		{
+			opts,
+			&crypto.EnCrypto{
+				Crypto: crypto.Crypto{
+					Algos:   crypto.Pbkdf2Aes256Gcm,
+					Version: -1,
+				},
+			},
+			"unknown version",
+		},
+		{
+			opts,
+			&crypto.EnCrypto{
+				Crypto: crypto.Crypto{
+					Algos:   crypto.Pbkdf2Aes256Gcm,
+					Version: 0,
+					Salt:    make([]byte, 0),
+				},
+			},
+			"salt is wrong length",
+		},
+		{
+			opts,
+			&crypto.EnCrypto{
+				Crypto: crypto.Crypto{
+					Algos:   crypto.Pbkdf2Aes256Gcm,
+					Version: 0,
+					Salt:    make([]byte, 16),
+					Nonce:   make([]byte, 0),
+				},
+			},
+			"nonce is wrong length",
+		},
+	}
+
+	for _, test := range tests {
+		opts.SetPassphrase(passphrase)
+		_, err := crypto.DecryptKey(*test.encrypto, test.opts)
+		_ = err != nil && assert.EqualError(err, test.errMsg) || !assert.Equal(test.errMsg, "")
+	}
+}
+
 func TestEncDecCryptoCompat(t *testing.T) {
 	assert := assert.New(t)
 
