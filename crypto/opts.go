@@ -31,7 +31,8 @@ type Opts struct {
 	Compat        bool
 	passphraseSet bool
 	passphrase    string
-	EncType       Algos
+	Version       int
+	Algos         Algos
 	Iter          int
 }
 

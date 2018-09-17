@@ -53,16 +53,17 @@ func TestUnMarshalling(t *testing.T) {
 	require.NoError(err)
 
 	opts := &crypto.Opts{
-		EncType: crypto.Pbkdf2Aes256Gcm,
+		Algos: crypto.Pbkdf2Aes256Gcm,
 	}
 	opts.SetPassphrase("hunter2")
 
+	nonce := []byte("012345678901")
 	salt := []byte("0123456789012345")
 
-	ec, err := val.Encrypt(key, salt)
+	ec, err := val.Encrypt(key, nonce, salt)
 	require.NoError(err)
 
-	dc, err := ec.Decrypt(key, opts)
+	dc, err := ec.Decrypt(key, nonce, salt, opts)
 	require.NoError(err)
 
 	require.Equal(val, dc)

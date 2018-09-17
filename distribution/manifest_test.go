@@ -160,7 +160,7 @@ func TestImageEncryptDecrypt(t *testing.T) {
 			"mock is not a valid encryption type",
 			false,
 		},
-		{nTRep, opts, "", passphrase, true},
+		{nTRep, opts, passphrase, "", true},
 		{nTRep, optsNone, "", "", true},
 		{nTRep, optsCompat, passphrase, "", true},
 		{nTRep, opts, passphrase, "", false},
@@ -172,8 +172,7 @@ func TestImageEncryptDecrypt(t *testing.T) {
 		test.opts.SetPassphrase(test.passphrase)
 
 		manifest, err := distribution.NewManifest(test.ref, test.opts, dir)
-		if err != nil {
-			assert.EqualError(err, test.errMsg)
+		if err != nil && assert.EqualError(err, test.errMsg) || !assert.Equal(test.errMsg, "") {
 			continue
 		}
 

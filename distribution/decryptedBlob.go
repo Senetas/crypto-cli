@@ -40,10 +40,10 @@ type DecryptedBlob interface {
 
 type decryptedBlob struct {
 	*NoncryptedBlob
-	*DeCrypto `json:"-"`
+	*crypto.DeCrypto `json:"-"`
 }
 
-func (db *decryptedBlob) EncryptBlob(opts *crypto.Opts, outname string) (_ EncryptedBlob, err error) {
+func (db *decryptedBlob) EncryptBlob(opts *crypto.Opts, outname string) (eb EncryptedBlob, err error) {
 	r, err := db.ReadCloser()
 	if err != nil {
 		err = errors.WithStack(err)
@@ -88,7 +88,7 @@ func (db *decryptedBlob) EncryptBlob(opts *crypto.Opts, outname string) (_ Encry
 
 	dgst := digester.Digest()
 
-	ek, err := EncryptKey(*db.DeCrypto, opts)
+	ek, err := crypto.EncryptKey(*db.DeCrypto, opts)
 	if err != nil {
 		return
 	}
@@ -101,34 +101,27 @@ func (db *decryptedBlob) EncryptBlob(opts *crypto.Opts, outname string) (_ Encry
 	}
 
 	if opts.Compat {
-		u, err := url.Parse(BaseCryptoURL)
-		if err != nil {
-			return nil, errors.WithStack(err)
-		}
-
-		v := url.Values{}
-		v.Set(AlgosKey, string(ek.Algos))
-		v.Set(KeyKey, ek.EncKey)
-		u.RawQuery = v.Encode()
-
-		return &encryptedBlobCompat{
+		var u *url.URL
+		u, err = crypto.NewURLCompat(&ek, opts)
+		eb = &encryptedBlobCompat{
 			NoncryptedBlob: nb,
 			URLs:           []string{u.String()},
-		}, nil
+		}
+	} else {
+		eb = &encryptedBlobNew{
+			NoncryptedBlob: nb,
+			EnCrypto:       &ek,
+		}
 	}
-
-	return &encryptedBlobNew{
-		NoncryptedBlob: nb,
-		EnCrypto:       &ek,
-	}, nil
+	return
 }
 
 type decryptedConfig struct {
 	*NoncryptedBlob
-	*DeCrypto `json:"-"`
+	*crypto.DeCrypto `json:"-"`
 }
 
-func (db *decryptedConfig) EncryptBlob(opts *crypto.Opts, outname string) (_ EncryptedBlob, err error) {
+func (db *decryptedConfig) EncryptBlob(opts *crypto.Opts, outname string) (eb EncryptedBlob, err error) {
 	r, err := db.ReadCloser()
 	if err != nil {
 		err = errors.WithStack(err)
@@ -152,7 +145,7 @@ func (db *decryptedConfig) EncryptBlob(opts *crypto.Opts, outname string) (_ Enc
 		return
 	}
 
-	ec, err := dc.Encrypt(db.DecKey, db.DeCrypto.Salt)
+	ec, err := dc.Encrypt(db.DecKey, db.Nonce, db.Salt)
 	if err != nil {
 		return
 	}
@@ -173,7 +166,7 @@ func (db *decryptedConfig) EncryptBlob(opts *crypto.Opts, outname string) (_ Enc
 		Filename:    outname,
 	}
 
-	ek, err := EncryptKey(*db.DeCrypto, opts)
+	ek, err := crypto.EncryptKey(*db.DeCrypto, opts)
 	if err != nil {
 		err = errors.WithStack(err)
 		return
@@ -181,25 +174,16 @@ func (db *decryptedConfig) EncryptBlob(opts *crypto.Opts, outname string) (_ Enc
 
 	if opts.Compat {
 		var u *url.URL
-		u, err = url.Parse(BaseCryptoURL)
-		if err != nil {
-			err = errors.WithStack(err)
-			return
-		}
-
-		v := url.Values{}
-		v.Set(AlgosKey, string(ek.Algos))
-		v.Set(KeyKey, ek.EncKey)
-		u.RawQuery = v.Encode()
-
-		return &encryptedConfigCompat{
+		u, err = crypto.NewURLCompat(&ek, opts)
+		eb = &encryptedConfigCompat{
 			NoncryptedBlob: nb,
 			URLs:           []string{u.String()},
-		}, nil
+		}
+	} else {
+		eb = &encryptedConfigNew{
+			NoncryptedBlob: nb,
+			EnCrypto:       &ek,
+		}
 	}
-
-	return &encryptedConfigNew{
-		NoncryptedBlob: nb,
-		EnCrypto:       &ek,
-	}, nil
+	return
 }

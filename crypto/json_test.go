@@ -51,12 +51,17 @@ func TestJSONEncDec(t *testing.T) {
 	require.NoError(err)
 	require.Equal(16, m)
 
-	str, err := crypto.EncryptJSON(o, key, salt)
+	nonce := make([]byte, 12)
+	p, err := rand.Read(nonce)
+	require.NoError(err)
+	require.Equal(12, p)
+
+	str, err := crypto.EncryptJSON(o, key, nonce, salt)
 	require.NoError(err)
 
 	t.Log(str)
 	o1 := test{}
 
-	require.NoError(crypto.DecryptJSON(str, key, &o1))
+	require.NoError(crypto.DecryptJSON(str, key, nonce, salt, &o1))
 	require.Equal(o, o1)
 }

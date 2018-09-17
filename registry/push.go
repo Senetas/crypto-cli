@@ -157,6 +157,7 @@ func PushLayer(
 	return uploadBlob(loc, token, dig, bldr, layer)
 }
 
+// layerExists checks if the layer already exists on the repository
 func layerExists(token dauth.Scope, ref reference.Canonical, bldr *v2.URLBuilder) (b bool, err error) {
 	layerURLStr, err := bldr.BuildBlobURL(ref)
 	if err != nil {
@@ -197,6 +198,7 @@ func layerExists(token dauth.Scope, ref reference.Canonical, bldr *v2.URLBuilder
 	return
 }
 
+// getUploadLoc optains the urlString to upload the blob to by querying the API
 func getUploadLoc(
 	token dauth.Scope,
 	dig reference.Named,
@@ -241,6 +243,7 @@ func getUploadLoc(
 	return
 }
 
+// uploadBlob uploads the blob to the given urlString
 func uploadBlob(
 	loc string,
 	token dauth.Scope,
@@ -302,28 +305,30 @@ func uploadBlob(
 	return <-errCh
 }
 
+// upload executes the upload request in uploadBlob
 func upload(
 	req *http.Request,
 	bar *pb.ProgressBar,
 	blob distribution.Blob,
 	errCh chan<- error,
 ) {
+	var err error
+	defer func() { errCh <- err }()
+
 	bar.Start()
 
 	resp, err := httpclient.DoRequest(http.DefaultClient, req, false, true)
 	if resp != nil {
 		defer func() { err = utils.CheckedClose(resp.Body, err) }()
 	}
-	if err != nil {
-		errCh <- err
-		return
-	}
 
 	bar.Finish()
 
-	if resp.StatusCode != http.StatusCreated {
-		errCh <- errors.Errorf("upload of blob %s failed with status %s", blob.GetFilename(), resp.Status)
+	if err != nil {
+		return
 	}
 
-	errCh <- nil
+	if resp.StatusCode != http.StatusCreated {
+		err = errors.Errorf("upload of blob %s failed with status %s", blob.GetFilename(), resp.Status)
+	}
 }

@@ -33,8 +33,8 @@ var (
 	passphrase string
 	debug      bool
 	opts       = crypto.Opts{
-		EncType: crypto.Pbkdf2Aes256Gcm,
-		Compat:  false,
+		Algos:  crypto.Pbkdf2Aes256Gcm,
+		Compat: false,
 	}
 
 	// rootCmd represents the base command when called without any subcommands

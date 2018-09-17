@@ -20,8 +20,6 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/image"
-	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 
 	"github.com/Senetas/crypto-cli/crypto"
 )
@@ -55,7 +53,7 @@ type clearFields struct {
 
 // DecConfig is config that may be encrypted
 type DecConfig interface {
-	Encrypt(key, salt []byte) (EncConfig, error)
+	Encrypt(key, nonce, salt []byte) (EncConfig, error)
 }
 
 type decConfig struct {
@@ -69,7 +67,6 @@ func NewDecConfig() DecConfig { return &decConfig{} }
 // Sort the keys when marshalling
 func (c *decConfig) MarshalJSON() (_ []byte, err error) {
 	type MarshalImage decConfig
-
 	pass1, err := json.Marshal(MarshalImage(*c))
 	if err != nil {
 		return
@@ -79,23 +76,19 @@ func (c *decConfig) MarshalJSON() (_ []byte, err error) {
 	if err = json.Unmarshal(pass1, &sorted); err != nil {
 		return
 	}
+
 	return json.Marshal(sorted)
 }
 
-func (c *decConfig) Encrypt(key, salt []byte) (_ EncConfig, err error) {
-	enc, err := crypto.EncryptJSON(c.secretFields, key, salt)
-	if err != nil {
-		return
-	}
-	return &encConfig{
-		clearFields: c.clearFields,
-		Enc:         enc,
-	}, nil
+func (c *decConfig) Encrypt(key, nonce, salt []byte) (_ EncConfig, err error) {
+	out := &encConfig{clearFields: c.clearFields}
+	out.Enc, err = crypto.EncryptJSON(c.secretFields, key, nonce, salt)
+	return out, err
 }
 
 // EncConfig has the secretFields encrypted
 type EncConfig interface {
-	Decrypt(key []byte, opts *crypto.Opts) (DecConfig, error)
+	Decrypt(key, nonce, salt []byte, opts *crypto.Opts) (DecConfig, error)
 }
 
 type encConfig struct {
@@ -103,12 +96,8 @@ type encConfig struct {
 	clearFields
 }
 
-func (c *encConfig) Decrypt(key []byte, opts *crypto.Opts) (dc DecConfig, err error) {
+func (c *encConfig) Decrypt(key, nonce, salt []byte, opts *crypto.Opts) (dc DecConfig, err error) {
 	dc = &decConfig{clearFields: c.clearFields}
-	log.Debug().Msgf("%v", opts)
-	if err = crypto.DecryptJSON(c.Enc, key, dc); err != nil {
-		err = errors.WithStack(err)
-		return
-	}
-	return
+	err = crypto.DecryptJSON(c.Enc, key, nonce, salt, dc)
+	return dc, err
 }
