@@ -1,9 +1,9 @@
 # Crypto-Cli
 
-A command line utility to push and pull encrypted docker images. This is in the pre-alpha proof of concept stage and is not indented for any use other than to prove that Docker Hub may be used to distribute encrypted docker images. Currently, it only runs on Linux with Linux images. See also the privacy section below.
+A command line utility to push and pull encrypted docker images. Currently, it only runs on Linux with Linux images. See also the privacy section below.
 
 ## Warning
-This application is not suitable for use in a production environment. There are no guarantees as to the security of these implementations. Use at your own risk.
+This application is not suitable for use in a production environment. There are no guarantees as to the security of these implementations. Use at your own risk...that being said we make a concerted effort on the crypto side. See the cryptography section below.
 
 ## License
 Apache 2.0
