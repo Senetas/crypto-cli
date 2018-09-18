@@ -64,7 +64,7 @@ func NewManifest(
 	// TODO: fix hardcoded version if necessary
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
 	if err != nil {
-		err = utils.StripTrace(errors.Wrap(err, "could not create client for docker daemon"))
+		err = errors.Wrap(err, "could not create client for docker daemon")
 		return
 	}
 
@@ -168,19 +168,17 @@ func (m *ImageManifest) DecryptKeys(
 		return
 	}
 
-	for i, l := range m.Layers {
-		switch blob := l.(type) {
+	for i := 0; i < len(m.Layers) && err == nil; i++ {
+		switch blob := m.Layers[i].(type) {
 		case EncryptedBlob:
 			m.Layers[i], err = blob.DecryptKey(opts)
 		case *NoncryptedBlob:
 		default:
 			err = errors.Errorf("layer is of wrong type: %T", blob)
 		}
-		if err != nil {
-			return
-		}
 	}
-	return nil
+
+	return
 }
 
 // Decrypt decrypt a manifest, both the keys and layer data
@@ -212,7 +210,7 @@ func (m *ImageManifest) Decrypt(
 	// decrypt keys and files for layers
 	out.Layers = make([]Blob, len(m.Layers))
 	for i := 0; i < len(m.Layers) && err == nil; i++ {
-		out.Layers[i], err = decryptLayer(ref, opts, m.Layers[i], i)
+		out.Layers[i], err = decryptLayer(ref, opts, m.Layers[i])
 	}
 
 	return
@@ -313,7 +311,7 @@ func mkBlobs(
 		return
 	}
 
-	image, err := mkArchiveStruct(path, manifestFH)
+	image, err := NewImageArchiveManifest(manifestFH)
 	if err != nil {
 		return
 	}
@@ -333,19 +331,19 @@ func mkBlobs(
 func noneEncrypt(
 	path string,
 	layerSet map[string]bool,
-	image *archiveStruct,
+	image *ImageArchiveManifest,
 	opts *crypto.Opts,
 ) (
-	Blob,
-	[]Blob,
-	error,
+	configBlob Blob,
+	layerBlobs []Blob,
+	_ error,
 ) {
-	layerBlobs := make([]Blob, len(image.Layers))
-	configBlob := NewPlainConfig(filepath.Join(path, image.Config), "", 0)
+	layerBlobs = make([]Blob, len(image.Layers))
+	configBlob = NewPlainConfig(filepath.Join(path, image.Config), "", 0)
 	for i, f := range image.Layers {
 		layerBlobs[i] = NewPlainLayer(filepath.Join(path, f), "", 0)
 	}
-	return configBlob, layerBlobs, nil
+	return
 }
 
 // pbkdf2Aes256GcmEncrypt encrypts the images's Blob structs when the enctype
@@ -353,7 +351,7 @@ func noneEncrypt(
 func pbkdf2Aes256GcmEncrypt(
 	path string,
 	layerSet map[string]bool,
-	image *archiveStruct,
+	image *ImageArchiveManifest,
 	opts *crypto.Opts,
 ) (
 	configBlob Blob,
@@ -469,23 +467,23 @@ func encryptPositions(hist []image.HistoryResponseItem) (encryptPos []int, err e
 	}
 
 	if len(encryptPos) == 0 {
-		err = utils.NewError("this image was not built with the correct LABEL", false)
+		err = errors.New("this image was not built with the correct LABEL")
 		return
 	}
 
-	return encryptPos, nil
+	return
 }
 
-// archiveStruct collects the filenames of the config and layers in the image
+// ImageArchiveManifest collects the filenames of the config and layers in the image
 // archive obtained from a docker save command
-type archiveStruct struct {
+type ImageArchiveManifest struct {
 	Config string
 	Layers []string
 }
 
-// mkArchiveStruct creates a new archiveStruct
-func mkArchiveStruct(path string, manifestFH io.Reader) (a *archiveStruct, err error) {
-	var images []*archiveStruct
+// NewImageArchiveManifest reads a image archive manifest file
+func NewImageArchiveManifest(manifestFH io.Reader) (a *ImageArchiveManifest, err error) {
+	var images []*ImageArchiveManifest
 	if err = json.NewDecoder(manifestFH).Decode(&images); err != nil {
 		err = errors.Wrapf(err, "error unmarshalling manifest")
 		return
@@ -541,7 +539,6 @@ func decryptLayer(
 	ref names.NamedTaggedRepository,
 	opts *crypto.Opts,
 	l Blob,
-	i int,
 ) (layer Blob, err error) {
 	switch blob := l.(type) {
 	case EncryptedBlob:
@@ -550,8 +547,6 @@ func decryptLayer(
 		layer, err = blob.DecryptFile(opts, blob.GetFilename()+".dec")
 	case CompressedBlob:
 		layer, err = blob.Decompress(blob.GetFilename() + ".dec")
-	case *NoncryptedBlob:
-		layer = l
 	default:
 		err = errors.Errorf("layer is of wrong type: %T", blob)
 	}

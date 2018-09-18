@@ -136,14 +136,13 @@ func unmarshalLayers(v json.RawMessage) (layers []Blob, err error) {
 	var layerJSONs []json.RawMessage
 	err = json.Unmarshal(v, &layerJSONs)
 	if err != nil {
+		err = errors.WithStack(err)
 		return
 	}
 
 	layers = make([]Blob, len(layerJSONs))
-	for i, l := range layerJSONs {
-		if layers[i], err = unmarshalLayer(l); err != nil {
-			return
-		}
+	for i := 0; i < len(layerJSONs) && err == nil; i++ {
+		layers[i], err = unmarshalLayer(layerJSONs[i])
 	}
 
 	return
@@ -152,6 +151,7 @@ func unmarshalLayers(v json.RawMessage) (layers []Blob, err error) {
 func unmarshalLayer(m json.RawMessage) (blob Blob, err error) {
 	blobMap := make(map[string]json.RawMessage)
 	if err = json.Unmarshal(m, &blobMap); err != nil {
+		err = errors.WithStack(err)
 		return
 	}
 
