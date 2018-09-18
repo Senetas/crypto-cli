@@ -1,5 +1,5 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/Senetas/crypto-cli)](https://goreportcard.com/report/github.com/Senetas/crypto-cli)
-(https://img.shields.io/badge/license-Apache-blue.svg?style=flat)](https://raw.githubusercontent.com/Senetas/crypto-cli/master/LICENSE)
+[https://img.shields.io/badge/license-Apache-blue.svg?style=flat](https://raw.githubusercontent.com/Senetas/crypto-cli/master/LICENSE)
 
 # Crypto-Cli
 
