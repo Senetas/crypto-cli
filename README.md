@@ -43,12 +43,12 @@ For example, in the following Dockerfile:
 ```Dockerfile
 FROM alpine:latest
 LABEL "com.senetas.crypto.enabled"="true"
-RUN echo "hello" > file.txt
+RUN echo "some secret" > secret-file.txt
 LABEL "com.senetas.crypto.enabled"="false"
-RUN rm file.txt
+RUN echo "some not secret" > not-secret-file.txt
 ENTRYPOINT ["/bin/sh"]
 ```
-only the layer resulting from the command `RUN echo "hello" > file.txt` will be encrypted.
+only the layer resulting from the command `RUN echo "some secret" > secret-file.txt` will be encrypted.
 
 Note that although in general a `LABEL` line may contain multiple labels, this is not supported for the `com.senetas.crypto.enabled` label for the purposes of this application.
 
