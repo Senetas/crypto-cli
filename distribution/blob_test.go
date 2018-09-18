@@ -26,7 +26,7 @@ import (
 func TestNonCryptedBlob(t *testing.T) {
 	assert := assert.New(t)
 
-	contentType := distribution.MediaTypeImageConfig
+	mediaType := distribution.MediaTypeImageConfig
 	size := int64(0)
 	d := digest.Canonical.FromString("Hello")
 	filename := "/"
@@ -48,7 +48,7 @@ func TestNonCryptedBlob(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		_ = assert.Equal(contentType, test.blob.GetContentType()) && assert.Equal(size, test.blob.GetSize()) && assert.Equal(d.String(), test.blob.GetDigest().String()) && assert.Equal(filename, test.blob.GetFilename())
+		_ = assert.Equal(mediaType, test.blob.GetMediaType()) && assert.Equal(size, test.blob.GetSize()) && assert.Equal(d.String(), test.blob.GetDigest().String()) && assert.Equal(filename, test.blob.GetFilename())
 		test.blob.SetFilename("\\")
 		assert.Equal("\\", test.blob.GetFilename())
 	}

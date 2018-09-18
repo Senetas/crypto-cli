@@ -61,6 +61,7 @@ func NewManifest(
 ) {
 	ctx := context.Background()
 
+	// create client to docker API
 	// TODO: fix hardcoded version if necessary
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.37"))
 	if err != nil {
@@ -75,7 +76,7 @@ func NewManifest(
 		return
 	}
 
-	// docker save the image (as a ReadCloser)
+	// docker save the image to an achive (as a ReadCloser)
 	imageTar, err := cli.ImageSave(ctx, []string{inspt.ID})
 	if err != nil {
 		err = errors.WithStack(err)
@@ -98,7 +99,7 @@ func NewManifest(
 		DirName:       filepath.Join(tempDir, uuid.New().String()),
 	}
 
-	// extract image and fill out manifest
+	// extract image archive and fill out manifest
 	if err = extractTarBall(imageTar, inspt.Size, manifest); err != nil {
 		return
 	}
@@ -130,13 +131,23 @@ func (m *ImageManifest) Encrypt(
 		Layers:        make([]Blob, len(m.Layers)),
 	}
 
-	out.Config, err = prepareConfig(m.Config, opts, ref)
+	// encrypt the config
+	switch blob := m.Config.(type) {
+	case DecryptedBlob:
+		log.Debug().Msg("encrypting config")
+		out.Config, err = blob.EncryptBlob(opts, blob.GetFilename()+".aes")
+	case *NoncryptedBlob:
+		log.Debug().Msgf("preparing config")
+		out.Config, err = unencryptedConfig(blob)
+	default:
+		err = errors.Errorf("config is of wrong type: %T", blob)
+	}
 	if err != nil {
 		return
 	}
 
-	for i, l := range m.Layers {
-		switch blob := l.(type) {
+	for i := 0; i < len(m.Layers) && err == nil; i++ {
+		switch blob := m.Layers[i].(type) {
 		case DecryptedBlob:
 			log.Debug().Msgf("encrypting layer %d: %s", i, blob.GetFilename())
 			out.Layers[i], err = blob.EncryptBlob(opts, blob.GetFilename()+".aes")
@@ -144,9 +155,7 @@ func (m *ImageManifest) Encrypt(
 			log.Debug().Msgf("compressing layer %d: %s", i, blob.GetFilename())
 			out.Layers[i], err = blob.Compress(blob.GetFilename() + ".gz")
 		default:
-		}
-		if err != nil {
-			return
+			err = errors.Errorf("layer is of wrong type: %T", blob)
 		}
 	}
 	return
@@ -495,27 +504,6 @@ func NewImageArchiveManifest(manifestFH io.Reader) (a *ImageArchiveManifest, err
 	}
 
 	return images[0], nil
-}
-
-// creates a blob a blob that contains a config
-func prepareConfig(
-	config Blob,
-	opts *crypto.Opts,
-	ref names.NamedTaggedRepository,
-) (
-	_ Blob,
-	err error,
-) {
-	switch blob := config.(type) {
-	case DecryptedBlob:
-		log.Debug().Msg("encrypting config")
-		return blob.EncryptBlob(opts, blob.GetFilename()+".aes")
-	case *NoncryptedBlob:
-		log.Debug().Msgf("preparing config")
-		return unencryptedConfig(blob)
-	}
-	err = errors.Errorf("config is of wrong type: %T", config)
-	return
 }
 
 // unencryptedConfig creates a blob that contains an unencrypted config

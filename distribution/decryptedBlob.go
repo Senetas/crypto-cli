@@ -94,10 +94,10 @@ func (db *decryptedBlob) EncryptBlob(opts *crypto.Opts, outname string) (eb Encr
 	}
 
 	nb := &NoncryptedBlob{
-		Size:        int64(cw.Count),
-		ContentType: db.ContentType,
-		Digest:      dgst,
-		Filename:    outname,
+		Size:      int64(cw.Count),
+		MediaType: db.MediaType,
+		Digest:    dgst,
+		Filename:  outname,
 	}
 
 	if opts.Compat {
@@ -160,10 +160,10 @@ func (db *decryptedConfig) EncryptBlob(opts *crypto.Opts, outname string) (eb En
 	dgst := digester.Digest()
 
 	nb := &NoncryptedBlob{
-		Size:        int64(cw.Count),
-		ContentType: db.ContentType,
-		Digest:      dgst,
-		Filename:    outname,
+		Size:      int64(cw.Count),
+		MediaType: db.MediaType,
+		Digest:    dgst,
+		Filename:  outname,
 	}
 
 	ek, err := crypto.EncryptKey(*db.DeCrypto, opts)

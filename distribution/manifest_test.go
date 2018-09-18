@@ -40,7 +40,7 @@ const imageName = "cryptocli/alpine:latest"
 
 type mockBlob byte
 
-func (b *mockBlob) GetContentType() string             { return "" }
+func (b *mockBlob) GetMediaType() string               { return "" }
 func (b *mockBlob) GetDigest() digest.Digest           { return digest.Canonical.FromString("") }
 func (b *mockBlob) GetSize() int64                     { return 0 }
 func (b *mockBlob) GetFilename() string                { return "" }

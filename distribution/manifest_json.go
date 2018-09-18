@@ -51,7 +51,7 @@ func marshalBlob(config Blob) (bs json.RawMessage, err error) {
 	layer := &Layer{
 		Digest:    config.GetDigest(),
 		Size:      config.GetSize(),
-		MediaType: config.GetContentType(),
+		MediaType: config.GetMediaType(),
 	}
 	switch b := config.(type) {
 	case *encryptedConfigNew:
