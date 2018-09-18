@@ -5,6 +5,9 @@ A command line utility to push and pull encrypted docker images. Currently, it o
 ## Warning
 This application is not suitable for use in a production environment. There are no guarantees as to the security of these implementations. Use at your own risk...that being said we make a concerted effort on the crypto side. See the cryptography section below.
 
+## Issues
+Don't try to pull an encrypted image with `docker pull`, it will fail.
+
 ## License
 Apache 2.0
 
