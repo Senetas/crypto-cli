@@ -60,8 +60,8 @@ Note that although in general a `LABEL` line may contain multiple labels, this i
 
 ### Global Options
 
-#### `--pass=PASSPHRASE`
-Specifies `PASSPHRASE` as the passphrase to use for encryption. Is ignored if encryption is disabled.
+#### `--pass=<PASSPHRASE>`
+Specifies `<PASSPHRASE>` as the passphrase to use for encryption. Is ignored if encryption is disabled.
 
 #### `--verbose`
 Verbose output.
@@ -69,11 +69,12 @@ Verbose output.
 ### Push Options
 
 #### `--compat`
-Makes the produced image manifests adhere more strictly to the Docker v2.2 manifest schema.
+Makes the generated image manifests adhere more strictly to the [Docker v2.2 image manifest schema](https://docs.docker.com/registry/spec/manifest-v2-2/#image-manifest-field-descriptions).
 
-#### `--type=TYPE`
-Specifies the encryption scheme to use. At the moment the options are `NONE` and `PBKDF2-AES256-GCM`.
-The former does no encryption, and the latter offers passphrase derived symmetric encryption.
+#### `--type=<TYPE>`
+Specifies the encryption scheme to use.
+At the moment `<TYPE>` may be `NONE` or `PBKDF2-AES256-GCM`.
+The former does no encryption, and the latter offers passphrase derived symmetric encryption and is the default.
 
 ### Pull Options
 [None]
@@ -90,8 +91,9 @@ See also the privacy note below.
 The user MUST be logged into a docker hub account. Because `docker login` stores an encoded username and password, the clear text password is exposed to this utility. While the password is not transmitted anywhere other then the repository, it may be logged to `STDOUT` in certain situations. Thus, it is recommended to set up an alternate Docker Hub account while this is under development.
 
 ## Cryptography
-The layer archives are (if specified) encrypted using AES-GCM, with a 256-bit key that is randomly generated.
+The layer archives and the config are encrypted using AES-GCM, with a 256-bit key that is randomly generated.
 Chunking is handled by the go SIO library: <https://github.com/minio/sio>, which implements the DARE standard for data encryption at rest.
 The keys are encrypted using AES-GCM from a key derived from a user specified passphrase and a random salt.
-The key derivation function is 100,000 iterations of PBKDF2 with SHA256 used in the HMAC.
-The encrypted key and salt are stored in the image manifest and may be inspected using the `docker manifest` command, which is experimental at this stage.
+The salt, nonce and data key are randomly generated for each layer and the config.
+The key derivation function is 40,000 iterations of PBKDF2 with SHA256 used in the HMAC.
+The encrypted data key, the none used to encrypt and the salt are stored in the image manifest and may be inspected using the experimental `docker manifest inspect` command.
