@@ -33,7 +33,7 @@ type Blob interface {
 	ReadCloser() (io.ReadCloser, error)
 }
 
-// NoncryptedBlob is a vanilla blob with no encrpytion data
+// NoncryptedBlob is a vanilla blob with no encryption data
 // Despite appearnces, the MediaType type is not indicative of whether
 // the blob is compressed or not
 type NoncryptedBlob struct {

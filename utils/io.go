@@ -23,7 +23,7 @@ import (
 	"golang.org/x/text/unicode/rangetable"
 )
 
-// CounterWriter is a writer that counts the number bytes writen to it
+// CounterWriter is a writer that counts the number bytes written to it
 type CounterWriter struct {
 	io.Writer
 	Count int
