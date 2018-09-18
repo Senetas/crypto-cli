@@ -1,3 +1,6 @@
+[![Go Report Card](https://goreportcard.com/badge/github.com/Senetas/crypto-cli)](https://goreportcard.com/report/github.com/Senetas/crypto-cli)
+(https://img.shields.io/badge/license-Apache-blue.svg?style=flat)](https://raw.githubusercontent.com/Senetas/crypto-cli/master/LICENSE)
+
 # Crypto-Cli
 
 A command line utility to push and pull encrypted docker images. Currently, it only runs on Linux with Linux images. See also the privacy section below.

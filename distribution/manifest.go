@@ -302,7 +302,7 @@ func mkBlobs(
 
 	// read the archive manifest
 	// manifestfile consists of information that is local to the os, or supplied by the user or the
-	// docker daemon. Thus, assuming they are not comprimised, it is safe to open
+	// docker daemon. Thus, assuming they are not compromised, it is safe to open
 	manifestfile := filepath.Join(path, "manifest.json")
 	manifestFH, err := os.Open(manifestfile) // #nosec
 	defer func() { err = utils.CheckedClose(manifestFH, err) }()
@@ -397,7 +397,7 @@ func pbkdf2Aes256GcmEncrypt(
 // note its error are not wraped
 func fileDigest(filename string) (d digest.Digest, err error) {
 	// filename consists of information that is local to the os or the docker
-	// daemon. Thus assuming they are not comprimised, it is safe to open
+	// daemon. Thus assuming they are not compromised, it is safe to open
 	fh, err := os.Open(filename) // #nosec
 	defer func() { err = utils.CheckedClose(fh, err) }()
 	if err != nil {

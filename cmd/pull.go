@@ -30,7 +30,7 @@ var pullCmd = &cobra.Command{
 	Use:   "pull [OPTIONS] NAME[:TAG]",
 	Short: "Download an image from a remote repository, decrypting if necessary.",
 	Long: `pull is used to download an image from a repository, decrypt it if necessary and
-load that images into the local docker engine. It is then avaliable to be run under the same
+load that images into the local docker engine. It is then available to be run under the same
 name as it was downloaded.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cmd.Flags().VisitAll(checkFlagsPull)

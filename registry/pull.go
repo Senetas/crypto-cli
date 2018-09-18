@@ -55,7 +55,7 @@ func PullImage(
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Msg("Mainfest obtained.")
+	log.Info().Msg("Manifest obtained.")
 
 	if err = manifest.DecryptKeys(ref, opts); err != nil {
 		return
@@ -147,7 +147,7 @@ func PullManifest(
 	return manifest, nil
 }
 
-// PullFromDigest downloads a blob (refereced by its digest) from the registry to a temporay file.
+// PullFromDigest downloads a blob (refereced by its digest) from the registry to a temporary file.
 // It verifies that the downloaded file matches its digest, deleting if it does not. While the
 // digest is used to name the file, it is first verified to be a valid digest, so this cannot lead
 // to a file inclusion vulrenability.
@@ -233,7 +233,7 @@ func download(
 	err = processResp(resp, d, fn, fh, timer)
 }
 
-// processResp handles the responce to the request to download a blob
+// processResp handles the response to the request to download a blob
 // includeing: downloading any data, time handling, verifying that the
 // download matches the expected digest
 func processResp(

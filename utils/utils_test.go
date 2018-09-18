@@ -67,9 +67,9 @@ func TestConcat(t *testing.T) {
 		out []byte
 	}{
 		{[][]byte{[]byte("3.14"), []byte("159")}, []byte("3.14159")},
-		{[][]byte{[]byte{}, []byte("159")}, []byte("159")},
-		{[][]byte{[]byte("3.14"), []byte{}}, []byte("3.14")},
-		{[][]byte{[]byte{}, []byte{}}, []byte{}},
+		{[][]byte{{}, []byte("159")}, []byte("159")},
+		{[][]byte{[]byte("3.14"), {}}, []byte("3.14")},
+		{[][]byte{{}, {}}, []byte{}},
 		{[][]byte{[]byte("3.14"), []byte("159"), []byte("265")}, []byte("3.14159265")},
 	}
 
