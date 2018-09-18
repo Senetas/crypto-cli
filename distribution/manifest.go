@@ -368,8 +368,8 @@ func pbkdf2Aes256GcmEncrypt(
 	err error,
 ) {
 	// make the config
-	var dec *crypto.DeCrypto
-	dec, err = crypto.NewDecrypto(opts)
+	//var dec *crypto.DeCrypto
+	dec, err := crypto.NewDecrypto(opts)
 	if err != nil {
 		return
 	}

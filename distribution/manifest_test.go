@@ -100,7 +100,7 @@ func TestImageMock(t *testing.T) {
 			mockLayer,
 			*opts,
 			passphrase,
-			"",
+			fmt.Sprintf("layer is of wrong type: %T", new(mockBlob)),
 			fmt.Sprintf("config is of wrong type: %T", manifest.Config),
 			fmt.Sprintf("layer is of wrong type: %T", new(mockBlob)),
 		},
