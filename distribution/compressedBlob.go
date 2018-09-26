@@ -68,10 +68,10 @@ func (b *NoncryptedBlob) Decompress(outfile string) (_ DecompressedBlob, err err
 	dgst := digester.Digest()
 
 	return &NoncryptedBlob{
-		Size:        size,
-		ContentType: b.ContentType,
-		Digest:      dgst,
-		Filename:    outfile,
+		Size:      size,
+		MediaType: b.MediaType,
+		Digest:    dgst,
+		Filename:  outfile,
 	}, nil
 }
 
@@ -109,9 +109,9 @@ func (b *NoncryptedBlob) Compress(outfile string) (_ CompressedBlob, err error) 
 	dgst := digester.Digest()
 
 	return &NoncryptedBlob{
-		Size:        int64(cw.Count),
-		ContentType: b.ContentType,
-		Digest:      dgst,
-		Filename:    outfile,
+		Size:      int64(cw.Count),
+		MediaType: b.MediaType,
+		Digest:    dgst,
+		Filename:  outfile,
 	}, nil
 }

@@ -15,6 +15,7 @@
 package distribution_test
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -39,7 +40,7 @@ const imageName = "cryptocli/alpine:latest"
 
 type mockBlob byte
 
-func (b *mockBlob) GetContentType() string             { return "" }
+func (b *mockBlob) GetMediaType() string               { return "" }
 func (b *mockBlob) GetDigest() digest.Digest           { return digest.Canonical.FromString("") }
 func (b *mockBlob) GetSize() int64                     { return 0 }
 func (b *mockBlob) GetFilename() string                { return "" }
@@ -99,7 +100,7 @@ func TestImageMock(t *testing.T) {
 			mockLayer,
 			*opts,
 			passphrase,
-			"",
+			fmt.Sprintf("layer is of wrong type: %T", new(mockBlob)),
 			fmt.Sprintf("config is of wrong type: %T", manifest.Config),
 			fmt.Sprintf("layer is of wrong type: %T", new(mockBlob)),
 		},
@@ -133,6 +134,16 @@ func TestImageMock(t *testing.T) {
 	}
 }
 
+func TestImageArchiveManifest(t *testing.T) {
+	require := require.New(t)
+
+	imageArchiveJSON := []byte(`[]`)
+	b := bytes.NewReader(imageArchiveJSON)
+
+	_, err := distribution.NewImageArchiveManifest(b)
+	require.EqualError(err, "no image data was found")
+}
+
 func TestImageEncryptDecrypt(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
@@ -146,6 +157,12 @@ func TestImageEncryptDecrypt(t *testing.T) {
 	nTRep, err := names.CastToTagged(ref)
 	require.NoError(err)
 
+	refNoEnc, err := reference.ParseNormalizedNamed("alpine:latest")
+	require.NoError(err)
+
+	nTRepNoEnc, err := names.CastToTagged(refNoEnc)
+	require.NoError(err)
+
 	tests := []struct {
 		ref         names.NamedTaggedRepository
 		opts        *crypto.Opts
@@ -153,13 +170,8 @@ func TestImageEncryptDecrypt(t *testing.T) {
 		errMsg      string
 		decryptKeys bool
 	}{
-		{
-			nTRep,
-			optsMock,
-			passphrase,
-			"mock is not a valid encryption type",
-			false,
-		},
+		{nTRep, optsMock, passphrase, "mock is not a valid encryption type", false},
+		{nTRepNoEnc, opts, passphrase, "this image was not built with the correct LABEL", false},
 		{nTRep, opts, passphrase, "", true},
 		{nTRep, optsNone, "", "", true},
 		{nTRep, optsCompat, passphrase, "", true},

@@ -25,7 +25,7 @@ import (
 
 // Blob represents an entry for a blob in the image manifest
 type Blob interface {
-	GetContentType() string
+	GetMediaType() string
 	GetDigest() digest.Digest
 	GetSize() int64
 	GetFilename() string
@@ -33,21 +33,21 @@ type Blob interface {
 	ReadCloser() (io.ReadCloser, error)
 }
 
-// NoncryptedBlob is a vanilla blob with no encrpytion data
-// Despite appearnces, the ContentType type is not indicative of whether
+// NoncryptedBlob is a vanilla blob with no encryption data
+// Despite appearnces, the MediaType type is not indicative of whether
 // the blob is compressed or not
 type NoncryptedBlob struct {
-	ContentType string        `json:"mediaType"`
-	Size        int64         `json:"size"`
-	Digest      digest.Digest `json:"digest"`
-	Filename    string        `json:"-"`
+	MediaType string        `json:"mediaType"`
+	Size      int64         `json:"size"`
+	Digest    digest.Digest `json:"digest"`
+	Filename  string        `json:"-"`
 }
 
 // GetDigest returnts the digest
 func (b *NoncryptedBlob) GetDigest() digest.Digest { return b.Digest }
 
-//GetContentType returns the content type
-func (b *NoncryptedBlob) GetContentType() string { return b.ContentType }
+//GetMediaType returns the content type
+func (b *NoncryptedBlob) GetMediaType() string { return b.MediaType }
 
 // GetSize returns the size
 func (b *NoncryptedBlob) GetSize() int64 { return b.Size }
@@ -66,13 +66,13 @@ func newPlainBlob(
 	filename string,
 	d digest.Digest,
 	size int64,
-	contentType string,
+	mediaType string,
 ) *NoncryptedBlob {
 	return &NoncryptedBlob{
-		Size:        size,
-		Digest:      d,
-		ContentType: contentType,
-		Filename:    filename,
+		Size:      size,
+		Digest:    d,
+		MediaType: mediaType,
+		Filename:  filename,
 	}
 }
 

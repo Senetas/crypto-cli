@@ -38,9 +38,7 @@ type versionData struct {
 	nonceLength int
 }
 
-var (
-	versionDataStore = map[int]versionData{0: versionData{saltLength: 16, nonceLength: 12}}
-)
+var versionDataStore = map[int]versionData{0: {saltLength: 16, nonceLength: 12}}
 
 // ValidateAlgos converts a string to valid Algos if possible
 func ValidateAlgos(ctstr string) (Algos, error) {

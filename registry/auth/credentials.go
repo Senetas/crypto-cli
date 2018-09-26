@@ -17,9 +17,11 @@ package auth
 import (
 	"net/http"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/cli/cli/config"
 	dregistry "github.com/docker/docker/registry"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
 // Credentials represents a username password pair
@@ -46,16 +48,23 @@ func (c *credentials) SetAuth(req *http.Request) *http.Request {
 	return req
 }
 
-// NewDefaultCreds create a credentials struct from the credentials in
+// NewDefaultCreds creates a credentials struct from the credentials in
 // the default conf file, typically ~/.docker/config.json. the struct is lazy,
 // i.e. the file is only read if the username or password is accessed
-func NewDefaultCreds(repoInfo *dregistry.RepositoryInfo) (Credentials, error) {
+func NewDefaultCreds(repoInfo *dregistry.RepositoryInfo) (creds Credentials, err error) {
 	confFile, err := config.Load("")
 	if err != nil {
-		return nil, errors.WithStack(err)
+		err = errors.WithStack(err)
+		return
 	}
 
 	authConfig := dregistry.ResolveAuthConfig(confFile.AuthConfigs, repoInfo.Index)
 
-	return &credentials{username: authConfig.Username, password: authConfig.Password}, nil
+	log.Debug().Msgf("%s", spew.Sdump(authConfig))
+
+	creds = &credentials{username: authConfig.Username, password: authConfig.Password}
+
+	log.Debug().Msgf("username = %s, password = %s", authConfig.Username, authConfig.Password)
+
+	return
 }

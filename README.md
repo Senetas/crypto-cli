@@ -1,9 +1,15 @@
+[![Go Report Card](https://goreportcard.com/badge/github.com/Senetas/crypto-cli)](https://goreportcard.com/report/github.com/Senetas/crypto-cli)
+[![license](https://img.shields.io/badge/license-Apache-blue.svg?style=flat)](https://raw.githubusercontent.com/Senetas/crypto-cli/master/LICENSE)
+
 # Crypto-Cli
 
-A command line utility to push and pull encrypted docker images. This is in the pre-alpha proof of concept stage and is not indented for any use other than to prove that Docker Hub may be used to distribute encrypted docker images. Currently, it only runs on Linux with Linux images. See also the privacy section below.
+A command line utility to push and pull encrypted docker images. Currently, it only runs on Linux with Linux images. See also the privacy section below.
 
 ## Warning
-This application is not suitable for use in a production environment. There are no guarantees as to the security of these implementations. Use at your own risk.
+This application is not suitable for use in a production environment. There are no guarantees as to the security of these implementations. Use at your own risk...that being said we make a concerted effort on the crypto side. See the cryptography section below.
+
+## Issues
+Don't try to pull an encrypted image with `docker pull`, it will fail.
 
 ## License
 Apache 2.0
@@ -43,19 +49,19 @@ For example, in the following Dockerfile:
 ```Dockerfile
 FROM alpine:latest
 LABEL "com.senetas.crypto.enabled"="true"
-RUN echo "hello" > file.txt
+RUN echo "some secret" > secret-file.txt
 LABEL "com.senetas.crypto.enabled"="false"
-RUN rm file.txt
+RUN echo "some not secret" > not-secret-file.txt
 ENTRYPOINT ["/bin/sh"]
 ```
-only the layer resulting from the command `RUN echo "hello" > file.txt` will be encrypted.
+only the layer resulting from the command `RUN echo "some secret" > secret-file.txt` will be encrypted.
 
 Note that although in general a `LABEL` line may contain multiple labels, this is not supported for the `com.senetas.crypto.enabled` label for the purposes of this application.
 
 ### Global Options
 
-#### `--pass=PASSPHRASE`
-Specifies `PASSPHRASE` as the passphrase to use for encryption. Is ignored if encryption is disabled.
+#### `--pass=<PASSPHRASE>`
+Specifies `<PASSPHRASE>` as the passphrase to use for encryption. Is ignored if encryption is disabled.
 
 #### `--verbose`
 Verbose output.
@@ -63,11 +69,12 @@ Verbose output.
 ### Push Options
 
 #### `--compat`
-Makes the produced image manifests adhere more strictly to the Docker v2.2 manifest schema.
+Makes the generated image manifests adhere more strictly to the [Docker v2.2 image manifest schema](https://docs.docker.com/registry/spec/manifest-v2-2/#image-manifest-field-descriptions).
 
-#### `--type=TYPE`
-Specifies the encryption scheme to use. At the moment the options are `NONE` and `PBKDF2-AES256-GCM`.
-The former does no encryption, and the latter offers passphrase derived symmetric encryption.
+#### `--type=<TYPE>`
+Specifies the encryption scheme to use.
+At the moment `<TYPE>` may be `NONE` or `PBKDF2-AES256-GCM`.
+The former does no encryption, and the latter offers passphrase derived symmetric encryption and is the default.
 
 ### Pull Options
 [None]
@@ -84,8 +91,9 @@ See also the privacy note below.
 The user MUST be logged into a docker hub account. Because `docker login` stores an encoded username and password, the clear text password is exposed to this utility. While the password is not transmitted anywhere other then the repository, it may be logged to `STDOUT` in certain situations. Thus, it is recommended to set up an alternate Docker Hub account while this is under development.
 
 ## Cryptography
-The layer archives are (if specified) encrypted using AES-GCM, with a 256-bit key that is randomly generated.
+The layer archives and the config are encrypted using AES-GCM, with a 256-bit key that is randomly generated.
 Chunking is handled by the go SIO library: <https://github.com/minio/sio>, which implements the DARE standard for data encryption at rest.
 The keys are encrypted using AES-GCM from a key derived from a user specified passphrase and a random salt.
-The key derivation function is 100,000 iterations of PBKDF2 with SHA256 used in the HMAC.
-The encrypted key and salt are stored in the image manifest and may be inspected using the `docker manifest` command, which is experimental at this stage.
+The salt, nonce and data key are randomly generated for each layer and the config.
+The key derivation function is 40,000 iterations of PBKDF2 with SHA256 used in the HMAC.
+The encrypted data key, the none used to encrypt and the salt are stored in the image manifest and may be inspected using the experimental `docker manifest inspect` command.
