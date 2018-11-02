@@ -61,20 +61,10 @@ func TestPassPhrase(t *testing.T) {
 		}
 
 		passphrase2, err := test.opts.GetPassphrase(test.passReader)
-		if assert.NoError(err) {
+		if !assert.NoError(err) {
 			continue
 		}
 
-		if !assert.Equal(test.passphrase, passphrase2) {
-			continue
-		}
+		assert.Equal(test.passphrase, passphrase2)
 	}
-}
-
-func TestStdinPassReader(t *testing.T) {
-	assert := assert.New(t)
-	passReader := crypto.StdinPassReader
-	assert.NotNil(passReader)
-
-	go passReader()
 }
