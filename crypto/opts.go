@@ -23,7 +23,9 @@ import (
 )
 
 // StdinPassReader reads a password from stdin
-var StdinPassReader = func() ([]byte, error) { return terminal.ReadPassword(syscall.Stdin) }
+var StdinPassReader = func() ([]byte, error) {
+	return terminal.ReadPassword(syscall.Stdin) // notest
+}
 
 // Opts stores data necessary for encryption
 type Opts struct {
