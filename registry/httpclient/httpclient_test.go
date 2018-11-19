@@ -31,7 +31,7 @@ func TestHTTPClient(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		assert.Equal(req.URL.String(), "/")
-		rw.Write([]byte(`OK`))
+		_, _ = rw.Write([]byte(`OK`))
 	}))
 	defer server.Close()
 

@@ -196,7 +196,10 @@ func blobTest(
 	}
 
 	if !equal {
-		showContents(t, filename, deconvpath)
+		err = showContents(t, filename, deconvpath)
+		if err != nil {
+			t.Error(err)
+		}
 		return
 	}
 
