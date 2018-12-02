@@ -76,7 +76,7 @@ func NewManifest(
 		return
 	}
 
-	// docker save the image to an achive (as a ReadCloser)
+	// docker save the image to an archive (as a ReadCloser)
 	imageTar, err := cli.ImageSave(ctx, []string{inspt.ID})
 	if err != nil {
 		err = errors.WithStack(err)
