@@ -34,11 +34,15 @@
 
 [[constraint]]
   name = "github.com/docker/cli"
-  version = "18.6.0-ce-rc1"
+  version = "v18.09.0"
 
 [[constraint]]
   branch = "master"
   name = "github.com/docker/distribution"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/docker/docker-credential-helpers"
 
 [[constraint]]
   name = "github.com/davecgh/go-spew"
