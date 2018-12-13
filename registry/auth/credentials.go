@@ -15,13 +15,12 @@
 package auth
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/docker/cli/cli/config"
-	"github.com/docker/docker-credential-helpers/client"
-	dcredentials "github.com/docker/docker-credential-helpers/credentials"
+	"github.com/docker/docker/api/types"
 	dregistry "github.com/docker/docker/registry"
+
 	"github.com/pkg/errors"
 )
 
@@ -31,25 +30,17 @@ type Credentials interface {
 }
 
 type credentials struct {
-	dcredentials.Credentials
+	types.AuthConfig
 }
 
 // NewCreds creates a new Credentials with a username and password
 func NewCreds(username, password string) Credentials {
 	return &credentials{
-		dcredentials.Credentials{
+		types.AuthConfig{
 			Username: username,
-			Secret:   password,
+			Password: password,
 		},
 	}
-}
-
-func (c *credentials) SetAuth(req *http.Request) *http.Request {
-	req.SetBasicAuth(c.Username, c.Secret)
-	q := req.URL.Query()
-	q.Set("account", c.Username)
-	req.URL.RawQuery = q.Encode()
-	return req
 }
 
 // NewDefaultCreds creates a credentials struct from the credentials in
@@ -62,20 +53,24 @@ func NewDefaultCreds(repoInfo *dregistry.RepositoryInfo) (creds Credentials, err
 		return
 	}
 
-	authConfig := dregistry.ResolveAuthConfig(confFile.AuthConfigs, repoInfo.Index)
+	serverAddress := dregistry.IndexServer
+	store := confFile.GetCredentialsStore(serverAddress)
 
-	if confFile.CredentialsStore != "" {
-		p := client.NewShellProgramFunc(fmt.Sprintf("docker-credential-%s", confFile.CredentialsStore))
-		var c *dcredentials.Credentials
-		c, err = client.Get(p, authConfig.ServerAddress)
-		if err != nil {
-			err = errors.WithStack(err)
-			return
-		}
-		creds = &credentials{*c}
-	} else {
-		creds = NewCreds(authConfig.Username, authConfig.Password)
+	authConfig, err := store.Get(serverAddress)
+	if err != nil {
+		err = errors.WithStack(err)
+		return
 	}
 
+	creds = NewCreds(authConfig.Username, authConfig.Password)
+
 	return
+}
+
+func (c *credentials) SetAuth(req *http.Request) *http.Request {
+	req.SetBasicAuth(c.Username, c.Password)
+	q := req.URL.Query()
+	q.Set("account", c.Username)
+	req.URL.RawQuery = q.Encode()
+	return req
 }
