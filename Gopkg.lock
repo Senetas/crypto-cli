@@ -58,7 +58,7 @@
   version = "v1.1.0"
 
 [[projects]]
-  digest = "1:3f3abc28161804a5291ca37ac1c6f5d082e050a2544ee52aba9d36bd5dd7b564"
+  digest = "1:1ae6152840bd4fe1009e4ce51d8cd989b452ad2e8aaf3bfa3b3ae55974fed729"
   name = "github.com/docker/cli"
   packages = [
     "cli/config",
@@ -67,8 +67,8 @@
     "opts",
   ]
   pruneopts = "UT"
-  revision = "204ab4ca74f5d1046b28714489741020948d157e"
-  version = "v18.06.0-ce-rc1"
+  revision = "51668a30f26250ccfce31bcc13d9334eaafabe36"
+  version = "v18.09.0"
 
 [[projects]]
   branch = "master"
@@ -150,15 +150,15 @@
   revision = "f57f260b49b6142366e6bc1274204ee0a1205945"
 
 [[projects]]
-  digest = "1:5828e77c0532c5c4e0eefb2568ace68e1f5f8bdb86ecf8f13d01f058a1da8b99"
+  branch = "master"
+  digest = "1:8866486038791fe65ea1abf660041423954b1f3fb99ea6a0ad8424422e943458"
   name = "github.com/docker/docker-credential-helpers"
   packages = [
     "client",
     "credentials",
-    "pass",
   ]
   pruneopts = "UT"
-  revision = "3c90bd29a46b943b2a9842987b58fb91a7c1819b"
+  revision = "123ba1b7cd646aaee13ba2e028b7c268db72e2b2"
 
 [[projects]]
   digest = "1:d339ac52dc03196c71c8403084882308da59b09a1ae4048b6b5f83640557a972"
@@ -530,6 +530,8 @@
     "github.com/docker/distribution/reference",
     "github.com/docker/distribution/registry/api/v2",
     "github.com/docker/distribution/registry/client/auth",
+    "github.com/docker/docker-credential-helpers/client",
+    "github.com/docker/docker-credential-helpers/credentials",
     "github.com/docker/docker/api/types",
     "github.com/docker/docker/api/types/container",
     "github.com/docker/docker/api/types/image",

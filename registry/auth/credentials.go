@@ -17,11 +17,11 @@ package auth
 import (
 	"net/http"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/cli/cli/config"
+	"github.com/docker/docker/api/types"
 	dregistry "github.com/docker/docker/registry"
+
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 )
 
 // Credentials represents a username password pair
@@ -30,22 +30,17 @@ type Credentials interface {
 }
 
 type credentials struct {
-	username string
-	password string
+	types.AuthConfig
 }
 
-// NewCreds creates a struct that satisfies Credentials from
-// a username and password (typically entered at the command like)
+// NewCreds creates a new Credentials with a username and password
 func NewCreds(username, password string) Credentials {
-	return &credentials{username: username, password: password}
-}
-
-func (c *credentials) SetAuth(req *http.Request) *http.Request {
-	req.SetBasicAuth(c.username, c.password)
-	q := req.URL.Query()
-	q.Set("account", c.username)
-	req.URL.RawQuery = q.Encode()
-	return req
+	return &credentials{
+		types.AuthConfig{
+			Username: username,
+			Password: password,
+		},
+	}
 }
 
 // NewDefaultCreds creates a credentials struct from the credentials in
@@ -58,13 +53,24 @@ func NewDefaultCreds(repoInfo *dregistry.RepositoryInfo) (creds Credentials, err
 		return
 	}
 
-	authConfig := dregistry.ResolveAuthConfig(confFile.AuthConfigs, repoInfo.Index)
+	serverAddress := dregistry.IndexServer
+	store := confFile.GetCredentialsStore(serverAddress)
 
-	log.Debug().Msgf("%s", spew.Sdump(authConfig))
+	authConfig, err := store.Get(serverAddress)
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
 
-	creds = &credentials{username: authConfig.Username, password: authConfig.Password}
-
-	log.Debug().Msgf("username = %s, password = %s", authConfig.Username, authConfig.Password)
+	creds = NewCreds(authConfig.Username, authConfig.Password)
 
 	return
+}
+
+func (c *credentials) SetAuth(req *http.Request) *http.Request {
+	req.SetBasicAuth(c.Username, c.Password)
+	q := req.URL.Query()
+	q.Set("account", c.Username)
+	req.URL.RawQuery = q.Encode()
+	return req
 }
