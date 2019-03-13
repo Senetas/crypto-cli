@@ -31,6 +31,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	pb "gopkg.in/cheggaaa/pb.v1"
 
 	"github.com/Senetas/crypto-cli/crypto"
 	"github.com/Senetas/crypto-cli/distribution"
@@ -38,7 +39,6 @@ import (
 	"github.com/Senetas/crypto-cli/registry/httpclient"
 	"github.com/Senetas/crypto-cli/registry/names"
 	"github.com/Senetas/crypto-cli/utils"
-	pb "gopkg.in/cheggaaa/pb.v1"
 )
 
 // PullImage pulls an image from a remote repository
